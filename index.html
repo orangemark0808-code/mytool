@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mytool</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", Meiryo, sans-serif;
+      color: #10243d;
+      background: #d9ecff;
+    }
+
+    main {
+      width: min(760px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0;
+    }
+
+    .eyebrow {
+      margin-bottom: 6px;
+      color: #0d63c7;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      color: #073b75;
+      font-size: clamp(22px, 2.4vw, 30px);
+      line-height: 1.1;
+    }
+
+    .tool-list {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 22px 60px rgba(14, 73, 135, 0.18);
+    }
+
+    a {
+      display: block;
+      padding: 12px 14px;
+      border-bottom: 1px solid #cfe1f4;
+      color: #073b75;
+      font-size: 16px;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    a:hover {
+      background: #f1f8ff;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">MY TOOL</div>
+    <h1>ツール目次</h1>
+    <section class="tool-list" aria-label="ツール一覧">
+      <a href="./PROMPT_STOCK/">AI依頼文ストック</a>
+    </section>
+  </main>
+</body>
+</html>
