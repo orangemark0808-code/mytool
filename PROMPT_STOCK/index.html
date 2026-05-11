@@ -113,6 +113,7 @@
       font-size: 12px;
       font-weight: 700;
       line-height: 1.5;
+      overflow-wrap: anywhere;
     }
 
     .account-actions {
@@ -682,6 +683,8 @@
     let remoteStore = null;
     let unsubscribeRemote = null;
     let isApplyingRemoteData = false;
+    let authReadyTimer = null;
+    let syncReadyTimer = null;
 
     function loadPrompts() {
       try {
@@ -752,6 +755,16 @@
       );
     }
 
+    function getFirebaseConfigStatus() {
+      if (!window.PROMPT_STOCK_FIREBASE_CONFIG && !window.PROMPT_COPY_FIREBASE_CONFIG) {
+        return "firebase-config.js未読込";
+      }
+      if (!isFirebaseConfigured()) {
+        return "firebase-config.js読込済み / 設定不足";
+      }
+      return `firebase-config.js読込済み / ${FIREBASE_CONFIG.projectId}`;
+    }
+
     function setSyncStatus(message) {
       elements.syncStatus.textContent = message;
     }
@@ -763,7 +776,7 @@
       elements.loginButton.disabled = false;
       elements.logoutButton.hidden = true;
       elements.logoutButton.disabled = false;
-      setSyncStatus(message);
+      setSyncStatus(`${message}（${getFirebaseConfigStatus()}）`);
     }
 
     function setSignedInUi(user) {
@@ -783,6 +796,30 @@
       elements.loginButton.disabled = true;
       elements.logoutButton.hidden = true;
       setSyncStatus(message);
+    }
+
+    function startAuthReadyTimer() {
+      clearTimeout(authReadyTimer);
+      authReadyTimer = setTimeout(() => {
+        setSignedOutUi("認証の確認に時間がかかっています。ログインボタンから再ログインしてください");
+      }, 8000);
+    }
+
+    function stopAuthReadyTimer() {
+      clearTimeout(authReadyTimer);
+      authReadyTimer = null;
+    }
+
+    function startSyncReadyTimer() {
+      clearTimeout(syncReadyTimer);
+      syncReadyTimer = setTimeout(() => {
+        setSyncStatus("同期準備に時間がかかっています。通信状態を確認し、必要ならログアウト後に再ログインしてください");
+      }, 12000);
+    }
+
+    function stopSyncReadyTimer() {
+      clearTimeout(syncReadyTimer);
+      syncReadyTimer = null;
     }
 
     function saveLocalData() {
@@ -809,9 +846,11 @@
         const provider = new authModule.GoogleAuthProvider();
 
         elements.loginButton.addEventListener("click", () => {
+          setSyncStatus("ログイン画面を開いています...");
           authModule.signInWithPopup(auth, provider).catch(() => {
             authModule.signInWithRedirect(auth, provider).catch(() => {
               showToast("ログインできませんでした");
+              setSignedOutUi("ログインできませんでした。Safariの設定と通信状態を確認してください");
             });
           });
         });
@@ -821,7 +860,16 @@
           });
         });
 
+        startAuthReadyTimer();
+        authModule.getRedirectResult(auth).then(() => {
+          setSyncStatus("リダイレクトログイン結果を確認しました");
+        }).catch((error) => {
+          const detail = error && error.message ? `: ${error.message}` : "";
+          setSignedOutUi(`リダイレクトログインの確認に失敗しました${detail}`);
+        });
+
         authModule.onAuthStateChanged(auth, async (user) => {
+          stopAuthReadyTimer();
           if (unsubscribeRemote) {
             unsubscribeRemote();
             unsubscribeRemote = null;
@@ -835,28 +883,43 @@
 
           setSignedInUi(user);
           setSyncStatus("同期を準備中...");
+          startSyncReadyTimer();
 
-          const dataRef = firestore.doc(db, "users", user.uid, "promptCopyApp", SYNC_DOCUMENT_ID);
-          remoteStore = { firestore, dataRef };
+          try {
+            const dataRef = firestore.doc(db, "users", user.uid, "promptCopyApp", SYNC_DOCUMENT_ID);
+            remoteStore = { firestore, dataRef };
 
-          const firstSnapshot = await firestore.getDoc(dataRef);
-          if (firstSnapshot.exists()) {
-            applyRemoteData(firstSnapshot.data());
-          } else if (prompts.length > 0 || categories.length > 0) {
-            await writeRemoteData();
+            const firstSnapshot = await firestore.getDoc(dataRef);
+            if (firstSnapshot.exists()) {
+              applyRemoteData(firstSnapshot.data());
+            } else if (prompts.length > 0 || categories.length > 0) {
+              await writeRemoteData();
+            }
+
+            unsubscribeRemote = firestore.onSnapshot(dataRef, (snapshot) => {
+              if (!snapshot.exists()) return;
+              applyRemoteData(snapshot.data());
+              stopSyncReadyTimer();
+              setSyncStatus("クラウド同期中");
+            }, (error) => {
+              stopSyncReadyTimer();
+              const detail = error && error.message ? `: ${error.message}` : "";
+              setSyncStatus(`同期エラー${detail}`);
+            });
+
+            stopSyncReadyTimer();
+            setSyncStatus("クラウド同期中");
+          } catch (error) {
+            remoteStore = null;
+            stopSyncReadyTimer();
+            const detail = error && error.message ? `: ${error.message}` : "";
+            setSyncStatus(`同期準備エラー${detail}`);
           }
-
-          unsubscribeRemote = firestore.onSnapshot(dataRef, (snapshot) => {
-            if (!snapshot.exists()) return;
-            applyRemoteData(snapshot.data());
-          }, () => {
-            setSyncStatus("同期エラー: ローカル保存中");
-          });
-
-          setSyncStatus("クラウド同期中");
         });
       } catch (error) {
         remoteStore = null;
+        stopAuthReadyTimer();
+        stopSyncReadyTimer();
         const detail = error && error.message ? `: ${error.message}` : "";
         setAuthErrorUi(`Firebase初期化エラー${detail}`);
       }
