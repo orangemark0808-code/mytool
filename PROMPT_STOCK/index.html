@@ -386,13 +386,23 @@
 
     .category-row {
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: auto 1fr auto auto;
       gap: 8px;
       align-items: center;
       padding: 8px;
       border: 1px solid rgba(207, 225, 244, 0.88);
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.72);
+    }
+
+    .category-row.is-dragging {
+      opacity: 0.48;
+      transform: scale(0.995);
+    }
+
+    .category-row.is-drop-target {
+      border-color: var(--blue-700);
+      box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.13);
     }
 
     .search {
@@ -906,6 +916,7 @@
     let hasInitializedCategoryFilter = false;
     let activeType = "short";
     let draggedPromptId = null;
+    let draggedCategoryId = null;
     let currentView = "main";
     ensureDefaultLongCategories();
     saveLocalData();
@@ -932,7 +943,7 @@
         const saved = JSON.parse(localStorage.getItem(CATEGORY_STORAGE_KEY));
         if (!Array.isArray(saved)) return [];
         return saved
-          .map(normalizeCategory)
+          .map((category, index) => normalizeCategory(category, index))
           .filter((category) => category.name);
       } catch {
         return [];
@@ -962,22 +973,23 @@
       };
     }
 
-    function normalizeCategory(category) {
+    function normalizeCategory(category, index = 0) {
       return {
         id: category.id || createId(),
         type: category.type === "long" ? "long" : "short",
         name: String(category.name || "").trim(),
+        order: Number.isFinite(Number(category.order)) ? Number(category.order) : index * 1000,
       };
     }
 
     function ensureDefaultLongCategories() {
-      const originalOrder = categories.map((category) => category.id).join("\n");
+      const originalOrder = categories.map((category) => `${category.id}:${category.order}`).join("\n");
       let changed = false;
       const defaultLongCategories = DEFAULT_LONG_CATEGORY_NAMES.map((name) => {
         const existing = categories.find((category) => category.type === "long" && category.name === name);
         if (existing) return existing;
         changed = true;
-        return { id: createId(), type: "long", name };
+        return { id: createId(), type: "long", name, order: 0 };
       });
       const defaultNameSet = new Set(DEFAULT_LONG_CATEGORY_NAMES);
       const nonLongCategories = categories.filter((category) => category.type !== "long");
@@ -986,7 +998,8 @@
       ));
 
       categories = [...nonLongCategories, ...defaultLongCategories, ...otherLongCategories];
-      const nextOrder = categories.map((category) => category.id).join("\n");
+      normalizeCategoryOrder("long");
+      const nextOrder = categories.map((category) => `${category.id}:${category.order}`).join("\n");
       return changed || originalOrder !== nextOrder;
     }
 
@@ -1303,7 +1316,7 @@
         ? data.prompts.map(normalizePrompt).filter((prompt) => prompt.body)
         : [];
       categories = Array.isArray(data.categories)
-        ? data.categories.map(normalizeCategory).filter((category) => category.name)
+        ? data.categories.map((category, index) => normalizeCategory(category, index)).filter((category) => category.name)
         : [];
       const shouldSaveDefaultLongCategories = ensureDefaultLongCategories();
       selectedIds = new Set([...selectedIds].filter((id) => prompts.some((prompt) => prompt.id === id)));
@@ -1375,7 +1388,21 @@
     }
 
     function getCategoriesByType(type) {
-      return categories.filter((category) => category.type === type);
+      return [...categories]
+        .filter((category) => category.type === type)
+        .sort((a, b) => {
+          const orderDiff = Number(a.order || 0) - Number(b.order || 0);
+          if (orderDiff !== 0) return orderDiff;
+          return a.name.localeCompare(b.name, "ja");
+        });
+    }
+
+    function normalizeCategoryOrder(type) {
+      const ordered = getCategoriesByType(type);
+      const orderById = new Map(ordered.map((category, index) => [category.id, index * 1000]));
+      categories = categories.map((category) => (
+        orderById.has(category.id) ? { ...category, order: orderById.get(category.id) } : category
+      ));
     }
 
     function getEffectiveCategory(prompt) {
@@ -1715,9 +1742,48 @@
 
     function renderSettings() {
       elements.settingsCategoryList.innerHTML = "";
-      getCategoriesByType(activeType).forEach((category) => {
+      const typeCategories = getCategoriesByType(activeType);
+      typeCategories.forEach((category, index) => {
         const row = document.createElement("div");
         row.className = "category-row";
+        row.draggable = true;
+        row.dataset.categoryId = category.id;
+        row.addEventListener("dragstart", (event) => handleCategoryDragStart(event, category.id));
+        row.addEventListener("dragover", (event) => handleCategoryDragOver(event, category.id));
+        row.addEventListener("dragleave", () => row.classList.remove("is-drop-target"));
+        row.addEventListener("drop", (event) => handleCategoryDrop(event, category.id));
+        row.addEventListener("dragend", clearCategoryDragState);
+
+        const orderCell = document.createElement("div");
+        orderCell.className = "order-cell";
+
+        const dragHandle = document.createElement("button");
+        dragHandle.type = "button";
+        dragHandle.className = "drag-handle";
+        dragHandle.textContent = "⋮⋮";
+        dragHandle.setAttribute("aria-label", "ドラッグしてカテゴリを並び替え");
+
+        const mobileOrderActions = document.createElement("div");
+        mobileOrderActions.className = "mobile-order-actions";
+
+        const moveUpButton = document.createElement("button");
+        moveUpButton.type = "button";
+        moveUpButton.className = "order-button";
+        moveUpButton.textContent = "↑";
+        moveUpButton.disabled = index === 0;
+        moveUpButton.setAttribute("aria-label", "このカテゴリを上へ移動");
+        moveUpButton.addEventListener("click", () => moveCategory(category.id, -1));
+
+        const moveDownButton = document.createElement("button");
+        moveDownButton.type = "button";
+        moveDownButton.className = "order-button";
+        moveDownButton.textContent = "↓";
+        moveDownButton.disabled = index === typeCategories.length - 1;
+        moveDownButton.setAttribute("aria-label", "このカテゴリを下へ移動");
+        moveDownButton.addEventListener("click", () => moveCategory(category.id, 1));
+
+        mobileOrderActions.append(moveUpButton, moveDownButton);
+        orderCell.append(dragHandle, mobileOrderActions);
 
         const input = document.createElement("input");
         input.type = "text";
@@ -1736,7 +1802,7 @@
         deleteButton.textContent = "削除";
         deleteButton.addEventListener("click", () => deleteCategory(category.id));
 
-        row.append(input, renameButton, deleteButton);
+        row.append(orderCell, input, renameButton, deleteButton);
         elements.settingsCategoryList.appendChild(row);
       });
 
@@ -1874,6 +1940,79 @@
         orderById.has(prompt.id) ? { ...prompt, order: orderById.get(prompt.id) } : prompt
       ));
       savePrompts();
+      render();
+    }
+
+    function clearCategoryDragState() {
+      draggedCategoryId = null;
+      elements.settingsCategoryList.querySelectorAll(".category-row").forEach((row) => {
+        row.classList.remove("is-dragging", "is-drop-target");
+      });
+    }
+
+    function handleCategoryDragStart(event, id) {
+      draggedCategoryId = id;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", id);
+      event.currentTarget.classList.add("is-dragging");
+    }
+
+    function handleCategoryDragOver(event, targetId) {
+      if (!draggedCategoryId || draggedCategoryId === targetId) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      event.currentTarget.classList.add("is-drop-target");
+    }
+
+    function handleCategoryDrop(event, targetId) {
+      event.preventDefault();
+      const sourceId = draggedCategoryId || event.dataTransfer.getData("text/plain");
+      clearCategoryDragState();
+      if (!sourceId || sourceId === targetId) return;
+      moveCategoryTo(sourceId, targetId);
+    }
+
+    function moveCategory(id, direction) {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
+      normalizeCategoryOrder(activeType);
+      const typeCategories = getCategoriesByType(activeType);
+      const currentIndex = typeCategories.findIndex((category) => category.id === id);
+      const targetIndex = currentIndex + direction;
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= typeCategories.length) return;
+      const current = typeCategories[currentIndex];
+      const target = typeCategories[targetIndex];
+      const currentOrder = current.order;
+      const targetOrder = target.order;
+      categories = categories.map((category) => {
+        if (category.id === current.id) return { ...category, order: targetOrder };
+        if (category.id === target.id) return { ...category, order: currentOrder };
+        return category;
+      });
+      saveCategories();
+      render();
+    }
+
+    function moveCategoryTo(sourceId, targetId) {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
+      normalizeCategoryOrder(activeType);
+      const typeCategories = getCategoriesByType(activeType);
+      const sourceIndex = typeCategories.findIndex((category) => category.id === sourceId);
+      const targetIndex = typeCategories.findIndex((category) => category.id === targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return;
+      const reordered = [...typeCategories];
+      const [moved] = reordered.splice(sourceIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+      const orderById = new Map(reordered.map((category, index) => [category.id, index * 1000]));
+      categories = categories.map((category) => (
+        orderById.has(category.id) ? { ...category, order: orderById.get(category.id) } : category
+      ));
+      saveCategories();
       render();
     }
 
@@ -2111,7 +2250,11 @@
         showToast("同じカテゴリがあります");
         return;
       }
-      const category = { id: createId(), type: activeType, name };
+      const typeCategories = getCategoriesByType(activeType);
+      const lastOrder = typeCategories.length > 0
+        ? Math.max(...typeCategories.map((category) => Number(category.order || 0)))
+        : -1000;
+      const category = { id: createId(), type: activeType, name, order: lastOrder + 1000 };
       categories.push(category);
       saveCategories();
       elements.settingsCategoryNameInput.value = "";
