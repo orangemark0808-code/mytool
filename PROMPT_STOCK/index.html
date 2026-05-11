@@ -289,7 +289,7 @@
 
     .toolbar {
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: 1fr minmax(130px, 170px) auto auto;
       gap: 8px;
       padding: 10px 0;
       border-bottom: 1px solid var(--line);
@@ -581,7 +581,6 @@
   <main class="app">
     <header class="topbar">
       <div class="title-block">
-        <div class="eyebrow">PROMPT-STOCK</div>
         <h1>PROMPT-STOCK</h1>
         <div class="sync-status" id="syncStatus" aria-live="polite">ローカル保存</div>
       </div>
@@ -596,7 +595,6 @@
         <div class="account-actions" id="accountActions">
           <span class="account-user" id="accountUser">未ログイン</span>
           <button class="btn btn-secondary" id="loginButton" type="button">ログイン</button>
-          <button class="btn btn-secondary" id="redirectLoginButton" type="button">別方式でログイン</button>
           <button class="btn btn-secondary" id="refreshButton" type="button" hidden>更新</button>
           <button class="btn btn-secondary" id="logoutButton" type="button" hidden>ログアウト</button>
         </div>
@@ -605,6 +603,7 @@
             <span class="search-icon" aria-hidden="true"></span>
             <input id="searchInput" type="search" autocomplete="off" placeholder="文言・カテゴリで検索">
           </div>
+          <select class="sort-select" id="filterCategorySelect" aria-label="カテゴリで絞り込み"></select>
           <select class="sort-select" id="sortSelect" aria-label="並び替え">
             <option value="newest">新しい順</option>
             <option value="oldest">古い順</option>
@@ -672,6 +671,7 @@
       submitButton: document.getElementById("submitButton"),
       cancelButton: document.getElementById("cancelButton"),
       search: document.getElementById("searchInput"),
+      filterCategory: document.getElementById("filterCategorySelect"),
       sort: document.getElementById("sortSelect"),
       categoryTools: document.getElementById("categoryTools"),
       categoryManageSelect: document.getElementById("categoryManageSelect"),
@@ -687,7 +687,6 @@
       accountActions: document.getElementById("accountActions"),
       accountUser: document.getElementById("accountUser"),
       loginButton: document.getElementById("loginButton"),
-      redirectLoginButton: document.getElementById("redirectLoginButton"),
       refreshButton: document.getElementById("refreshButton"),
       logoutButton: document.getElementById("logoutButton"),
       toast: document.getElementById("toast"),
@@ -702,6 +701,7 @@
     let isApplyingRemoteData = false;
     let authReadyTimer = null;
     let refreshTimer = null;
+    let hasInitializedCategoryFilter = false;
 
     function loadPrompts() {
       try {
@@ -811,8 +811,6 @@
       elements.accountUser.textContent = "未ログイン";
       elements.loginButton.hidden = false;
       elements.loginButton.disabled = false;
-      elements.redirectLoginButton.hidden = false;
-      elements.redirectLoginButton.disabled = false;
       elements.refreshButton.hidden = true;
       elements.refreshButton.disabled = false;
       elements.logoutButton.hidden = true;
@@ -826,8 +824,6 @@
       elements.accountUser.textContent = name;
       elements.loginButton.hidden = true;
       elements.loginButton.disabled = false;
-      elements.redirectLoginButton.hidden = true;
-      elements.redirectLoginButton.disabled = false;
       elements.refreshButton.hidden = false;
       elements.refreshButton.disabled = false;
       elements.logoutButton.hidden = false;
@@ -839,8 +835,6 @@
       elements.accountUser.textContent = "同期エラー";
       elements.loginButton.hidden = false;
       elements.loginButton.disabled = true;
-      elements.redirectLoginButton.hidden = false;
-      elements.redirectLoginButton.disabled = true;
       elements.refreshButton.hidden = true;
       elements.logoutButton.hidden = true;
       setSyncStatus(message);
@@ -1029,17 +1023,8 @@
         elements.loginButton.addEventListener("click", () => {
           setSyncStatus("ログイン画面を開いています...");
           elements.loginButton.disabled = true;
-          elements.redirectLoginButton.disabled = true;
           authModule.signInWithPopup(auth, provider).catch((error) => {
             handleLoginError(error, "ポップアップログイン");
-          });
-        });
-        elements.redirectLoginButton.addEventListener("click", () => {
-          setSyncStatus("同じタブでログイン画面を開いています...");
-          elements.loginButton.disabled = true;
-          elements.redirectLoginButton.disabled = true;
-          authModule.signInWithRedirect(auth, provider).catch((error) => {
-            handleLoginError(error, "リダイレクトログイン");
           });
         });
         elements.refreshButton.addEventListener("click", () => {
@@ -1158,6 +1143,10 @@
       return categories.find((category) => category.id === categoryId)?.name || "";
     }
 
+    function getDefaultCategoryId() {
+      return categories.find((category) => category.name === "AI")?.id || "";
+    }
+
     function createCategorySelect(selectedCategoryId) {
       const select = document.createElement("select");
       select.className = "category-select";
@@ -1183,7 +1172,10 @@
 
     function getVisiblePrompts() {
       const query = normalize(elements.search.value);
+      const filterCategoryId = elements.filterCategory.value;
       const filtered = prompts.filter((prompt) => {
+        if (filterCategoryId === "__none" && prompt.categoryId) return false;
+        if (filterCategoryId && filterCategoryId !== "__none" && prompt.categoryId !== filterCategoryId) return false;
         if (!query) return true;
         return normalize(prompt.body).includes(query) || normalize(getCategoryName(prompt.categoryId)).includes(query);
       });
@@ -1201,13 +1193,14 @@
 
     function render() {
       const locked = isAuthLocked();
+      renderCategoryOptions();
       const visiblePrompts = getVisiblePrompts();
       elements.count.textContent = locked ? "0" : prompts.length.toString();
       elements.openAddButton.disabled = locked;
       elements.toggleSettingsButton.disabled = locked;
       elements.search.disabled = locked;
+      elements.filterCategory.disabled = locked;
       elements.sort.disabled = locked;
-      renderCategoryOptions();
       updateBulkActions();
       elements.list.innerHTML = "";
 
@@ -1315,9 +1308,11 @@
     function renderCategoryOptions() {
       const currentPromptCategory = elements.promptCategory.value;
       const currentManagedCategory = elements.categoryManageSelect.value;
+      const currentFilterCategory = elements.filterCategory.value;
 
       elements.promptCategory.innerHTML = '<option value="">カテゴリなし</option>';
       elements.categoryManageSelect.innerHTML = '<option value="">カテゴリを選択</option>';
+      elements.filterCategory.innerHTML = '<option value="">すべてのカテゴリ</option><option value="__none">カテゴリなし</option>';
 
       categories.forEach((category) => {
         const promptOption = document.createElement("option");
@@ -1329,6 +1324,11 @@
         manageOption.value = category.id;
         manageOption.textContent = category.name;
         elements.categoryManageSelect.appendChild(manageOption);
+
+        const filterOption = document.createElement("option");
+        filterOption.value = category.id;
+        filterOption.textContent = category.name;
+        elements.filterCategory.appendChild(filterOption);
       });
 
       if (categories.some((category) => category.id === currentPromptCategory)) {
@@ -1336,6 +1336,12 @@
       }
       if (categories.some((category) => category.id === currentManagedCategory)) {
         elements.categoryManageSelect.value = currentManagedCategory;
+      }
+      if (currentFilterCategory === "__none" || categories.some((category) => category.id === currentFilterCategory)) {
+        elements.filterCategory.value = currentFilterCategory;
+      } else if (!hasInitializedCategoryFilter) {
+        elements.filterCategory.value = getDefaultCategoryId();
+        hasInitializedCategoryFilter = true;
       }
     }
 
@@ -1368,7 +1374,7 @@
       elements.form.reset();
       elements.form.classList.remove("is-open");
       elements.submitButton.textContent = "追加";
-      elements.promptCategory.value = "";
+      elements.promptCategory.value = getDefaultCategoryId();
     }
 
     function openAddPrompt() {
@@ -1380,7 +1386,7 @@
       elements.form.reset();
       elements.form.classList.add("is-open");
       elements.submitButton.textContent = "追加";
-      elements.promptCategory.value = "";
+      elements.promptCategory.value = getDefaultCategoryId();
       elements.body.focus();
       render();
     }
@@ -1576,6 +1582,9 @@
       render();
       elements.categoryManageSelect.value = category.id;
       elements.promptCategory.value = category.id;
+      if (category.name === "AI") {
+        elements.filterCategory.value = category.id;
+      }
       showToast("カテゴリを追加しました");
     }
 
@@ -1632,6 +1641,7 @@
     elements.toggleSettingsButton.addEventListener("click", toggleSettings);
     elements.cancelButton.addEventListener("click", resetForm);
     elements.search.addEventListener("input", render);
+    elements.filterCategory.addEventListener("change", render);
     elements.sort.addEventListener("change", render);
     elements.categoryManageSelect.addEventListener("change", () => {
       elements.categoryNameInput.value = getCategoryName(elements.categoryManageSelect.value);
