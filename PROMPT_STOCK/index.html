@@ -732,6 +732,7 @@
     };
     const SYNC_DOCUMENT_ID = "main";
     const FIRESTORE_USER_COLLECTION = "promptCopyApp";
+    const DEFAULT_LONG_CATEGORY_NAMES = ["BOOTH", "note", "Discord"];
 
     const elements = {
       form: document.getElementById("promptForm"),
@@ -777,6 +778,8 @@
     let refreshTimer = null;
     let hasInitializedCategoryFilter = false;
     let activeType = "short";
+    ensureDefaultLongCategories();
+    saveLocalData();
 
     function loadPrompts() {
       try {
@@ -800,10 +803,7 @@
         const saved = JSON.parse(localStorage.getItem(CATEGORY_STORAGE_KEY));
         if (!Array.isArray(saved)) return [];
         return saved
-          .map((category) => ({
-            id: category.id || createId(),
-            name: String(category.name || "").trim(),
-          }))
+          .map(normalizeCategory)
           .filter((category) => category.name);
       } catch {
         return [];
@@ -833,8 +833,29 @@
     function normalizeCategory(category) {
       return {
         id: category.id || createId(),
+        type: category.type === "long" ? "long" : "short",
         name: String(category.name || "").trim(),
       };
+    }
+
+    function ensureDefaultLongCategories() {
+      const originalOrder = categories.map((category) => category.id).join("\n");
+      let changed = false;
+      const defaultLongCategories = DEFAULT_LONG_CATEGORY_NAMES.map((name) => {
+        const existing = categories.find((category) => category.type === "long" && category.name === name);
+        if (existing) return existing;
+        changed = true;
+        return { id: createId(), type: "long", name };
+      });
+      const defaultNameSet = new Set(DEFAULT_LONG_CATEGORY_NAMES);
+      const nonLongCategories = categories.filter((category) => category.type !== "long");
+      const otherLongCategories = categories.filter((category) => (
+        category.type === "long" && !defaultNameSet.has(category.name)
+      ));
+
+      categories = [...nonLongCategories, ...defaultLongCategories, ...otherLongCategories];
+      const nextOrder = categories.map((category) => category.id).join("\n");
+      return changed || originalOrder !== nextOrder;
     }
 
     function isFirebaseConfigured() {
@@ -1152,6 +1173,7 @@
       categories = Array.isArray(data.categories)
         ? data.categories.map(normalizeCategory).filter((category) => category.name)
         : [];
+      const shouldSaveDefaultLongCategories = ensureDefaultLongCategories();
       selectedIds = new Set([...selectedIds].filter((id) => prompts.some((prompt) => prompt.id === id)));
       if (editingId && !prompts.some((prompt) => prompt.id === editingId)) {
         resetForm();
@@ -1159,6 +1181,9 @@
       saveLocalData();
       render();
       isApplyingRemoteData = false;
+      if (shouldSaveDefaultLongCategories) {
+        saveCategories();
+      }
     }
 
     function getRemotePayload() {
@@ -1217,6 +1242,14 @@
       return categories.find((category) => category.id === categoryId)?.name || "";
     }
 
+    function getCategoriesByType(type) {
+      return categories.filter((category) => category.type === type);
+    }
+
+    function getEffectiveCategory(prompt) {
+      return categories.find((category) => category.id === prompt.categoryId && category.type === prompt.type) || null;
+    }
+
     function getTypeLabel(type) {
       return type === "long" ? "長文" : "短文";
     }
@@ -1234,10 +1267,11 @@
     }
 
     function getDefaultCategoryId() {
-      return categories.find((category) => category.name === "AI")?.id || "";
+      return getCategoriesByType(activeType).find((category) => category.name === "AI")?.id || "";
     }
 
-    function createCategorySelect(selectedCategoryId) {
+    function createCategorySelect(selectedCategoryId, type = activeType) {
+      const typeCategories = getCategoriesByType(type);
       const select = document.createElement("select");
       select.className = "category-select";
       select.setAttribute("aria-label", "カテゴリ");
@@ -1247,14 +1281,14 @@
       emptyOption.textContent = "カテゴリなし";
       select.appendChild(emptyOption);
 
-      categories.forEach((category) => {
+      typeCategories.forEach((category) => {
         const option = document.createElement("option");
         option.value = category.id;
         option.textContent = category.name;
         select.appendChild(option);
       });
 
-      select.value = categories.some((category) => category.id === selectedCategoryId)
+      select.value = typeCategories.some((category) => category.id === selectedCategoryId)
         ? selectedCategoryId
         : "";
       return select;
@@ -1264,13 +1298,15 @@
       const query = normalize(elements.search.value);
       const filterCategoryId = elements.filterCategory.value;
       const filtered = prompts.filter((prompt) => {
+        const effectiveCategory = getEffectiveCategory(prompt);
+        const effectiveCategoryId = effectiveCategory?.id || "";
         if (prompt.type !== activeType) return false;
-        if (filterCategoryId === "__none" && prompt.categoryId) return false;
-        if (filterCategoryId && filterCategoryId !== "__none" && prompt.categoryId !== filterCategoryId) return false;
+        if (filterCategoryId === "__none" && effectiveCategoryId) return false;
+        if (filterCategoryId && filterCategoryId !== "__none" && effectiveCategoryId !== filterCategoryId) return false;
         if (!query) return true;
         return normalize(prompt.body).includes(query) ||
           normalize(prompt.title || "").includes(query) ||
-          normalize(getCategoryName(prompt.categoryId)).includes(query);
+          normalize(effectiveCategory?.name || "").includes(query);
       });
 
       return filtered.sort((a, b) => {
@@ -1344,7 +1380,7 @@
 
         const isEditing = editingId === prompt.id;
         if (isEditing) {
-          const categorySelect = createCategorySelect(prompt.categoryId);
+          const categorySelect = createCategorySelect(prompt.categoryId, prompt.type);
           categoryCell.appendChild(categorySelect);
 
           const editForm = document.createElement("form");
@@ -1394,7 +1430,7 @@
           editForm.append(textarea, actions);
           main = editForm;
         } else {
-          const categoryName = getCategoryName(prompt.categoryId);
+          const categoryName = getEffectiveCategory(prompt)?.name || "";
           categoryCell.textContent = categoryName || "カテゴリなし";
           if (!categoryName) {
             categoryCell.classList.add("category-empty");
@@ -1450,12 +1486,13 @@
       const currentPromptCategory = elements.promptCategory.value;
       const currentManagedCategory = elements.categoryManageSelect.value;
       const currentFilterCategory = elements.filterCategory.value;
+      const typeCategories = getCategoriesByType(activeType);
 
       elements.promptCategory.innerHTML = '<option value="">カテゴリなし</option>';
       elements.categoryManageSelect.innerHTML = '<option value="">カテゴリを選択</option>';
       elements.filterCategory.innerHTML = '<option value="">すべてのカテゴリ</option><option value="__none">カテゴリなし</option>';
 
-      categories.forEach((category) => {
+      typeCategories.forEach((category) => {
         const promptOption = document.createElement("option");
         promptOption.value = category.id;
         promptOption.textContent = category.name;
@@ -1472,13 +1509,13 @@
         elements.filterCategory.appendChild(filterOption);
       });
 
-      if (categories.some((category) => category.id === currentPromptCategory)) {
+      if (typeCategories.some((category) => category.id === currentPromptCategory)) {
         elements.promptCategory.value = currentPromptCategory;
       }
-      if (categories.some((category) => category.id === currentManagedCategory)) {
+      if (typeCategories.some((category) => category.id === currentManagedCategory)) {
         elements.categoryManageSelect.value = currentManagedCategory;
       }
-      if (currentFilterCategory === "__none" || categories.some((category) => category.id === currentFilterCategory)) {
+      if (currentFilterCategory === "__none" || typeCategories.some((category) => category.id === currentFilterCategory)) {
         elements.filterCategory.value = currentFilterCategory;
       } else if (!hasInitializedCategoryFilter) {
         elements.filterCategory.value = getDefaultCategoryId();
@@ -1501,6 +1538,7 @@
       if (activeType === type) return;
       activeType = type;
       selectedIds = new Set();
+      elements.categoryNameInput.value = "";
       resetForm();
       render();
     }
@@ -1754,11 +1792,11 @@
         showToast("カテゴリ名を入力してください");
         return;
       }
-      if (categories.some((category) => category.name === name)) {
+      if (categories.some((category) => category.type === activeType && category.name === name)) {
         showToast("同じカテゴリがあります");
         return;
       }
-      const category = { id: createId(), name };
+      const category = { id: createId(), type: activeType, name };
       categories.push(category);
       saveCategories();
       elements.categoryNameInput.value = "";
@@ -1778,12 +1816,21 @@
       }
       const id = elements.categoryManageSelect.value;
       const name = elements.categoryNameInput.value.trim();
+      const targetCategory = categories.find((category) => category.id === id && category.type === activeType);
       if (!id) {
         showToast("カテゴリを選択してください");
         return;
       }
+      if (!targetCategory) {
+        showToast("このタブのカテゴリを選択してください");
+        return;
+      }
       if (!name) {
         showToast("カテゴリ名を入力してください");
+        return;
+      }
+      if (categories.some((category) => category.id !== id && category.type === activeType && category.name === name)) {
+        showToast("同じカテゴリがあります");
         return;
       }
       categories = categories.map((category) => (
@@ -1801,8 +1848,13 @@
         return;
       }
       const id = elements.categoryManageSelect.value;
+      const targetCategory = categories.find((category) => category.id === id && category.type === activeType);
       if (!id) {
         showToast("カテゴリを選択してください");
+        return;
+      }
+      if (!targetCategory) {
+        showToast("このタブのカテゴリを選択してください");
         return;
       }
       const categoryName = getCategoryName(id);
