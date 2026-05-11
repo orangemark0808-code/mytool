@@ -828,6 +828,90 @@
       return code.includes("unavailable") || message.includes("client is offline");
     }
 
+    function toFirestoreValue(value) {
+      if (value === null || value === undefined) return { nullValue: null };
+      if (Array.isArray(value)) {
+        return { arrayValue: { values: value.map(toFirestoreValue) } };
+      }
+      if (typeof value === "object") {
+        return {
+          mapValue: {
+            fields: Object.fromEntries(
+              Object.entries(value).map(([key, item]) => [key, toFirestoreValue(item)])
+            ),
+          },
+        };
+      }
+      if (typeof value === "number") {
+        return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+      }
+      if (typeof value === "boolean") return { booleanValue: value };
+      return { stringValue: String(value) };
+    }
+
+    function fromFirestoreValue(value) {
+      if (!value || typeof value !== "object") return null;
+      if ("stringValue" in value) return value.stringValue;
+      if ("integerValue" in value) return Number(value.integerValue);
+      if ("doubleValue" in value) return Number(value.doubleValue);
+      if ("booleanValue" in value) return Boolean(value.booleanValue);
+      if ("nullValue" in value) return null;
+      if ("arrayValue" in value) {
+        return (value.arrayValue.values || []).map(fromFirestoreValue);
+      }
+      if ("mapValue" in value) {
+        return Object.fromEntries(
+          Object.entries(value.mapValue.fields || {}).map(([key, item]) => [key, fromFirestoreValue(item)])
+        );
+      }
+      return null;
+    }
+
+    function fromFirestoreFields(fields) {
+      return Object.fromEntries(
+        Object.entries(fields || {}).map(([key, value]) => [key, fromFirestoreValue(value)])
+      );
+    }
+
+    function getFirestoreRestUrl(user) {
+      const projectId = encodeURIComponent(FIREBASE_CONFIG.projectId);
+      const userId = encodeURIComponent(user.uid);
+      return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}/promptCopyApp/${SYNC_DOCUMENT_ID}`;
+    }
+
+    async function readRemoteDataViaRest(user) {
+      const token = await user.getIdToken();
+      const response = await fetch(getFirestoreRestUrl(user), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.status === 404) return false;
+      if (!response.ok) {
+        throw new Error(`REST読み込み失敗 ${response.status}`);
+      }
+      const documentData = await response.json();
+      applyRemoteData(fromFirestoreFields(documentData.fields));
+      return true;
+    }
+
+    async function writeRemoteDataViaRest(user, data) {
+      const token = await user.getIdToken();
+      const response = await fetch(getFirestoreRestUrl(user), {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fields: Object.fromEntries(
+            Object.entries(data).map(([key, value]) => [key, toFirestoreValue(value)])
+          ),
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`REST保存失敗 ${response.status}`);
+      }
+    }
+
     function saveLocalData() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
       localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
@@ -896,7 +980,7 @@
 
           try {
             const dataRef = firestore.doc(db, "users", user.uid, "promptCopyApp", SYNC_DOCUMENT_ID);
-            remoteStore = { firestore, dataRef };
+            remoteStore = { firestore, dataRef, user, useRestFallback: false };
 
             unsubscribeRemote = firestore.onSnapshot(dataRef, (snapshot) => {
               if (!snapshot.exists()) {
@@ -920,7 +1004,18 @@
             }, (error) => {
               stopSyncReadyTimer();
               if (isOfflineFirestoreError(error)) {
-                setSyncStatus("オフラインのためローカル保存中です。iPadの通信状態を確認してください");
+                remoteStore.useRestFallback = true;
+                readRemoteDataViaRest(user).then((found) => {
+                  if (!found && (prompts.length > 0 || categories.length > 0)) {
+                    return writeRemoteData();
+                  }
+                  return null;
+                }).then(() => {
+                  setSyncStatus("REST APIでクラウド同期中");
+                }).catch((restError) => {
+                  const detail = restError && restError.message ? `: ${restError.message}` : "";
+                  setSyncStatus(`REST同期エラー${detail}`);
+                });
                 return;
               }
               const detail = error && error.message ? `: ${error.message}` : "";
@@ -945,7 +1040,18 @@
             }).catch((error) => {
               stopSyncReadyTimer();
               if (isOfflineFirestoreError(error)) {
-                setSyncStatus("オフラインのためローカル保存中です。iPadの通信状態を確認してください");
+                remoteStore.useRestFallback = true;
+                readRemoteDataViaRest(user).then((found) => {
+                  if (!found && (prompts.length > 0 || categories.length > 0)) {
+                    return writeRemoteData();
+                  }
+                  return null;
+                }).then(() => {
+                  setSyncStatus("REST APIでクラウド同期中");
+                }).catch((restError) => {
+                  const detail = restError && restError.message ? `: ${restError.message}` : "";
+                  setSyncStatus(`REST同期エラー${detail}`);
+                });
                 return;
               }
               const detail = error && error.message ? `: ${error.message}` : "";
@@ -986,11 +1092,26 @@
 
     async function writeRemoteData() {
       if (!remoteStore || isApplyingRemoteData) return;
-      await remoteStore.firestore.setDoc(remoteStore.dataRef, {
+      const data = {
         prompts,
         categories,
         updatedAt: Date.now(),
-      });
+      };
+      if (remoteStore.useRestFallback) {
+        await writeRemoteDataViaRest(remoteStore.user, data);
+        return;
+      }
+      try {
+        await remoteStore.firestore.setDoc(remoteStore.dataRef, data);
+      } catch (error) {
+        if (remoteStore.user && isOfflineFirestoreError(error)) {
+          remoteStore.useRestFallback = true;
+          await writeRemoteDataViaRest(remoteStore.user, data);
+          setSyncStatus("REST APIでクラウド同期中");
+          return;
+        }
+        throw error;
+      }
     }
 
     function saveRemoteData() {
