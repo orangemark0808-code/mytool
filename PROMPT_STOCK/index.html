@@ -322,7 +322,7 @@
 
     .toolbar {
       display: grid;
-      grid-template-columns: 1fr minmax(130px, 170px) auto auto;
+      grid-template-columns: 1fr minmax(130px, 170px) auto auto auto;
       gap: 8px;
       padding: 10px 0;
       border-bottom: 1px solid var(--line);
@@ -334,21 +334,65 @@
       align-items: center;
     }
 
-    .category-tools {
-      display: grid;
-      grid-template-columns: minmax(150px, 180px) 1fr auto auto auto;
-      gap: 7px;
-      padding: 10px 0;
-      border-bottom: 1px solid var(--line);
-      align-items: center;
+    .icon-button {
+      width: 34px;
+      min-width: 34px;
+      padding: 0;
+      font-size: 16px;
     }
 
-    .category-tools[hidden] {
+    .view[hidden] {
       display: none;
     }
 
-    .category-tools input {
-      min-width: 0;
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 0 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .settings-header h2 {
+      color: var(--blue-900);
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    .settings-section {
+      display: grid;
+      gap: 12px;
+      padding: 16px 0 0;
+    }
+
+    .settings-section h3 {
+      color: var(--blue-900);
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    .settings-add-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .category-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .category-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid rgba(207, 225, 244, 0.88);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
     }
 
     .search {
@@ -411,7 +455,7 @@
 
     .prompt-list {
       display: grid;
-      gap: 0;
+      gap: 8px;
       align-content: start;
       padding: 8px 0 0;
     }
@@ -420,12 +464,24 @@
       display: flex;
       align-items: flex-start;
       gap: 12px;
-      border-bottom: 1px solid var(--line);
-      background: transparent;
+      border: 1px solid rgba(207, 225, 244, 0.88);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
     }
 
     .prompt-card.selected {
       background: rgba(25, 118, 210, 0.07);
+    }
+
+    .prompt-card.is-dragging {
+      opacity: 0.48;
+      transform: scale(0.995);
+    }
+
+    .prompt-card.is-drop-target {
+      border-color: var(--blue-700);
+      box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.13);
     }
 
     .select-cell {
@@ -466,13 +522,42 @@
       flex: 0 0 auto;
       display: grid;
       gap: 4px;
+      justify-items: center;
       padding: 5px 0;
     }
 
+    .drag-handle {
+      min-width: 26px;
+      min-height: 30px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--blue-800);
+      font-size: 17px;
+      line-height: 1;
+      font-weight: 900;
+      cursor: grab;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .drag-handle:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .mobile-order-actions {
+      display: none;
+      gap: 3px;
+    }
+
     .order-button {
-      min-width: 30px;
-      min-height: 26px;
-      padding: 0 8px;
+      min-width: 24px;
+      min-height: 24px;
+      padding: 0 6px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
@@ -620,7 +705,8 @@
         grid-template-columns: 1fr;
       }
 
-      .category-tools {
+      .settings-add-row,
+      .category-row {
         grid-template-columns: 1fr;
       }
 
@@ -643,6 +729,10 @@
 
       .long-actions {
         justify-content: flex-start;
+      }
+
+      .mobile-order-actions {
+        display: flex;
       }
 
       .long-actions .btn,
@@ -691,53 +781,62 @@
           <button class="btn btn-secondary" id="refreshButton" type="button" hidden>更新</button>
           <button class="btn btn-secondary" id="logoutButton" type="button" hidden>ログアウト</button>
         </div>
-        <div class="type-tabs" role="tablist" aria-label="文言タイプ">
-          <button class="tab-button is-active" id="shortTabButton" type="button" role="tab" aria-selected="true" data-type="short">short</button>
-          <button class="tab-button" id="longTabButton" type="button" role="tab" aria-selected="false" data-type="long">long</button>
-        </div>
-        <div class="toolbar">
-          <div class="search">
-            <span class="search-icon" aria-hidden="true"></span>
-            <input id="searchInput" type="search" autocomplete="off" placeholder="文言・カテゴリで検索">
+        <div class="view" id="mainView">
+          <div class="type-tabs" role="tablist" aria-label="文言タイプ">
+            <button class="tab-button is-active" id="shortTabButton" type="button" role="tab" aria-selected="true" data-type="short">short</button>
+            <button class="tab-button" id="longTabButton" type="button" role="tab" aria-selected="false" data-type="long">long</button>
           </div>
-          <select class="sort-select" id="filterCategorySelect" aria-label="カテゴリで絞り込み"></select>
-          <select class="sort-select" id="sortSelect" aria-label="並び替え">
-            <option value="manual">任意順</option>
-            <option value="newest">新しい順</option>
-            <option value="oldest">古い順</option>
-            <option value="short">短い順</option>
-          </select>
-          <div class="bulk-actions" aria-label="選択した文言の操作">
-            <button class="btn btn-primary" id="openAddButton" type="button">追加</button>
-            <button class="btn btn-edit" id="editSelectedButton" type="button" disabled>編集</button>
-            <button class="btn btn-delete" id="deleteSelectedButton" type="button" disabled>削除</button>
-            <button class="btn btn-secondary" id="toggleSettingsButton" type="button" aria-expanded="false">設定</button>
-          </div>
-        </div>
-        <div class="category-tools" id="categoryTools" aria-label="カテゴリ管理" hidden>
-          <select class="category-select" id="categoryManageSelect" aria-label="編集するカテゴリ"></select>
-          <input id="categoryNameInput" type="text" autocomplete="off" placeholder="カテゴリ名">
-          <button class="btn btn-primary" id="addCategoryButton" type="button">カテゴリ追加</button>
-          <button class="btn btn-edit" id="renameCategoryButton" type="button">名称変更</button>
-          <button class="btn btn-delete" id="deleteCategoryButton" type="button">カテゴリ削除</button>
-        </div>
-        <form class="editor" id="promptForm">
-          <div class="select-cell" aria-hidden="true">
-            <span class="fake-checkbox"></span>
-          </div>
-          <div class="inline-editor">
-            <div class="editor-fields">
-              <input class="title-field" id="promptTitle" type="text" autocomplete="off" aria-label="タイトル" placeholder="タイトルを入力">
-              <select class="category-select" id="promptCategory" aria-label="カテゴリ"></select>
-              <textarea id="promptBody" rows="1" aria-label="文言" placeholder="文言を入力"></textarea>
+          <div class="toolbar">
+            <div class="search">
+              <span class="search-icon" aria-hidden="true"></span>
+              <input id="searchInput" type="search" autocomplete="off" placeholder="文言・カテゴリで検索">
             </div>
-            <div class="form-actions">
-              <button class="btn btn-primary" id="submitButton" type="submit">追加</button>
-              <button class="btn btn-secondary" id="cancelButton" type="button">キャンセル</button>
+            <select class="sort-select" id="filterCategorySelect" aria-label="カテゴリで絞り込み"></select>
+            <select class="sort-select" id="sortSelect" aria-label="並び替え">
+              <option value="manual">任意順</option>
+              <option value="newest">新しい順</option>
+              <option value="oldest">古い順</option>
+              <option value="short">短い順</option>
+            </select>
+            <div class="bulk-actions" aria-label="選択した文言の操作">
+              <button class="btn btn-primary" id="openAddButton" type="button">追加</button>
+              <button class="btn btn-edit" id="editSelectedButton" type="button" disabled>編集</button>
+              <button class="btn btn-delete" id="deleteSelectedButton" type="button" disabled>削除</button>
             </div>
+            <button class="btn btn-secondary icon-button" id="settingsButton" type="button" aria-label="設定">⚙</button>
           </div>
-        </form>
-        <div class="prompt-list" id="promptList"></div>
+          <form class="editor" id="promptForm">
+            <div class="select-cell" aria-hidden="true">
+              <span class="fake-checkbox"></span>
+            </div>
+            <div class="inline-editor">
+              <div class="editor-fields">
+                <input class="title-field" id="promptTitle" type="text" autocomplete="off" aria-label="タイトル" placeholder="タイトルを入力">
+                <select class="category-select" id="promptCategory" aria-label="カテゴリ"></select>
+                <textarea id="promptBody" rows="1" aria-label="文言" placeholder="文言を入力"></textarea>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-primary" id="submitButton" type="submit">追加</button>
+                <button class="btn btn-secondary" id="cancelButton" type="button">キャンセル</button>
+              </div>
+            </div>
+          </form>
+          <div class="prompt-list" id="promptList"></div>
+        </div>
+        <div class="view" id="settingsView" hidden>
+          <div class="settings-header">
+            <button class="btn btn-secondary" id="backSettingsButton" type="button">← 戻る</button>
+            <h2>設定</h2>
+          </div>
+          <section class="settings-section" aria-label="カテゴリ管理">
+            <h3>カテゴリ管理</h3>
+            <div class="settings-add-row">
+              <input id="settingsCategoryNameInput" type="text" autocomplete="off" placeholder="新しいカテゴリ名">
+              <button class="btn btn-primary" id="addSettingsCategoryButton" type="button">カテゴリ追加</button>
+            </div>
+            <div class="category-list" id="settingsCategoryList"></div>
+          </section>
+        </div>
       </section>
     </section>
   </main>
@@ -763,6 +862,8 @@
     const DEFAULT_LONG_CATEGORY_NAMES = ["BOOTH", "note", "Discord"];
 
     const elements = {
+      mainView: document.getElementById("mainView"),
+      settingsView: document.getElementById("settingsView"),
       form: document.getElementById("promptForm"),
       title: document.getElementById("promptTitle"),
       body: document.getElementById("promptBody"),
@@ -770,18 +871,16 @@
       shortTabButton: document.getElementById("shortTabButton"),
       longTabButton: document.getElementById("longTabButton"),
       openAddButton: document.getElementById("openAddButton"),
-      toggleSettingsButton: document.getElementById("toggleSettingsButton"),
+      settingsButton: document.getElementById("settingsButton"),
+      backSettingsButton: document.getElementById("backSettingsButton"),
       submitButton: document.getElementById("submitButton"),
       cancelButton: document.getElementById("cancelButton"),
       search: document.getElementById("searchInput"),
       filterCategory: document.getElementById("filterCategorySelect"),
       sort: document.getElementById("sortSelect"),
-      categoryTools: document.getElementById("categoryTools"),
-      categoryManageSelect: document.getElementById("categoryManageSelect"),
-      categoryNameInput: document.getElementById("categoryNameInput"),
-      addCategoryButton: document.getElementById("addCategoryButton"),
-      renameCategoryButton: document.getElementById("renameCategoryButton"),
-      deleteCategoryButton: document.getElementById("deleteCategoryButton"),
+      settingsCategoryNameInput: document.getElementById("settingsCategoryNameInput"),
+      addSettingsCategoryButton: document.getElementById("addSettingsCategoryButton"),
+      settingsCategoryList: document.getElementById("settingsCategoryList"),
       editSelectedButton: document.getElementById("editSelectedButton"),
       deleteSelectedButton: document.getElementById("deleteSelectedButton"),
       list: document.getElementById("promptList"),
@@ -806,6 +905,8 @@
     let refreshTimer = null;
     let hasInitializedCategoryFilter = false;
     let activeType = "short";
+    let draggedPromptId = null;
+    let currentView = "main";
     ensureDefaultLongCategories();
     saveLocalData();
 
@@ -1376,20 +1477,30 @@
 
     function render() {
       const locked = isAuthLocked();
+      if (locked) {
+        currentView = "main";
+      }
+      elements.mainView.hidden = currentView !== "main";
+      elements.settingsView.hidden = currentView !== "settings";
       renderCategoryOptions();
       renderTypeTabs();
+      renderSettings();
       const visiblePrompts = getVisiblePrompts();
       const activeTypeCount = prompts.filter((prompt) => prompt.type === activeType).length;
       elements.count.textContent = locked ? "0" : activeTypeCount.toString();
       elements.shortTabButton.disabled = locked;
       elements.longTabButton.disabled = locked;
       elements.openAddButton.disabled = locked;
-      elements.toggleSettingsButton.disabled = locked;
+      elements.settingsButton.disabled = locked;
       elements.search.disabled = locked;
       elements.filterCategory.disabled = locked;
       elements.sort.disabled = locked;
       updateBulkActions();
       elements.list.innerHTML = "";
+
+      if (currentView === "settings") {
+        return;
+      }
 
       if (locked) {
         const empty = document.createElement("div");
@@ -1410,8 +1521,16 @@
       }
 
       visiblePrompts.forEach((prompt, index) => {
+        const isEditing = editingId === prompt.id;
         const card = document.createElement("article");
         card.className = selectedIds.has(prompt.id) ? "prompt-card selected" : "prompt-card";
+        card.draggable = elements.sort.value === "manual" && !isEditing;
+        card.dataset.promptId = prompt.id;
+        card.addEventListener("dragstart", (event) => handleDragStart(event, prompt.id));
+        card.addEventListener("dragover", (event) => handleDragOver(event, prompt.id));
+        card.addEventListener("dragleave", () => card.classList.remove("is-drop-target"));
+        card.addEventListener("drop", (event) => handleDrop(event, prompt.id));
+        card.addEventListener("dragend", clearDragState);
 
         const selectCell = document.createElement("label");
         selectCell.className = "select-cell";
@@ -1429,10 +1548,26 @@
         const orderCell = document.createElement("div");
         orderCell.className = "order-cell";
 
+        const dragHandle = document.createElement("button");
+        dragHandle.type = "button";
+        dragHandle.className = "drag-handle";
+        dragHandle.textContent = "⋮⋮";
+        dragHandle.disabled = elements.sort.value !== "manual" || isEditing;
+        dragHandle.setAttribute("aria-label", "ドラッグして並び替え");
+        dragHandle.addEventListener("mousedown", () => {
+          if (elements.sort.value !== "manual") {
+            elements.sort.value = "manual";
+            render();
+          }
+        });
+
+        const mobileOrderActions = document.createElement("div");
+        mobileOrderActions.className = "mobile-order-actions";
+
         const moveUpButton = document.createElement("button");
         moveUpButton.type = "button";
         moveUpButton.className = "order-button";
-        moveUpButton.textContent = "上";
+        moveUpButton.textContent = "↑";
         moveUpButton.disabled = elements.sort.value !== "manual" || index === 0;
         moveUpButton.setAttribute("aria-label", "この文言を上へ移動");
         moveUpButton.addEventListener("click", () => movePrompt(prompt.id, -1));
@@ -1440,12 +1575,13 @@
         const moveDownButton = document.createElement("button");
         moveDownButton.type = "button";
         moveDownButton.className = "order-button";
-        moveDownButton.textContent = "下";
+        moveDownButton.textContent = "↓";
         moveDownButton.disabled = elements.sort.value !== "manual" || index === visiblePrompts.length - 1;
         moveDownButton.setAttribute("aria-label", "この文言を下へ移動");
         moveDownButton.addEventListener("click", () => movePrompt(prompt.id, 1));
 
-        orderCell.append(moveUpButton, moveDownButton);
+        mobileOrderActions.append(moveUpButton, moveDownButton);
+        orderCell.append(dragHandle, mobileOrderActions);
 
         let main = document.createElement("div");
         main.className = "prompt-main";
@@ -1453,7 +1589,6 @@
         const categoryCell = document.createElement("div");
         categoryCell.className = "category-cell";
 
-        const isEditing = editingId === prompt.id;
         if (isEditing) {
           const categorySelect = createCategorySelect(prompt.categoryId, prompt.type);
           categoryCell.appendChild(categorySelect);
@@ -1549,12 +1684,10 @@
 
     function renderCategoryOptions() {
       const currentPromptCategory = elements.promptCategory.value;
-      const currentManagedCategory = elements.categoryManageSelect.value;
       const currentFilterCategory = elements.filterCategory.value;
       const typeCategories = getCategoriesByType(activeType);
 
       elements.promptCategory.innerHTML = '<option value="">カテゴリなし</option>';
-      elements.categoryManageSelect.innerHTML = '<option value="">カテゴリを選択</option>';
       elements.filterCategory.innerHTML = '<option value="">すべてのカテゴリ</option><option value="__none">カテゴリなし</option>';
 
       typeCategories.forEach((category) => {
@@ -1562,11 +1695,6 @@
         promptOption.value = category.id;
         promptOption.textContent = category.name;
         elements.promptCategory.appendChild(promptOption);
-
-        const manageOption = document.createElement("option");
-        manageOption.value = category.id;
-        manageOption.textContent = category.name;
-        elements.categoryManageSelect.appendChild(manageOption);
 
         const filterOption = document.createElement("option");
         filterOption.value = category.id;
@@ -1577,14 +1705,46 @@
       if (typeCategories.some((category) => category.id === currentPromptCategory)) {
         elements.promptCategory.value = currentPromptCategory;
       }
-      if (typeCategories.some((category) => category.id === currentManagedCategory)) {
-        elements.categoryManageSelect.value = currentManagedCategory;
-      }
       if (currentFilterCategory === "__none" || typeCategories.some((category) => category.id === currentFilterCategory)) {
         elements.filterCategory.value = currentFilterCategory;
       } else if (!hasInitializedCategoryFilter) {
         elements.filterCategory.value = getDefaultCategoryId();
         hasInitializedCategoryFilter = true;
+      }
+    }
+
+    function renderSettings() {
+      elements.settingsCategoryList.innerHTML = "";
+      getCategoriesByType(activeType).forEach((category) => {
+        const row = document.createElement("div");
+        row.className = "category-row";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = category.name;
+        input.setAttribute("aria-label", `${category.name} のカテゴリ名`);
+
+        const renameButton = document.createElement("button");
+        renameButton.type = "button";
+        renameButton.className = "btn btn-edit";
+        renameButton.textContent = "名称変更";
+        renameButton.addEventListener("click", () => renameCategory(category.id, input.value));
+
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "btn btn-delete";
+        deleteButton.textContent = "削除";
+        deleteButton.addEventListener("click", () => deleteCategory(category.id));
+
+        row.append(input, renameButton, deleteButton);
+        elements.settingsCategoryList.appendChild(row);
+      });
+
+      if (elements.settingsCategoryList.children.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.innerHTML = "<strong>カテゴリがありません</strong><span>新しいカテゴリを追加できます。</span>";
+        elements.settingsCategoryList.appendChild(empty);
       }
     }
 
@@ -1603,7 +1763,7 @@
       if (activeType === type) return;
       activeType = type;
       selectedIds = new Set();
-      elements.categoryNameInput.value = "";
+      elements.settingsCategoryNameInput.value = "";
       resetForm();
       render();
     }
@@ -1632,6 +1792,39 @@
       render();
     }
 
+    function clearDragState() {
+      draggedPromptId = null;
+      elements.list.querySelectorAll(".prompt-card").forEach((card) => {
+        card.classList.remove("is-dragging", "is-drop-target");
+      });
+    }
+
+    function handleDragStart(event, id) {
+      if (elements.sort.value !== "manual" || editingId === id) {
+        event.preventDefault();
+        return;
+      }
+      draggedPromptId = id;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", id);
+      event.currentTarget.classList.add("is-dragging");
+    }
+
+    function handleDragOver(event, targetId) {
+      if (!draggedPromptId || draggedPromptId === targetId || elements.sort.value !== "manual") return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      event.currentTarget.classList.add("is-drop-target");
+    }
+
+    function handleDrop(event, targetId) {
+      event.preventDefault();
+      const sourceId = draggedPromptId || event.dataTransfer.getData("text/plain");
+      clearDragState();
+      if (!sourceId || sourceId === targetId) return;
+      movePromptTo(sourceId, targetId);
+    }
+
     function movePrompt(id, direction) {
       if (isAuthLocked()) {
         showToast("ログインしてください");
@@ -1655,6 +1848,31 @@
         if (prompt.id === target.id) return { ...prompt, order: currentOrder };
         return prompt;
       });
+      savePrompts();
+      render();
+    }
+
+    function movePromptTo(sourceId, targetId) {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
+      if (elements.sort.value !== "manual") {
+        elements.sort.value = "manual";
+      }
+      normalizeManualOrder(activeType);
+      const visiblePrompts = getVisiblePrompts();
+      const sourceIndex = visiblePrompts.findIndex((prompt) => prompt.id === sourceId);
+      const targetIndex = visiblePrompts.findIndex((prompt) => prompt.id === targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return;
+
+      const reordered = [...visiblePrompts];
+      const [moved] = reordered.splice(sourceIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+      const orderById = new Map(reordered.map((prompt, index) => [prompt.id, index * 1000]));
+      prompts = prompts.map((prompt) => (
+        orderById.has(prompt.id) ? { ...prompt, order: orderById.get(prompt.id) } : prompt
+      ));
       savePrompts();
       render();
     }
@@ -1730,18 +1948,22 @@
       showToast("更新しました");
     }
 
-    function toggleSettings() {
+    function openSettings() {
       if (isAuthLocked()) {
         showToast("ログインしてください");
         return;
       }
-      const willOpen = elements.categoryTools.hidden;
-      elements.categoryTools.hidden = !willOpen;
-      elements.toggleSettingsButton.setAttribute("aria-expanded", String(willOpen));
-      elements.toggleSettingsButton.textContent = willOpen ? "設定を閉じる" : "設定";
-      if (willOpen) {
-        elements.categoryNameInput.focus();
-      }
+      currentView = "settings";
+      resetForm();
+      selectedIds = new Set();
+      render();
+      elements.settingsCategoryNameInput.focus();
+    }
+
+    function closeSettings() {
+      currentView = "main";
+      elements.settingsCategoryNameInput.value = "";
+      render();
     }
 
     function deletePrompt(id) {
@@ -1880,7 +2102,7 @@
         showToast("ログインしてください");
         return;
       }
-      const name = elements.categoryNameInput.value.trim();
+      const name = elements.settingsCategoryNameInput.value.trim();
       if (!name) {
         showToast("カテゴリ名を入力してください");
         return;
@@ -1892,9 +2114,8 @@
       const category = { id: createId(), type: activeType, name };
       categories.push(category);
       saveCategories();
-      elements.categoryNameInput.value = "";
+      elements.settingsCategoryNameInput.value = "";
       render();
-      elements.categoryManageSelect.value = category.id;
       elements.promptCategory.value = category.id;
       if (category.name === "AI") {
         elements.filterCategory.value = category.id;
@@ -1902,13 +2123,12 @@
       showToast("カテゴリを追加しました");
     }
 
-    function renameCategory() {
+    function renameCategory(id, rawName) {
       if (isAuthLocked()) {
         showToast("ログインしてください");
         return;
       }
-      const id = elements.categoryManageSelect.value;
-      const name = elements.categoryNameInput.value.trim();
+      const name = rawName.trim();
       const targetCategory = categories.find((category) => category.id === id && category.type === activeType);
       if (!id) {
         showToast("カテゴリを選択してください");
@@ -1931,16 +2151,14 @@
       ));
       saveCategories();
       render();
-      elements.categoryManageSelect.value = id;
       showToast("カテゴリ名を変更しました");
     }
 
-    function deleteCategory() {
+    function deleteCategory(id) {
       if (isAuthLocked()) {
         showToast("ログインしてください");
         return;
       }
-      const id = elements.categoryManageSelect.value;
       const targetCategory = categories.find((category) => category.id === id && category.type === activeType);
       if (!id) {
         showToast("カテゴリを選択してください");
@@ -1960,7 +2178,7 @@
       ));
       saveCategories();
       savePrompts();
-      elements.categoryNameInput.value = "";
+      elements.settingsCategoryNameInput.value = "";
       render();
       showToast("カテゴリを削除しました");
     }
@@ -1968,17 +2186,19 @@
     elements.openAddButton.addEventListener("click", openAddPrompt);
     elements.shortTabButton.addEventListener("click", () => switchType("short"));
     elements.longTabButton.addEventListener("click", () => switchType("long"));
-    elements.toggleSettingsButton.addEventListener("click", toggleSettings);
+    elements.settingsButton.addEventListener("click", openSettings);
+    elements.backSettingsButton.addEventListener("click", closeSettings);
     elements.cancelButton.addEventListener("click", resetForm);
     elements.search.addEventListener("input", render);
     elements.filterCategory.addEventListener("change", render);
     elements.sort.addEventListener("change", render);
-    elements.categoryManageSelect.addEventListener("change", () => {
-      elements.categoryNameInput.value = getCategoryName(elements.categoryManageSelect.value);
+    elements.addSettingsCategoryButton.addEventListener("click", addCategory);
+    elements.settingsCategoryNameInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addCategory();
+      }
     });
-    elements.addCategoryButton.addEventListener("click", addCategory);
-    elements.renameCategoryButton.addEventListener("click", renameCategory);
-    elements.deleteCategoryButton.addEventListener("click", deleteCategory);
     elements.editSelectedButton.addEventListener("click", editSelectedPrompt);
     elements.deleteSelectedButton.addEventListener("click", deleteSelectedPrompts);
 
