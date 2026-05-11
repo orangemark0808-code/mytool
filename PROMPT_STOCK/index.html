@@ -822,6 +822,12 @@
       syncReadyTimer = null;
     }
 
+    function isOfflineFirestoreError(error) {
+      const message = String(error && error.message ? error.message : "");
+      const code = String(error && error.code ? error.code : "");
+      return code.includes("unavailable") || message.includes("client is offline");
+    }
+
     function saveLocalData() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
       localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
@@ -889,26 +895,59 @@
             const dataRef = firestore.doc(db, "users", user.uid, "promptCopyApp", SYNC_DOCUMENT_ID);
             remoteStore = { firestore, dataRef };
 
-            const firstSnapshot = await firestore.getDoc(dataRef);
-            if (firstSnapshot.exists()) {
-              applyRemoteData(firstSnapshot.data());
-            } else if (prompts.length > 0 || categories.length > 0) {
-              await writeRemoteData();
-            }
-
             unsubscribeRemote = firestore.onSnapshot(dataRef, (snapshot) => {
-              if (!snapshot.exists()) return;
+              if (!snapshot.exists()) {
+                if (prompts.length > 0 || categories.length > 0) {
+                  writeRemoteData().catch((error) => {
+                    if (isOfflineFirestoreError(error)) {
+                      setSyncStatus("オフラインのためローカル保存中です。接続後に再同期します");
+                      return;
+                    }
+                    const detail = error && error.message ? `: ${error.message}` : "";
+                    setSyncStatus(`同期エラー${detail}`);
+                  });
+                }
+                stopSyncReadyTimer();
+                setSyncStatus("クラウド同期中");
+                return;
+              }
               applyRemoteData(snapshot.data());
               stopSyncReadyTimer();
               setSyncStatus("クラウド同期中");
             }, (error) => {
               stopSyncReadyTimer();
+              if (isOfflineFirestoreError(error)) {
+                setSyncStatus("オフラインのためローカル保存中です。iPadの通信状態を確認してください");
+                return;
+              }
               const detail = error && error.message ? `: ${error.message}` : "";
               setSyncStatus(`同期エラー${detail}`);
             });
 
-            stopSyncReadyTimer();
-            setSyncStatus("クラウド同期中");
+            firestore.getDoc(dataRef).then((firstSnapshot) => {
+              if (firstSnapshot.exists()) {
+                applyRemoteData(firstSnapshot.data());
+              } else if (prompts.length > 0 || categories.length > 0) {
+                writeRemoteData().catch((error) => {
+                  if (isOfflineFirestoreError(error)) {
+                    setSyncStatus("オフラインのためローカル保存中です。接続後に再同期します");
+                    return;
+                  }
+                  const detail = error && error.message ? `: ${error.message}` : "";
+                  setSyncStatus(`同期エラー${detail}`);
+                });
+              }
+              stopSyncReadyTimer();
+              setSyncStatus("クラウド同期中");
+            }).catch((error) => {
+              stopSyncReadyTimer();
+              if (isOfflineFirestoreError(error)) {
+                setSyncStatus("オフラインのためローカル保存中です。iPadの通信状態を確認してください");
+                return;
+              }
+              const detail = error && error.message ? `: ${error.message}` : "";
+              setSyncStatus(`同期準備エラー${detail}`);
+            });
           } catch (error) {
             remoteStore = null;
             stopSyncReadyTimer();
