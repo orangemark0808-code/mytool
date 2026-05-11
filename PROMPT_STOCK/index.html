@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI依頼文ストック</title>
+  <title>PROMPT-STOCK</title>
   <style>
     * {
       box-sizing: border-box;
@@ -105,6 +105,26 @@
       color: var(--muted);
       font-size: 10px;
       font-weight: 700;
+    }
+
+    .sync-status {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .account-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      margin-bottom: 10px;
+    }
+
+    .account-actions[hidden] {
+      display: none;
     }
 
     .layout {
@@ -541,8 +561,9 @@
   <main class="app">
     <header class="topbar">
       <div class="title-block">
-        <div class="eyebrow">PROMPT STOCK</div>
-        <h1>AI依頼文ストック</h1>
+        <div class="eyebrow">PROMPT-STOCK</div>
+        <h1>PROMPT-STOCK</h1>
+        <div class="sync-status" id="syncStatus" aria-live="polite">ローカル保存</div>
       </div>
       <div class="count-pill" aria-live="polite">
         <strong id="totalCount">0</strong>
@@ -551,7 +572,11 @@
     </header>
 
     <section class="layout">
-      <section class="panel app-box" aria-label="依頼文ストック">
+      <section class="panel app-box" aria-label="PROMPT-STOCK">
+        <div class="account-actions" id="accountActions" hidden>
+          <button class="btn btn-secondary" id="loginButton" type="button">ログイン</button>
+          <button class="btn btn-secondary" id="logoutButton" type="button" hidden>ログアウト</button>
+        </div>
         <div class="toolbar">
           <div class="search">
             <span class="search-icon" aria-hidden="true"></span>
@@ -597,9 +622,21 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="./firebase-config.js"></script>
+  <script src="./firebase-config.local.js"></script>
   <script>
     const STORAGE_KEY = "prompt-copy-app-items";
     const CATEGORY_STORAGE_KEY = "prompt-copy-app-categories";
+    const FIREBASE_CONFIG = window.PROMPT_STOCK_FIREBASE_CONFIG || window.PROMPT_COPY_FIREBASE_CONFIG || {
+      apiKey: "",
+      authDomain: "",
+      projectId: "",
+      storageBucket: "",
+      messagingSenderId: "",
+      appId: "",
+      measurementId: "",
+    };
+    const SYNC_DOCUMENT_ID = "main";
 
     const elements = {
       form: document.getElementById("promptForm"),
@@ -619,6 +656,10 @@
       deleteSelectedButton: document.getElementById("deleteSelectedButton"),
       list: document.getElementById("promptList"),
       count: document.getElementById("totalCount"),
+      syncStatus: document.getElementById("syncStatus"),
+      accountActions: document.getElementById("accountActions"),
+      loginButton: document.getElementById("loginButton"),
+      logoutButton: document.getElementById("logoutButton"),
       toast: document.getElementById("toast"),
     };
 
@@ -627,6 +668,9 @@
     let editingId = null;
     let selectedIds = new Set();
     let toastTimer = null;
+    let remoteStore = null;
+    let unsubscribeRemote = null;
+    let isApplyingRemoteData = false;
 
     function loadPrompts() {
       try {
@@ -648,6 +692,7 @@
 
     function savePrompts() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
+      saveRemoteData();
     }
 
     function loadCategories() {
@@ -667,6 +712,148 @@
 
     function saveCategories() {
       localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
+      saveRemoteData();
+    }
+
+    function normalizePrompt(prompt) {
+      return {
+        id: prompt.id || createId(),
+        body: String(prompt.body || prompt.title || "").trim(),
+        categoryId: prompt.categoryId || "",
+        createdAt: Number(prompt.createdAt || Date.now()),
+        updatedAt: Number(prompt.updatedAt || prompt.createdAt || Date.now()),
+      };
+    }
+
+    function normalizeCategory(category) {
+      return {
+        id: category.id || createId(),
+        name: String(category.name || "").trim(),
+      };
+    }
+
+    function isFirebaseConfigured() {
+      return Boolean(
+        FIREBASE_CONFIG.apiKey &&
+        FIREBASE_CONFIG.authDomain &&
+        FIREBASE_CONFIG.projectId &&
+        FIREBASE_CONFIG.appId
+      );
+    }
+
+    function setSyncStatus(message) {
+      elements.syncStatus.textContent = message;
+    }
+
+    function saveLocalData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
+      localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
+    }
+
+    async function setupRemoteSync() {
+      if (!isFirebaseConfigured()) {
+        setSyncStatus("ローカル保存");
+        return;
+      }
+
+      try {
+        setSyncStatus("同期を準備中...");
+        const firebaseApp = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
+        const authModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
+        const firestore = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
+        const app = firebaseApp.initializeApp(FIREBASE_CONFIG);
+        const auth = authModule.getAuth(app);
+        const db = firestore.getFirestore(app);
+        const provider = new authModule.GoogleAuthProvider();
+
+        elements.accountActions.hidden = false;
+        elements.loginButton.addEventListener("click", () => {
+          authModule.signInWithPopup(auth, provider).catch(() => {
+            authModule.signInWithRedirect(auth, provider).catch(() => {
+              showToast("ログインできませんでした");
+            });
+          });
+        });
+        elements.logoutButton.addEventListener("click", () => {
+          authModule.signOut(auth).catch(() => {
+            showToast("ログアウトできませんでした");
+          });
+        });
+
+        authModule.onAuthStateChanged(auth, async (user) => {
+          if (unsubscribeRemote) {
+            unsubscribeRemote();
+            unsubscribeRemote = null;
+          }
+          remoteStore = null;
+
+          if (!user) {
+            elements.loginButton.hidden = false;
+            elements.logoutButton.hidden = true;
+            setSyncStatus("ログインするとクラウド同期します");
+            return;
+          }
+
+          elements.loginButton.hidden = true;
+          elements.logoutButton.hidden = false;
+          setSyncStatus("同期を準備中...");
+
+          const dataRef = firestore.doc(db, "users", user.uid, "promptCopyApp", SYNC_DOCUMENT_ID);
+          remoteStore = { firestore, dataRef };
+
+          const firstSnapshot = await firestore.getDoc(dataRef);
+          if (firstSnapshot.exists()) {
+            applyRemoteData(firstSnapshot.data());
+          } else if (prompts.length > 0 || categories.length > 0) {
+            await writeRemoteData();
+          }
+
+          unsubscribeRemote = firestore.onSnapshot(dataRef, (snapshot) => {
+            if (!snapshot.exists()) return;
+            applyRemoteData(snapshot.data());
+          }, () => {
+            setSyncStatus("同期エラー: ローカル保存中");
+          });
+
+          setSyncStatus("クラウド同期中");
+        });
+      } catch {
+        remoteStore = null;
+        setSyncStatus("同期エラー: ローカル保存中");
+      }
+    }
+
+    function applyRemoteData(data) {
+      isApplyingRemoteData = true;
+      prompts = Array.isArray(data.prompts)
+        ? data.prompts.map(normalizePrompt).filter((prompt) => prompt.body)
+        : [];
+      categories = Array.isArray(data.categories)
+        ? data.categories.map(normalizeCategory).filter((category) => category.name)
+        : [];
+      selectedIds = new Set([...selectedIds].filter((id) => prompts.some((prompt) => prompt.id === id)));
+      if (editingId && !prompts.some((prompt) => prompt.id === editingId)) {
+        resetForm();
+      }
+      saveLocalData();
+      render();
+      isApplyingRemoteData = false;
+    }
+
+    async function writeRemoteData() {
+      if (!remoteStore || isApplyingRemoteData) return;
+      await remoteStore.firestore.setDoc(remoteStore.dataRef, {
+        prompts,
+        categories,
+        updatedAt: Date.now(),
+      });
+    }
+
+    function saveRemoteData() {
+      if (!remoteStore || isApplyingRemoteData) return;
+      writeRemoteData().catch(() => {
+        setSyncStatus("同期エラー: ローカル保存中");
+      });
     }
 
     function createId() {
@@ -1023,6 +1210,7 @@
     elements.deleteSelectedButton.addEventListener("click", deleteSelectedPrompts);
 
     render();
+    setupRemoteSync();
   </script>
 </body>
 </html>
