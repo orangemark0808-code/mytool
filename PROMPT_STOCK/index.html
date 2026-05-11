@@ -586,6 +586,7 @@
         <div class="account-actions" id="accountActions">
           <span class="account-user" id="accountUser">未ログイン</span>
           <button class="btn btn-secondary" id="loginButton" type="button">ログイン</button>
+          <button class="btn btn-secondary" id="refreshButton" type="button" hidden>更新</button>
           <button class="btn btn-secondary" id="logoutButton" type="button" hidden>ログアウト</button>
         </div>
         <div class="toolbar">
@@ -671,6 +672,7 @@
       accountActions: document.getElementById("accountActions"),
       accountUser: document.getElementById("accountUser"),
       loginButton: document.getElementById("loginButton"),
+      refreshButton: document.getElementById("refreshButton"),
       logoutButton: document.getElementById("logoutButton"),
       toast: document.getElementById("toast"),
     };
@@ -680,12 +682,10 @@
     let editingId = null;
     let selectedIds = new Set();
     let toastTimer = null;
-    let remoteStore = null;
-    let unsubscribeRemote = null;
+    let currentUser = null;
     let isApplyingRemoteData = false;
     let authReadyTimer = null;
-    let syncReadyTimer = null;
-    let restPollTimer = null;
+    let refreshTimer = null;
 
     function loadPrompts() {
       try {
@@ -775,6 +775,8 @@
       elements.accountUser.textContent = "未ログイン";
       elements.loginButton.hidden = false;
       elements.loginButton.disabled = false;
+      elements.refreshButton.hidden = true;
+      elements.refreshButton.disabled = false;
       elements.logoutButton.hidden = true;
       elements.logoutButton.disabled = false;
       setSyncStatus(`${message}（${getFirebaseConfigStatus()}）`);
@@ -786,6 +788,8 @@
       elements.accountUser.textContent = name;
       elements.loginButton.hidden = true;
       elements.loginButton.disabled = false;
+      elements.refreshButton.hidden = false;
+      elements.refreshButton.disabled = false;
       elements.logoutButton.hidden = false;
       elements.logoutButton.disabled = false;
     }
@@ -795,6 +799,7 @@
       elements.accountUser.textContent = "同期エラー";
       elements.loginButton.hidden = false;
       elements.loginButton.disabled = true;
+      elements.refreshButton.hidden = true;
       elements.logoutButton.hidden = true;
       setSyncStatus(message);
     }
@@ -811,27 +816,16 @@
       authReadyTimer = null;
     }
 
-    function startSyncReadyTimer() {
-      clearTimeout(syncReadyTimer);
-      syncReadyTimer = setTimeout(() => {
-        setSyncStatus("同期準備に時間がかかっています。通信状態を確認し、必要ならログアウト後に再ログインしてください");
-      }, 12000);
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      refreshTimer = setInterval(() => {
+        refreshRemoteData({ silent: true });
+      }, 15000);
     }
 
-    function stopSyncReadyTimer() {
-      clearTimeout(syncReadyTimer);
-      syncReadyTimer = null;
-    }
-
-    function stopRestPolling() {
-      clearInterval(restPollTimer);
-      restPollTimer = null;
-    }
-
-    function isOfflineFirestoreError(error) {
-      const message = String(error && error.message ? error.message : "");
-      const code = String(error && error.code ? error.code : "");
-      return code.includes("unavailable") || message.includes("client is offline");
+    function stopAutoRefresh() {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
     }
 
     function toFirestoreValue(value) {
@@ -938,35 +932,6 @@
       }
     }
 
-    async function enableRestFallback(user, reason) {
-      if (!remoteStore) return;
-      remoteStore.useRestFallback = true;
-      stopRestPolling();
-
-      try {
-        const found = await readRemoteDataViaRest(user);
-        if (!found && (prompts.length > 0 || categories.length > 0)) {
-          await writeRemoteData();
-        }
-        setSyncStatus(`REST APIでクラウド同期中（${reason}）`);
-      } catch (error) {
-        const detail = error && error.message ? `: ${error.message}` : "";
-        setSyncStatus(`REST同期エラー${detail}`);
-        return;
-      }
-
-      restPollTimer = setInterval(() => {
-        readRemoteDataViaRest(user).then((found) => {
-          if (found) {
-            setSyncStatus("REST APIでクラウド同期中");
-          }
-        }).catch((error) => {
-          const detail = error && error.message ? `: ${error.message}` : "";
-          setSyncStatus(`REST同期エラー${detail}`);
-        });
-      }, 15000);
-    }
-
     function saveLocalData() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
       localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
@@ -981,16 +946,11 @@
       }
 
       try {
-        setSyncStatus("同期を準備中...");
+        setSyncStatus("Firebase Authを準備中...");
         const firebaseApp = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
         const authModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
-        const firestore = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
         const app = firebaseApp.initializeApp(FIREBASE_CONFIG);
         const auth = authModule.getAuth(app);
-        const db = firestore.initializeFirestore(app, {
-          experimentalAutoDetectLongPolling: true,
-          useFetchStreams: false,
-        });
         const provider = new authModule.GoogleAuthProvider();
 
         elements.loginButton.addEventListener("click", () => {
@@ -1002,7 +962,11 @@
             });
           });
         });
+        elements.refreshButton.addEventListener("click", () => {
+          refreshRemoteData();
+        });
         elements.logoutButton.addEventListener("click", () => {
+          stopAutoRefresh();
           authModule.signOut(auth).catch(() => {
             showToast("ログアウトできませんでした");
           });
@@ -1018,90 +982,23 @@
 
         authModule.onAuthStateChanged(auth, async (user) => {
           stopAuthReadyTimer();
-          if (unsubscribeRemote) {
-            unsubscribeRemote();
-            unsubscribeRemote = null;
-          }
-          stopRestPolling();
-          remoteStore = null;
+          stopAutoRefresh();
 
           if (!user) {
+            currentUser = null;
             setSignedOutUi();
             return;
           }
 
+          currentUser = user;
           setSignedInUi(user);
-          setSyncStatus("同期を準備中...");
-          startSyncReadyTimer();
-
-          try {
-            const dataRef = firestore.doc(db, "users", user.uid, "promptCopyApp", SYNC_DOCUMENT_ID);
-            remoteStore = { firestore, dataRef, user, useRestFallback: false };
-
-            unsubscribeRemote = firestore.onSnapshot(dataRef, (snapshot) => {
-              if (!snapshot.exists()) {
-                if (prompts.length > 0 || categories.length > 0) {
-                  writeRemoteData().catch((error) => {
-                    if (isOfflineFirestoreError(error)) {
-                      setSyncStatus("オフラインのためローカル保存中です。接続後に再同期します");
-                      return;
-                    }
-                    const detail = error && error.message ? `: ${error.message}` : "";
-                    setSyncStatus(`同期エラー${detail}`);
-                  });
-                }
-                stopSyncReadyTimer();
-                setSyncStatus("クラウド同期中");
-                return;
-              }
-              applyRemoteData(snapshot.data());
-              stopSyncReadyTimer();
-              setSyncStatus("クラウド同期中");
-            }, (error) => {
-              stopSyncReadyTimer();
-              if (isOfflineFirestoreError(error)) {
-                enableRestFallback(user, "Firestore SDK接続を代替");
-                return;
-              }
-              const detail = error && error.message ? `: ${error.message}` : "";
-              setSyncStatus(`同期エラー${detail}`);
-            });
-
-            firestore.getDoc(dataRef).then((firstSnapshot) => {
-              if (firstSnapshot.exists()) {
-                applyRemoteData(firstSnapshot.data());
-              } else if (prompts.length > 0 || categories.length > 0) {
-                writeRemoteData().catch((error) => {
-                  if (isOfflineFirestoreError(error)) {
-                    setSyncStatus("オフラインのためローカル保存中です。接続後に再同期します");
-                    return;
-                  }
-                  const detail = error && error.message ? `: ${error.message}` : "";
-                  setSyncStatus(`同期エラー${detail}`);
-                });
-              }
-              stopSyncReadyTimer();
-              setSyncStatus("クラウド同期中");
-            }).catch((error) => {
-              stopSyncReadyTimer();
-              if (isOfflineFirestoreError(error)) {
-                enableRestFallback(user, "Firestore SDK接続を代替");
-                return;
-              }
-              const detail = error && error.message ? `: ${error.message}` : "";
-              setSyncStatus(`同期準備エラー${detail}`);
-            });
-          } catch (error) {
-            remoteStore = null;
-            stopSyncReadyTimer();
-            const detail = error && error.message ? `: ${error.message}` : "";
-            setSyncStatus(`同期準備エラー${detail}`);
-          }
+          await refreshRemoteData();
+          startAutoRefresh();
         });
       } catch (error) {
-        remoteStore = null;
+        currentUser = null;
         stopAuthReadyTimer();
-        stopSyncReadyTimer();
+        stopAutoRefresh();
         const detail = error && error.message ? `: ${error.message}` : "";
         setAuthErrorUi(`Firebase初期化エラー${detail}`);
       }
@@ -1124,35 +1021,48 @@
       isApplyingRemoteData = false;
     }
 
-    async function writeRemoteData() {
-      if (!remoteStore || isApplyingRemoteData) return;
-      const data = {
+    function getRemotePayload() {
+      return {
         prompts,
         categories,
         updatedAt: Date.now(),
       };
-      if (remoteStore.useRestFallback) {
-        await writeRemoteDataViaRest(remoteStore.user, data);
-        return;
-      }
+    }
+
+    async function refreshRemoteData(options = {}) {
+      if (!currentUser) return;
+      const silent = Boolean(options.silent);
       try {
-        await remoteStore.firestore.setDoc(remoteStore.dataRef, data);
-      } catch (error) {
-        if (remoteStore.user && isOfflineFirestoreError(error)) {
-          remoteStore.useRestFallback = true;
-          await writeRemoteDataViaRest(remoteStore.user, data);
-          setSyncStatus("REST APIでクラウド同期中");
+        if (!silent) setSyncStatus("クラウドから読み込み中...");
+        const found = await readRemoteDataViaRest(currentUser);
+        if (!found) {
+          await writeRemoteDataViaRest(currentUser, getRemotePayload());
+          setSyncStatus("クラウド保存を作成しました");
           return;
         }
-        throw error;
+        if (!silent) setSyncStatus("クラウドから読み込みました");
+      } catch (error) {
+        const detail = error && error.message ? `: ${error.message}` : "";
+        setSyncStatus(`同期失敗。更新ボタンで再読み込みしてください${detail}`);
+      }
+    }
+
+    async function writeRemoteData() {
+      if (!currentUser || isApplyingRemoteData) return;
+      try {
+        setSyncStatus("クラウドに保存中...");
+        await writeRemoteDataViaRest(currentUser, getRemotePayload());
+        setSyncStatus("クラウドに保存しました");
+        await refreshRemoteData({ silent: true });
+      } catch (error) {
+        const detail = error && error.message ? `: ${error.message}` : "";
+        setSyncStatus(`同期失敗。保存後に更新ボタンで確認してください${detail}`);
       }
     }
 
     function saveRemoteData() {
-      if (!remoteStore || isApplyingRemoteData) return;
-      writeRemoteData().catch(() => {
-        setSyncStatus("同期エラー: ローカル保存中");
-      });
+      if (!currentUser || isApplyingRemoteData) return;
+      writeRemoteData();
     }
 
     function createId() {
