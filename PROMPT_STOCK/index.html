@@ -1016,12 +1016,9 @@
         elements.loginButton.addEventListener("click", () => {
           setSyncStatus("ログイン画面を開いています...");
           elements.loginButton.disabled = true;
-          authModule.signInWithPopup(auth, provider).catch((popupError) => {
-            setSyncStatus(`${getAuthErrorMessage(popupError, "ポップアップログイン")}。リダイレクトログインを試します...`);
-            authModule.signInWithRedirect(auth, provider).catch((redirectError) => {
-              showToast("ログインできませんでした");
-              setSignedOutUi(getAuthErrorMessage(redirectError, "リダイレクトログイン"));
-            });
+          authModule.signInWithRedirect(auth, provider).catch((error) => {
+            showToast("ログインできませんでした");
+            setSignedOutUi(getAuthErrorMessage(error, "リダイレクトログイン"));
           });
         });
         elements.refreshButton.addEventListener("click", () => {
