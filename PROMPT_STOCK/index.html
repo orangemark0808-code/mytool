@@ -893,6 +893,9 @@
           detail = "";
         }
       }
+      if (detail.includes("Cloud Firestore API has not been used") || detail.includes("is disabled")) {
+        return `REST${action}失敗 ${response.status}: Cloud Firestore APIが無効です。Google Cloud ConsoleでFirestore APIを有効化してください`;
+      }
       return `REST${action}失敗 ${response.status}${detail}`;
     }
 
