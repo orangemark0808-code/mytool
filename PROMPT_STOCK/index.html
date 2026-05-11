@@ -596,6 +596,7 @@
         <div class="account-actions" id="accountActions">
           <span class="account-user" id="accountUser">未ログイン</span>
           <button class="btn btn-secondary" id="loginButton" type="button">ログイン</button>
+          <button class="btn btn-secondary" id="redirectLoginButton" type="button">別方式でログイン</button>
           <button class="btn btn-secondary" id="refreshButton" type="button" hidden>更新</button>
           <button class="btn btn-secondary" id="logoutButton" type="button" hidden>ログアウト</button>
         </div>
@@ -686,6 +687,7 @@
       accountActions: document.getElementById("accountActions"),
       accountUser: document.getElementById("accountUser"),
       loginButton: document.getElementById("loginButton"),
+      redirectLoginButton: document.getElementById("redirectLoginButton"),
       refreshButton: document.getElementById("refreshButton"),
       logoutButton: document.getElementById("logoutButton"),
       toast: document.getElementById("toast"),
@@ -809,6 +811,8 @@
       elements.accountUser.textContent = "未ログイン";
       elements.loginButton.hidden = false;
       elements.loginButton.disabled = false;
+      elements.redirectLoginButton.hidden = false;
+      elements.redirectLoginButton.disabled = false;
       elements.refreshButton.hidden = true;
       elements.refreshButton.disabled = false;
       elements.logoutButton.hidden = true;
@@ -822,6 +826,8 @@
       elements.accountUser.textContent = name;
       elements.loginButton.hidden = true;
       elements.loginButton.disabled = false;
+      elements.redirectLoginButton.hidden = true;
+      elements.redirectLoginButton.disabled = false;
       elements.refreshButton.hidden = false;
       elements.refreshButton.disabled = false;
       elements.logoutButton.hidden = false;
@@ -833,6 +839,8 @@
       elements.accountUser.textContent = "同期エラー";
       elements.loginButton.hidden = false;
       elements.loginButton.disabled = true;
+      elements.redirectLoginButton.hidden = false;
+      elements.redirectLoginButton.disabled = true;
       elements.refreshButton.hidden = true;
       elements.logoutButton.hidden = true;
       setSyncStatus(message);
@@ -1013,12 +1021,25 @@
         const auth = authModule.getAuth(app);
         const provider = new authModule.GoogleAuthProvider();
 
+        function handleLoginError(error, action) {
+          showToast("ログインできませんでした");
+          setSignedOutUi(getAuthErrorMessage(error, action));
+        }
+
         elements.loginButton.addEventListener("click", () => {
           setSyncStatus("ログイン画面を開いています...");
           elements.loginButton.disabled = true;
+          elements.redirectLoginButton.disabled = true;
+          authModule.signInWithPopup(auth, provider).catch((error) => {
+            handleLoginError(error, "ポップアップログイン");
+          });
+        });
+        elements.redirectLoginButton.addEventListener("click", () => {
+          setSyncStatus("同じタブでログイン画面を開いています...");
+          elements.loginButton.disabled = true;
+          elements.redirectLoginButton.disabled = true;
           authModule.signInWithRedirect(auth, provider).catch((error) => {
-            showToast("ログインできませんでした");
-            setSignedOutUi(getAuthErrorMessage(error, "リダイレクトログイン"));
+            handleLoginError(error, "リダイレクトログイン");
           });
         });
         elements.refreshButton.addEventListener("click", () => {
