@@ -649,6 +649,7 @@
       measurementId: "",
     };
     const SYNC_DOCUMENT_ID = "main";
+    const FIRESTORE_USER_COLLECTION = "promptCopyApp";
 
     const elements = {
       form: document.getElementById("promptForm"),
@@ -873,11 +874,37 @@
       );
     }
 
-    function getFirestoreRestUrl(user) {
+    function decodeJwtPayload(token) {
+      try {
+        const payload = token.split(".")[1] || "";
+        const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+        return JSON.parse(atob(normalized));
+      } catch {
+        return {};
+      }
+    }
+
+    async function getAuthContext(user, forceRefresh = false) {
+      const token = await user.getIdToken(forceRefresh);
+      const payload = decodeJwtPayload(token);
+      return {
+        token,
+        uid: payload.user_id || payload.sub || user.uid,
+      };
+    }
+
+    function getFirestoreDocumentPath(uid) {
+      return `users/${uid}/${FIRESTORE_USER_COLLECTION}/${SYNC_DOCUMENT_ID}`;
+    }
+
+    function getCurrentFirestorePath() {
+      return currentUser ? getFirestoreDocumentPath(currentUser.uid) : "未ログイン";
+    }
+
+    function getFirestoreRestUrl(uid) {
       const projectId = encodeURIComponent(FIREBASE_CONFIG.projectId);
       const databaseId = encodeURIComponent("(default)");
-      const userId = encodeURIComponent(user.uid);
-      return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${userId}/promptCopyApp/${SYNC_DOCUMENT_ID}`;
+      return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/${getFirestoreDocumentPath(encodeURIComponent(uid))}`;
     }
 
     async function getRestErrorMessage(response, action) {
@@ -900,8 +927,8 @@
     }
 
     async function readRemoteDataViaRest(user) {
-      const token = await user.getIdToken();
-      const response = await fetch(getFirestoreRestUrl(user), {
+      const { token, uid } = await getAuthContext(user);
+      const response = await fetch(getFirestoreRestUrl(uid), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.status === 404) return false;
@@ -914,8 +941,8 @@
     }
 
     async function writeRemoteDataViaRest(user, data) {
-      const token = await user.getIdToken();
-      const response = await fetch(getFirestoreRestUrl(user), {
+      const { token, uid } = await getAuthContext(user, true);
+      const response = await fetch(getFirestoreRestUrl(uid), {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1037,13 +1064,13 @@
         const found = await readRemoteDataViaRest(currentUser);
         if (!found) {
           await writeRemoteDataViaRest(currentUser, getRemotePayload());
-          setSyncStatus("クラウド保存を作成しました");
+          setSyncStatus(`読み込み成功: 保存先を作成しました（${getCurrentFirestorePath()}）`);
           return;
         }
-        if (!silent) setSyncStatus("クラウドから読み込みました");
+        if (!silent) setSyncStatus(`読み込み成功（${getCurrentFirestorePath()}）`);
       } catch (error) {
         const detail = error && error.message ? `: ${error.message}` : "";
-        setSyncStatus(`同期失敗。更新ボタンで再読み込みしてください${detail}`);
+        setSyncStatus(`読み込み失敗。更新ボタンで再読み込みしてください${detail}`);
       }
     }
 
@@ -1052,11 +1079,11 @@
       try {
         setSyncStatus("クラウドに保存中...");
         await writeRemoteDataViaRest(currentUser, getRemotePayload());
-        setSyncStatus("クラウドに保存しました");
+        setSyncStatus(`保存成功（${getCurrentFirestorePath()}）`);
         await refreshRemoteData({ silent: true });
       } catch (error) {
         const detail = error && error.message ? `: ${error.message}` : "";
-        setSyncStatus(`同期失敗。保存後に更新ボタンで確認してください${detail}`);
+        setSyncStatus(`保存失敗（${getCurrentFirestorePath()}）${detail}`);
       }
     }
 
