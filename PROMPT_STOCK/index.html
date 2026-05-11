@@ -462,6 +462,25 @@
       outline-offset: 2px;
     }
 
+    .order-cell {
+      flex: 0 0 auto;
+      display: grid;
+      gap: 4px;
+      padding: 5px 0;
+    }
+
+    .order-button {
+      min-width: 30px;
+      min-height: 26px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--blue-800);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
     .prompt-main {
       flex: 1 1 auto;
       min-width: 0;
@@ -518,7 +537,9 @@
 
     .long-summary {
       display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 6px;
+      align-items: center;
       padding: 2px 0 8px;
     }
 
@@ -530,18 +551,11 @@
       overflow-wrap: anywhere;
     }
 
-    .long-excerpt {
-      color: #233a55;
-      font-size: 14px;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
-    }
-
     .long-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+      justify-content: flex-end;
       padding-top: 2px;
     }
 
@@ -623,6 +637,19 @@
         gap: 8px;
       }
 
+      .long-summary {
+        grid-template-columns: 1fr;
+      }
+
+      .long-actions {
+        justify-content: flex-start;
+      }
+
+      .long-actions .btn,
+      .order-cell .order-button {
+        width: auto;
+      }
+
       .category-cell {
         flex-basis: 96px;
         font-size: 12px;
@@ -675,6 +702,7 @@
           </div>
           <select class="sort-select" id="filterCategorySelect" aria-label="カテゴリで絞り込み"></select>
           <select class="sort-select" id="sortSelect" aria-label="並び替え">
+            <option value="manual">任意順</option>
             <option value="newest">新しい順</option>
             <option value="oldest">古い順</option>
             <option value="short">短い順</option>
@@ -825,6 +853,9 @@
         title,
         body,
         categoryId: prompt.categoryId || "",
+        order: Number.isFinite(Number(prompt.order))
+          ? Number(prompt.order)
+          : -Number(prompt.updatedAt || prompt.createdAt || Date.now()),
         createdAt: Number(prompt.createdAt || Date.now()),
         updatedAt: Number(prompt.updatedAt || prompt.createdAt || Date.now()),
       };
@@ -1262,8 +1293,26 @@
       return prompt.title ? `${prompt.title}\n\n${prompt.body}` : prompt.body;
     }
 
-    function getExcerpt(text, maxLength = 120) {
-      return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+    function getNextOrder(type) {
+      const typePrompts = prompts.filter((prompt) => prompt.type === type);
+      if (typePrompts.length === 0) return 0;
+      return Math.min(...typePrompts.map((prompt) => Number(prompt.order || 0))) - 1000;
+    }
+
+    function sortByManualOrder(items) {
+      return [...items].sort((a, b) => {
+        const orderDiff = Number(a.order || 0) - Number(b.order || 0);
+        if (orderDiff !== 0) return orderDiff;
+        return b.updatedAt - a.updatedAt;
+      });
+    }
+
+    function normalizeManualOrder(type) {
+      const ordered = sortByManualOrder(prompts.filter((prompt) => prompt.type === type));
+      const orderById = new Map(ordered.map((prompt, index) => [prompt.id, index * 1000]));
+      prompts = prompts.map((prompt) => (
+        orderById.has(prompt.id) ? { ...prompt, order: orderById.get(prompt.id) } : prompt
+      ));
     }
 
     function getDefaultCategoryId() {
@@ -1310,6 +1359,11 @@
       });
 
       return filtered.sort((a, b) => {
+        if (elements.sort.value === "manual") {
+          const orderDiff = Number(a.order || 0) - Number(b.order || 0);
+          if (orderDiff !== 0) return orderDiff;
+          return b.updatedAt - a.updatedAt;
+        }
         if (elements.sort.value === "oldest") {
           return a.updatedAt - b.updatedAt;
         }
@@ -1355,7 +1409,7 @@
         return;
       }
 
-      visiblePrompts.forEach((prompt) => {
+      visiblePrompts.forEach((prompt, index) => {
         const card = document.createElement("article");
         card.className = selectedIds.has(prompt.id) ? "prompt-card selected" : "prompt-card";
 
@@ -1371,6 +1425,27 @@
         const fakeCheckbox = document.createElement("span");
         fakeCheckbox.className = "fake-checkbox";
         fakeCheckbox.setAttribute("aria-hidden", "true");
+
+        const orderCell = document.createElement("div");
+        orderCell.className = "order-cell";
+
+        const moveUpButton = document.createElement("button");
+        moveUpButton.type = "button";
+        moveUpButton.className = "order-button";
+        moveUpButton.textContent = "上";
+        moveUpButton.disabled = elements.sort.value !== "manual" || index === 0;
+        moveUpButton.setAttribute("aria-label", "この文言を上へ移動");
+        moveUpButton.addEventListener("click", () => movePrompt(prompt.id, -1));
+
+        const moveDownButton = document.createElement("button");
+        moveDownButton.type = "button";
+        moveDownButton.className = "order-button";
+        moveDownButton.textContent = "下";
+        moveDownButton.disabled = elements.sort.value !== "manual" || index === visiblePrompts.length - 1;
+        moveDownButton.setAttribute("aria-label", "この文言を下へ移動");
+        moveDownButton.addEventListener("click", () => movePrompt(prompt.id, 1));
+
+        orderCell.append(moveUpButton, moveDownButton);
 
         let main = document.createElement("div");
         main.className = "prompt-main";
@@ -1444,10 +1519,6 @@
             title.className = "long-title";
             title.textContent = prompt.title || "タイトルなし";
 
-            const excerpt = document.createElement("div");
-            excerpt.className = "long-excerpt";
-            excerpt.textContent = getExcerpt(prompt.body);
-
             const actions = document.createElement("div");
             actions.className = "long-actions";
 
@@ -1457,14 +1528,8 @@
             bodyCopyButton.textContent = "本文コピー";
             bodyCopyButton.addEventListener("click", () => copyPrompt(prompt.body));
 
-            const fullCopyButton = document.createElement("button");
-            fullCopyButton.type = "button";
-            fullCopyButton.className = "btn btn-secondary";
-            fullCopyButton.textContent = "タイトル＋本文コピー";
-            fullCopyButton.addEventListener("click", () => copyPrompt(getLongCopyText(prompt)));
-
-            actions.append(bodyCopyButton, fullCopyButton);
-            summary.append(title, excerpt, actions);
+            actions.append(bodyCopyButton);
+            summary.append(title, actions);
             main.append(summary);
           } else {
             const content = document.createElement("button");
@@ -1477,7 +1542,7 @@
         }
 
         selectCell.append(checkbox, fakeCheckbox);
-        card.append(selectCell, categoryCell, main);
+        card.append(selectCell, orderCell, categoryCell, main);
         elements.list.appendChild(card);
       });
     }
@@ -1564,6 +1629,33 @@
       } else {
         selectedIds.delete(id);
       }
+      render();
+    }
+
+    function movePrompt(id, direction) {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
+      if (elements.sort.value !== "manual") {
+        elements.sort.value = "manual";
+      }
+      normalizeManualOrder(activeType);
+      const visiblePrompts = getVisiblePrompts();
+      const currentIndex = visiblePrompts.findIndex((prompt) => prompt.id === id);
+      const targetIndex = currentIndex + direction;
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= visiblePrompts.length) return;
+
+      const current = visiblePrompts[currentIndex];
+      const target = visiblePrompts[targetIndex];
+      const currentOrder = current.order;
+      const targetOrder = target.order;
+      prompts = prompts.map((prompt) => {
+        if (prompt.id === current.id) return { ...prompt, order: targetOrder };
+        if (prompt.id === target.id) return { ...prompt, order: currentOrder };
+        return prompt;
+      });
+      savePrompts();
       render();
     }
 
@@ -1770,6 +1862,7 @@
           title,
           body,
           categoryId,
+          order: getNextOrder(activeType),
           createdAt: now,
           updatedAt: now,
         });
