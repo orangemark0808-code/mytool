@@ -201,6 +201,30 @@
       margin-top: 8px;
     }
 
+    .type-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 0 0 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab-button {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--blue-800);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .tab-button.is-active {
+      border-color: var(--blue-700);
+      background: var(--blue-700);
+      color: #fff;
+    }
+
     .editor {
       display: none;
       gap: 12px;
@@ -243,6 +267,15 @@
       grid-template-columns: minmax(140px, 180px) 1fr;
       gap: 10px;
       align-items: start;
+    }
+
+    .title-field {
+      display: none;
+      grid-column: 1 / -1;
+    }
+
+    .editor.is-long .title-field {
+      display: block;
     }
 
     .btn {
@@ -483,6 +516,35 @@
       outline-offset: 2px;
     }
 
+    .long-summary {
+      display: grid;
+      gap: 6px;
+      padding: 2px 0 8px;
+    }
+
+    .long-title {
+      color: var(--blue-900);
+      font-size: 15px;
+      font-weight: 900;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .long-excerpt {
+      color: #233a55;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .long-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-top: 2px;
+    }
+
     .btn:disabled {
       cursor: not-allowed;
       opacity: 0.45;
@@ -548,6 +610,10 @@
         grid-template-columns: 1fr;
       }
 
+      .editor-fields {
+        grid-template-columns: 1fr;
+      }
+
       .bulk-actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -598,6 +664,10 @@
           <button class="btn btn-secondary" id="refreshButton" type="button" hidden>更新</button>
           <button class="btn btn-secondary" id="logoutButton" type="button" hidden>ログアウト</button>
         </div>
+        <div class="type-tabs" role="tablist" aria-label="文言タイプ">
+          <button class="tab-button is-active" id="shortTabButton" type="button" role="tab" aria-selected="true" data-type="short">short</button>
+          <button class="tab-button" id="longTabButton" type="button" role="tab" aria-selected="false" data-type="long">long</button>
+        </div>
         <div class="toolbar">
           <div class="search">
             <span class="search-icon" aria-hidden="true"></span>
@@ -629,6 +699,7 @@
           </div>
           <div class="inline-editor">
             <div class="editor-fields">
+              <input class="title-field" id="promptTitle" type="text" autocomplete="off" aria-label="タイトル" placeholder="タイトルを入力">
               <select class="category-select" id="promptCategory" aria-label="カテゴリ"></select>
               <textarea id="promptBody" rows="1" aria-label="文言" placeholder="文言を入力"></textarea>
             </div>
@@ -664,8 +735,11 @@
 
     const elements = {
       form: document.getElementById("promptForm"),
+      title: document.getElementById("promptTitle"),
       body: document.getElementById("promptBody"),
       promptCategory: document.getElementById("promptCategory"),
+      shortTabButton: document.getElementById("shortTabButton"),
+      longTabButton: document.getElementById("longTabButton"),
       openAddButton: document.getElementById("openAddButton"),
       toggleSettingsButton: document.getElementById("toggleSettingsButton"),
       submitButton: document.getElementById("submitButton"),
@@ -702,19 +776,14 @@
     let authReadyTimer = null;
     let refreshTimer = null;
     let hasInitializedCategoryFilter = false;
+    let activeType = "short";
 
     function loadPrompts() {
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (!Array.isArray(saved)) return [];
         return saved
-          .map((prompt) => ({
-            id: prompt.id || createId(),
-            body: String(prompt.body || prompt.title || "").trim(),
-            categoryId: prompt.categoryId || "",
-            createdAt: prompt.createdAt || Date.now(),
-            updatedAt: prompt.updatedAt || prompt.createdAt || Date.now(),
-          }))
+          .map(normalizePrompt)
           .filter((prompt) => prompt.body);
       } catch {
         return [];
@@ -747,9 +816,14 @@
     }
 
     function normalizePrompt(prompt) {
+      const type = prompt.type === "long" ? "long" : "short";
+      const body = String(prompt.body || (type === "short" ? prompt.title : "") || "").trim();
+      const title = type === "long" ? String(prompt.title || "").trim() : "";
       return {
         id: prompt.id || createId(),
-        body: String(prompt.body || prompt.title || "").trim(),
+        type,
+        title,
+        body,
         categoryId: prompt.categoryId || "",
         createdAt: Number(prompt.createdAt || Date.now()),
         updatedAt: Number(prompt.updatedAt || prompt.createdAt || Date.now()),
@@ -1143,6 +1217,22 @@
       return categories.find((category) => category.id === categoryId)?.name || "";
     }
 
+    function getTypeLabel(type) {
+      return type === "long" ? "長文" : "短文";
+    }
+
+    function getPromptLabel(prompt) {
+      return prompt.type === "long" ? prompt.title || prompt.body : prompt.body;
+    }
+
+    function getLongCopyText(prompt) {
+      return prompt.title ? `${prompt.title}\n\n${prompt.body}` : prompt.body;
+    }
+
+    function getExcerpt(text, maxLength = 120) {
+      return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+    }
+
     function getDefaultCategoryId() {
       return categories.find((category) => category.name === "AI")?.id || "";
     }
@@ -1174,10 +1264,13 @@
       const query = normalize(elements.search.value);
       const filterCategoryId = elements.filterCategory.value;
       const filtered = prompts.filter((prompt) => {
+        if (prompt.type !== activeType) return false;
         if (filterCategoryId === "__none" && prompt.categoryId) return false;
         if (filterCategoryId && filterCategoryId !== "__none" && prompt.categoryId !== filterCategoryId) return false;
         if (!query) return true;
-        return normalize(prompt.body).includes(query) || normalize(getCategoryName(prompt.categoryId)).includes(query);
+        return normalize(prompt.body).includes(query) ||
+          normalize(prompt.title || "").includes(query) ||
+          normalize(getCategoryName(prompt.categoryId)).includes(query);
       });
 
       return filtered.sort((a, b) => {
@@ -1194,8 +1287,12 @@
     function render() {
       const locked = isAuthLocked();
       renderCategoryOptions();
+      renderTypeTabs();
       const visiblePrompts = getVisiblePrompts();
-      elements.count.textContent = locked ? "0" : prompts.length.toString();
+      const activeTypeCount = prompts.filter((prompt) => prompt.type === activeType).length;
+      elements.count.textContent = locked ? "0" : activeTypeCount.toString();
+      elements.shortTabButton.disabled = locked;
+      elements.longTabButton.disabled = locked;
       elements.openAddButton.disabled = locked;
       elements.toggleSettingsButton.disabled = locked;
       elements.search.disabled = locked;
@@ -1215,9 +1312,9 @@
       if (visiblePrompts.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty";
-        empty.innerHTML = prompts.length === 0
-          ? "<strong>まだ登録がありません</strong><span>追加ボタンから依頼文を登録できます。</span>"
-          : "<strong>該当する依頼文がありません</strong><span>検索条件を変えてみてください。</span>";
+        empty.innerHTML = activeTypeCount === 0
+          ? `<strong>${getTypeLabel(activeType)}はまだ登録がありません</strong><span>追加ボタンから登録できます。</span>`
+          : "<strong>該当する文言がありません</strong><span>検索条件を変えてみてください。</span>";
         elements.list.appendChild(empty);
         return;
       }
@@ -1253,6 +1350,15 @@
           const editForm = document.createElement("form");
           editForm.className = "prompt-main";
 
+          let titleInput = null;
+          if (prompt.type === "long") {
+            titleInput = document.createElement("input");
+            titleInput.type = "text";
+            titleInput.value = prompt.title || "";
+            titleInput.setAttribute("aria-label", "タイトルを編集");
+            titleInput.placeholder = "タイトルを入力";
+          }
+
           const textarea = document.createElement("textarea");
           textarea.className = "card-edit-textarea";
           textarea.value = prompt.body;
@@ -1278,10 +1384,13 @@
 
           editForm.addEventListener("submit", (event) => {
             event.preventDefault();
-            updatePrompt(prompt.id, textarea.value, categorySelect.value);
+            updatePrompt(prompt.id, textarea.value, categorySelect.value, titleInput ? titleInput.value : "");
           });
 
           actions.append(saveButton, cancelButton);
+          if (titleInput) {
+            editForm.append(titleInput);
+          }
           editForm.append(textarea, actions);
           main = editForm;
         } else {
@@ -1291,12 +1400,44 @@
             categoryCell.classList.add("category-empty");
           }
 
-          const content = document.createElement("button");
-          content.type = "button";
-          content.className = "content";
-          content.textContent = prompt.body;
-          content.addEventListener("click", () => copyPrompt(prompt.body));
-          main.append(content);
+          if (prompt.type === "long") {
+            const summary = document.createElement("div");
+            summary.className = "long-summary";
+
+            const title = document.createElement("div");
+            title.className = "long-title";
+            title.textContent = prompt.title || "タイトルなし";
+
+            const excerpt = document.createElement("div");
+            excerpt.className = "long-excerpt";
+            excerpt.textContent = getExcerpt(prompt.body);
+
+            const actions = document.createElement("div");
+            actions.className = "long-actions";
+
+            const bodyCopyButton = document.createElement("button");
+            bodyCopyButton.type = "button";
+            bodyCopyButton.className = "btn btn-primary";
+            bodyCopyButton.textContent = "本文コピー";
+            bodyCopyButton.addEventListener("click", () => copyPrompt(prompt.body));
+
+            const fullCopyButton = document.createElement("button");
+            fullCopyButton.type = "button";
+            fullCopyButton.className = "btn btn-secondary";
+            fullCopyButton.textContent = "タイトル＋本文コピー";
+            fullCopyButton.addEventListener("click", () => copyPrompt(getLongCopyText(prompt)));
+
+            actions.append(bodyCopyButton, fullCopyButton);
+            summary.append(title, excerpt, actions);
+            main.append(summary);
+          } else {
+            const content = document.createElement("button");
+            content.type = "button";
+            content.className = "content";
+            content.textContent = prompt.body;
+            content.addEventListener("click", () => copyPrompt(prompt.body));
+            main.append(content);
+          }
         }
 
         selectCell.append(checkbox, fakeCheckbox);
@@ -1345,6 +1486,25 @@
       }
     }
 
+    function renderTypeTabs() {
+      const isShort = activeType === "short";
+      elements.shortTabButton.classList.toggle("is-active", isShort);
+      elements.longTabButton.classList.toggle("is-active", !isShort);
+      elements.shortTabButton.setAttribute("aria-selected", String(isShort));
+      elements.longTabButton.setAttribute("aria-selected", String(!isShort));
+      elements.form.classList.toggle("is-long", !isShort);
+      elements.body.placeholder = isShort ? "文言を入力" : "本文を入力";
+      elements.body.setAttribute("aria-label", isShort ? "文言" : "本文");
+    }
+
+    function switchType(type) {
+      if (activeType === type) return;
+      activeType = type;
+      selectedIds = new Set();
+      resetForm();
+      render();
+    }
+
     function updateBulkActions() {
       if (isAuthLocked()) {
         elements.editSelectedButton.disabled = true;
@@ -1373,6 +1533,7 @@
       editingId = null;
       elements.form.reset();
       elements.form.classList.remove("is-open");
+      elements.form.classList.toggle("is-long", activeType === "long");
       elements.submitButton.textContent = "追加";
       elements.promptCategory.value = getDefaultCategoryId();
     }
@@ -1385,9 +1546,14 @@
       editingId = null;
       elements.form.reset();
       elements.form.classList.add("is-open");
+      elements.form.classList.toggle("is-long", activeType === "long");
       elements.submitButton.textContent = "追加";
       elements.promptCategory.value = getDefaultCategoryId();
-      elements.body.focus();
+      if (activeType === "long") {
+        elements.title.focus();
+      } else {
+        elements.body.focus();
+      }
       render();
     }
 
@@ -1409,16 +1575,24 @@
       }
     }
 
-    function updatePrompt(id, rawBody, categoryId) {
+    function updatePrompt(id, rawBody, categoryId, rawTitle = "") {
       const body = rawBody.trim();
       if (!body) {
-        showToast("文言を入力してください");
+        showToast("本文を入力してください");
         return;
       }
 
       const now = Date.now();
       prompts = prompts.map((prompt) => (
-        prompt.id === id ? { ...prompt, body, categoryId, updatedAt: now } : prompt
+        prompt.id === id
+          ? {
+            ...prompt,
+            body,
+            categoryId,
+            title: prompt.type === "long" ? rawTitle.trim() : "",
+            updatedAt: now,
+          }
+          : prompt
       ));
       editingId = null;
       savePrompts();
@@ -1445,7 +1619,7 @@
       if (!prompt) return;
 
       const preview = prompt.body.length > 30 ? `${prompt.body.slice(0, 30)}...` : prompt.body;
-      const confirmed = window.confirm(`「${preview}」を削除しますか？`);
+      const confirmed = window.confirm(`「${getPromptLabel(prompt).slice(0, 30) || preview}」を削除しますか？`);
       if (!confirmed) return;
 
       prompts = prompts.filter((item) => item.id !== id);
@@ -1529,10 +1703,11 @@
       }
 
       const body = elements.body.value.trim();
+      const title = activeType === "long" ? elements.title.value.trim() : "";
       const categoryId = elements.promptCategory.value;
 
       if (!body) {
-        showToast("文言を入力してください");
+        showToast(activeType === "long" ? "本文を入力してください" : "文言を入力してください");
         return;
       }
 
@@ -1541,12 +1716,20 @@
       if (editingId) {
         prompts = prompts.map((prompt) => {
           if (prompt.id !== editingId) return prompt;
-          return { ...prompt, body, categoryId, updatedAt: now };
+          return {
+            ...prompt,
+            body,
+            categoryId,
+            title: prompt.type === "long" ? title : "",
+            updatedAt: now,
+          };
         });
         showToast("更新しました");
       } else {
         prompts.unshift({
           id: createId(),
+          type: activeType,
+          title,
           body,
           categoryId,
           createdAt: now,
@@ -1638,6 +1821,8 @@
     }
 
     elements.openAddButton.addEventListener("click", openAddPrompt);
+    elements.shortTabButton.addEventListener("click", () => switchType("short"));
+    elements.longTabButton.addEventListener("click", () => switchType("long"));
     elements.toggleSettingsButton.addEventListener("click", toggleSettings);
     elements.cancelButton.addEventListener("click", resetForm);
     elements.search.addEventListener("input", render);
