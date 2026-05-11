@@ -17,6 +17,11 @@ if (-not (Test-Path -LiteralPath $workflowPath)) {
   throw ".github\workflows\deploy-prompt-stock.yml が見つかりません。"
 }
 
+$workflow = Get-Content -LiteralPath $workflowPath -Raw
+if ($workflow -notmatch "dist/PROMPT_STOCK/firebase-config\.js") {
+  throw "workflow が PROMPT_STOCK 配下の firebase-config.js を生成していません。"
+}
+
 $html = Get-Content -LiteralPath $htmlPath -Raw
 if ($html -notmatch "firebase-config\.js") {
   throw "GitHub Pages用の firebase-config.js 読み込みがありません。"
