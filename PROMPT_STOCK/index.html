@@ -685,6 +685,7 @@
     let isApplyingRemoteData = false;
     let authReadyTimer = null;
     let syncReadyTimer = null;
+    let restPollTimer = null;
 
     function loadPrompts() {
       try {
@@ -822,6 +823,11 @@
       syncReadyTimer = null;
     }
 
+    function stopRestPolling() {
+      clearInterval(restPollTimer);
+      restPollTimer = null;
+    }
+
     function isOfflineFirestoreError(error) {
       const message = String(error && error.message ? error.message : "");
       const code = String(error && error.code ? error.code : "");
@@ -932,6 +938,35 @@
       }
     }
 
+    async function enableRestFallback(user, reason) {
+      if (!remoteStore) return;
+      remoteStore.useRestFallback = true;
+      stopRestPolling();
+
+      try {
+        const found = await readRemoteDataViaRest(user);
+        if (!found && (prompts.length > 0 || categories.length > 0)) {
+          await writeRemoteData();
+        }
+        setSyncStatus(`REST APIでクラウド同期中（${reason}）`);
+      } catch (error) {
+        const detail = error && error.message ? `: ${error.message}` : "";
+        setSyncStatus(`REST同期エラー${detail}`);
+        return;
+      }
+
+      restPollTimer = setInterval(() => {
+        readRemoteDataViaRest(user).then((found) => {
+          if (found) {
+            setSyncStatus("REST APIでクラウド同期中");
+          }
+        }).catch((error) => {
+          const detail = error && error.message ? `: ${error.message}` : "";
+          setSyncStatus(`REST同期エラー${detail}`);
+        });
+      }, 15000);
+    }
+
     function saveLocalData() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
       localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
@@ -987,6 +1022,7 @@
             unsubscribeRemote();
             unsubscribeRemote = null;
           }
+          stopRestPolling();
           remoteStore = null;
 
           if (!user) {
@@ -1024,18 +1060,7 @@
             }, (error) => {
               stopSyncReadyTimer();
               if (isOfflineFirestoreError(error)) {
-                remoteStore.useRestFallback = true;
-                readRemoteDataViaRest(user).then((found) => {
-                  if (!found && (prompts.length > 0 || categories.length > 0)) {
-                    return writeRemoteData();
-                  }
-                  return null;
-                }).then(() => {
-                  setSyncStatus("REST APIでクラウド同期中");
-                }).catch((restError) => {
-                  const detail = restError && restError.message ? `: ${restError.message}` : "";
-                  setSyncStatus(`REST同期エラー${detail}`);
-                });
+                enableRestFallback(user, "Firestore SDK接続を代替");
                 return;
               }
               const detail = error && error.message ? `: ${error.message}` : "";
@@ -1060,18 +1085,7 @@
             }).catch((error) => {
               stopSyncReadyTimer();
               if (isOfflineFirestoreError(error)) {
-                remoteStore.useRestFallback = true;
-                readRemoteDataViaRest(user).then((found) => {
-                  if (!found && (prompts.length > 0 || categories.length > 0)) {
-                    return writeRemoteData();
-                  }
-                  return null;
-                }).then(() => {
-                  setSyncStatus("REST APIでクラウド同期中");
-                }).catch((restError) => {
-                  const detail = restError && restError.message ? `: ${restError.message}` : "";
-                  setSyncStatus(`REST同期エラー${detail}`);
-                });
+                enableRestFallback(user, "Firestore SDK接続を代替");
                 return;
               }
               const detail = error && error.message ? `: ${error.message}` : "";
