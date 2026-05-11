@@ -182,7 +182,7 @@
     textarea {
       min-height: 78px;
       padding: 12px 13px;
-      line-height: 1.65;
+      line-height: 1.45;
       resize: vertical;
     }
 
@@ -229,7 +229,7 @@
       border: 0;
       border-radius: 0;
       background: transparent;
-      line-height: 1.68;
+      line-height: 1.45;
       resize: vertical;
     }
 
@@ -308,6 +308,10 @@
       padding: 10px 0;
       border-bottom: 1px solid var(--line);
       align-items: center;
+    }
+
+    .category-tools[hidden] {
+      display: none;
     }
 
     .category-tools input {
@@ -451,11 +455,17 @@
       background: transparent;
       color: #233a55;
       font-size: 16px;
-      line-height: 1.68;
+      line-height: 1.45;
       text-align: left;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .card-edit-textarea {
+      min-height: 72px;
+      padding: 8px 10px;
+      line-height: 1.45;
     }
 
     .category-empty {
@@ -540,7 +550,7 @@
 
       .bulk-actions {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr;
       }
 
       .prompt-card {
@@ -603,9 +613,10 @@
             <button class="btn btn-primary" id="openAddButton" type="button">追加</button>
             <button class="btn btn-edit" id="editSelectedButton" type="button" disabled>編集</button>
             <button class="btn btn-delete" id="deleteSelectedButton" type="button" disabled>削除</button>
+            <button class="btn btn-secondary" id="toggleSettingsButton" type="button" aria-expanded="false">設定</button>
           </div>
         </div>
-        <div class="category-tools" aria-label="カテゴリ管理">
+        <div class="category-tools" id="categoryTools" aria-label="カテゴリ管理" hidden>
           <select class="category-select" id="categoryManageSelect" aria-label="編集するカテゴリ"></select>
           <input id="categoryNameInput" type="text" autocomplete="off" placeholder="カテゴリ名">
           <button class="btn btn-primary" id="addCategoryButton" type="button">カテゴリ追加</button>
@@ -656,10 +667,12 @@
       body: document.getElementById("promptBody"),
       promptCategory: document.getElementById("promptCategory"),
       openAddButton: document.getElementById("openAddButton"),
+      toggleSettingsButton: document.getElementById("toggleSettingsButton"),
       submitButton: document.getElementById("submitButton"),
       cancelButton: document.getElementById("cancelButton"),
       search: document.getElementById("searchInput"),
       sort: document.getElementById("sortSelect"),
+      categoryTools: document.getElementById("categoryTools"),
       categoryManageSelect: document.getElementById("categoryManageSelect"),
       categoryNameInput: document.getElementById("categoryNameInput"),
       addCategoryButton: document.getElementById("addCategoryButton"),
@@ -1104,6 +1117,29 @@
       return categories.find((category) => category.id === categoryId)?.name || "";
     }
 
+    function createCategorySelect(selectedCategoryId) {
+      const select = document.createElement("select");
+      select.className = "category-select";
+      select.setAttribute("aria-label", "カテゴリ");
+
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = "カテゴリなし";
+      select.appendChild(emptyOption);
+
+      categories.forEach((category) => {
+        const option = document.createElement("option");
+        option.value = category.id;
+        option.textContent = category.name;
+        select.appendChild(option);
+      });
+
+      select.value = categories.some((category) => category.id === selectedCategoryId)
+        ? selectedCategoryId
+        : "";
+      return select;
+    }
+
     function getVisiblePrompts() {
       const query = normalize(elements.search.value);
       const filtered = prompts.filter((prompt) => {
@@ -1156,25 +1192,67 @@
         fakeCheckbox.className = "fake-checkbox";
         fakeCheckbox.setAttribute("aria-hidden", "true");
 
-        const main = document.createElement("div");
+        let main = document.createElement("div");
         main.className = "prompt-main";
 
         const categoryCell = document.createElement("div");
         categoryCell.className = "category-cell";
-        const categoryName = getCategoryName(prompt.categoryId);
-        categoryCell.textContent = categoryName || "カテゴリなし";
-        if (!categoryName) {
-          categoryCell.classList.add("category-empty");
+
+        const isEditing = editingId === prompt.id;
+        if (isEditing) {
+          const categorySelect = createCategorySelect(prompt.categoryId);
+          categoryCell.appendChild(categorySelect);
+
+          const editForm = document.createElement("form");
+          editForm.className = "prompt-main";
+
+          const textarea = document.createElement("textarea");
+          textarea.className = "card-edit-textarea";
+          textarea.value = prompt.body;
+          textarea.rows = 3;
+          textarea.setAttribute("aria-label", "文言を編集");
+
+          const actions = document.createElement("div");
+          actions.className = "form-actions";
+
+          const saveButton = document.createElement("button");
+          saveButton.className = "btn btn-primary";
+          saveButton.type = "submit";
+          saveButton.textContent = "保存";
+
+          const cancelButton = document.createElement("button");
+          cancelButton.className = "btn btn-secondary";
+          cancelButton.type = "button";
+          cancelButton.textContent = "キャンセル";
+          cancelButton.addEventListener("click", () => {
+            resetForm();
+            render();
+          });
+
+          editForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            updatePrompt(prompt.id, textarea.value, categorySelect.value);
+          });
+
+          actions.append(saveButton, cancelButton);
+          editForm.append(textarea, actions);
+          main = editForm;
+        } else {
+          const categoryName = getCategoryName(prompt.categoryId);
+          categoryCell.textContent = categoryName || "カテゴリなし";
+          if (!categoryName) {
+            categoryCell.classList.add("category-empty");
+          }
+
+          const content = document.createElement("button");
+          content.type = "button";
+          content.className = "content";
+          content.textContent = prompt.body;
+          content.addEventListener("click", () => copyPrompt(prompt.body));
+          main.append(content);
         }
 
-        const content = document.createElement("button");
-        content.type = "button";
-        content.className = "content";
-        content.textContent = prompt.body;
-        content.addEventListener("click", () => copyPrompt(prompt.body));
-
         selectCell.append(checkbox, fakeCheckbox);
-        main.append(content);
         card.append(selectCell, categoryCell, main);
         elements.list.appendChild(card);
       });
@@ -1239,6 +1317,7 @@
       elements.submitButton.textContent = "追加";
       elements.promptCategory.value = "";
       elements.body.focus();
+      render();
     }
 
     function startEdit(id) {
@@ -1246,12 +1325,40 @@
       if (!prompt) return;
 
       editingId = id;
-      elements.body.value = prompt.body;
-      elements.promptCategory.value = prompt.categoryId || "";
-      elements.form.classList.add("is-open");
-      elements.submitButton.textContent = "更新";
-      elements.body.focus();
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      elements.form.classList.remove("is-open");
+      render();
+      const textarea = elements.list.querySelector(".card-edit-textarea");
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      }
+    }
+
+    function updatePrompt(id, rawBody, categoryId) {
+      const body = rawBody.trim();
+      if (!body) {
+        showToast("文言を入力してください");
+        return;
+      }
+
+      const now = Date.now();
+      prompts = prompts.map((prompt) => (
+        prompt.id === id ? { ...prompt, body, categoryId, updatedAt: now } : prompt
+      ));
+      editingId = null;
+      savePrompts();
+      render();
+      showToast("更新しました");
+    }
+
+    function toggleSettings() {
+      const willOpen = elements.categoryTools.hidden;
+      elements.categoryTools.hidden = !willOpen;
+      elements.toggleSettingsButton.setAttribute("aria-expanded", String(willOpen));
+      elements.toggleSettingsButton.textContent = willOpen ? "設定を閉じる" : "設定";
+      if (willOpen) {
+        elements.categoryNameInput.focus();
+      }
     }
 
     function deletePrompt(id) {
@@ -1433,6 +1540,7 @@
     }
 
     elements.openAddButton.addEventListener("click", openAddPrompt);
+    elements.toggleSettingsButton.addEventListener("click", toggleSettings);
     elements.cancelButton.addEventListener("click", resetForm);
     elements.search.addEventListener("input", render);
     elements.sort.addEventListener("change", render);
