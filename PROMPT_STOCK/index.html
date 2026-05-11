@@ -770,6 +770,26 @@
       );
     }
 
+    function isAuthLocked() {
+      return isFirebaseConfigured() && !currentUser;
+    }
+
+    function getAuthErrorMessage(error, action) {
+      const code = error?.code || "";
+      const message = error?.message || "";
+      if (code === "auth/unauthorized-domain") {
+        return `${action}失敗: Firebase Authenticationの承認済みドメインに、現在開いているドメインを追加してください（${code}）`;
+      }
+      if (code === "auth/popup-blocked") {
+        return `${action}失敗: ポップアップがブロックされました。ブラウザ設定を確認してください（${code}）`;
+      }
+      if (code === "auth/operation-not-allowed") {
+        return `${action}失敗: Firebase AuthenticationでGoogleログインを有効にしてください（${code}）`;
+      }
+      const detail = [code, message].filter(Boolean).join(": ");
+      return detail ? `${action}失敗: ${detail}` : `${action}に失敗しました`;
+    }
+
     function getFirebaseConfigStatus() {
       if (!window.PROMPT_STOCK_FIREBASE_CONFIG && !window.PROMPT_COPY_FIREBASE_CONFIG) {
         return "firebase-config.js未読込";
@@ -995,10 +1015,12 @@
 
         elements.loginButton.addEventListener("click", () => {
           setSyncStatus("ログイン画面を開いています...");
-          authModule.signInWithPopup(auth, provider).catch(() => {
-            authModule.signInWithRedirect(auth, provider).catch(() => {
+          elements.loginButton.disabled = true;
+          authModule.signInWithPopup(auth, provider).catch((popupError) => {
+            setSyncStatus(`${getAuthErrorMessage(popupError, "ポップアップログイン")}。リダイレクトログインを試します...`);
+            authModule.signInWithRedirect(auth, provider).catch((redirectError) => {
               showToast("ログインできませんでした");
-              setSignedOutUi("ログインできませんでした。Safariの設定と通信状態を確認してください");
+              setSignedOutUi(getAuthErrorMessage(redirectError, "リダイレクトログイン"));
             });
           });
         });
@@ -1027,6 +1049,7 @@
           if (!user) {
             currentUser = null;
             setSignedOutUi();
+            render();
             return;
           }
 
@@ -1159,11 +1182,24 @@
     }
 
     function render() {
+      const locked = isAuthLocked();
       const visiblePrompts = getVisiblePrompts();
-      elements.count.textContent = prompts.length.toString();
+      elements.count.textContent = locked ? "0" : prompts.length.toString();
+      elements.openAddButton.disabled = locked;
+      elements.toggleSettingsButton.disabled = locked;
+      elements.search.disabled = locked;
+      elements.sort.disabled = locked;
       renderCategoryOptions();
       updateBulkActions();
       elements.list.innerHTML = "";
+
+      if (locked) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.innerHTML = "<strong>ログインしてください</strong><span>ログイン後にクラウドの保存内容を表示します。</span>";
+        elements.list.appendChild(empty);
+        return;
+      }
 
       if (visiblePrompts.length === 0) {
         const empty = document.createElement("div");
@@ -1286,6 +1322,13 @@
     }
 
     function updateBulkActions() {
+      if (isAuthLocked()) {
+        elements.editSelectedButton.disabled = true;
+        elements.deleteSelectedButton.disabled = true;
+        elements.editSelectedButton.textContent = "編集";
+        elements.deleteSelectedButton.textContent = "削除";
+        return;
+      }
       const selectedCount = selectedIds.size;
       elements.editSelectedButton.disabled = selectedCount !== 1;
       elements.deleteSelectedButton.disabled = selectedCount === 0;
@@ -1311,6 +1354,10 @@
     }
 
     function openAddPrompt() {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
       editingId = null;
       elements.form.reset();
       elements.form.classList.add("is-open");
@@ -1321,6 +1368,10 @@
     }
 
     function startEdit(id) {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
       const prompt = prompts.find((item) => item.id === id);
       if (!prompt) return;
 
@@ -1352,6 +1403,10 @@
     }
 
     function toggleSettings() {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
       const willOpen = elements.categoryTools.hidden;
       elements.categoryTools.hidden = !willOpen;
       elements.toggleSettingsButton.setAttribute("aria-expanded", String(willOpen));
@@ -1444,6 +1499,10 @@
 
     elements.form.addEventListener("submit", (event) => {
       event.preventDefault();
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
 
       const body = elements.body.value.trim();
       const categoryId = elements.promptCategory.value;
@@ -1479,6 +1538,10 @@
     });
 
     function addCategory() {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
       const name = elements.categoryNameInput.value.trim();
       if (!name) {
         showToast("カテゴリ名を入力してください");
@@ -1499,6 +1562,10 @@
     }
 
     function renameCategory() {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
       const id = elements.categoryManageSelect.value;
       const name = elements.categoryNameInput.value.trim();
       if (!id) {
@@ -1519,6 +1586,10 @@
     }
 
     function deleteCategory() {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
       const id = elements.categoryManageSelect.value;
       if (!id) {
         showToast("カテゴリを選択してください");
