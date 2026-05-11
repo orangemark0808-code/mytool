@@ -57,9 +57,8 @@ jobs:
           FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
         run: |
           mkdir -p dist/PROMPT_STOCK
-          cp "PROMPT_STOCK/index.html" "dist/index.html"
+          cp "index.html" "dist/index.html"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
-          cp "PROMPT_STOCK/README.md" "dist/README.md"
           cp "PROMPT_STOCK/README.md" "dist/PROMPT_STOCK/README.md"
           cat > "dist/firebase-config.js" <<'EOF'
           window.PROMPT_STOCK_FIREBASE_CONFIG = {
