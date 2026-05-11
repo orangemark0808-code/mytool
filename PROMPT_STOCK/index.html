@@ -121,10 +121,19 @@
       align-items: center;
       justify-content: flex-end;
       margin-bottom: 10px;
+      flex-wrap: wrap;
     }
 
     .account-actions[hidden] {
       display: none;
+    }
+
+    .account-user {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
     }
 
     .layout {
@@ -573,7 +582,8 @@
 
     <section class="layout">
       <section class="panel app-box" aria-label="PROMPT-STOCK">
-        <div class="account-actions" id="accountActions" hidden>
+        <div class="account-actions" id="accountActions">
+          <span class="account-user" id="accountUser">未ログイン</span>
           <button class="btn btn-secondary" id="loginButton" type="button">ログイン</button>
           <button class="btn btn-secondary" id="logoutButton" type="button" hidden>ログアウト</button>
         </div>
@@ -658,6 +668,7 @@
       count: document.getElementById("totalCount"),
       syncStatus: document.getElementById("syncStatus"),
       accountActions: document.getElementById("accountActions"),
+      accountUser: document.getElementById("accountUser"),
       loginButton: document.getElementById("loginButton"),
       logoutButton: document.getElementById("logoutButton"),
       toast: document.getElementById("toast"),
@@ -745,14 +756,45 @@
       elements.syncStatus.textContent = message;
     }
 
+    function setSignedOutUi(message = "ログインするとクラウド同期します") {
+      elements.accountActions.hidden = false;
+      elements.accountUser.textContent = "未ログイン";
+      elements.loginButton.hidden = false;
+      elements.loginButton.disabled = false;
+      elements.logoutButton.hidden = true;
+      elements.logoutButton.disabled = false;
+      setSyncStatus(message);
+    }
+
+    function setSignedInUi(user) {
+      const name = user.displayName || user.email || "ログイン中";
+      elements.accountActions.hidden = false;
+      elements.accountUser.textContent = name;
+      elements.loginButton.hidden = true;
+      elements.loginButton.disabled = false;
+      elements.logoutButton.hidden = false;
+      elements.logoutButton.disabled = false;
+    }
+
+    function setAuthErrorUi(message) {
+      elements.accountActions.hidden = false;
+      elements.accountUser.textContent = "同期エラー";
+      elements.loginButton.hidden = false;
+      elements.loginButton.disabled = true;
+      elements.logoutButton.hidden = true;
+      setSyncStatus(message);
+    }
+
     function saveLocalData() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
       localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories));
     }
 
     async function setupRemoteSync() {
+      setSignedOutUi("同期を確認中...");
+
       if (!isFirebaseConfigured()) {
-        setSyncStatus("ローカル保存");
+        setAuthErrorUi("Firebase設定が読み込まれていません。GitHub SecretsとActionsの公開結果を確認してください。");
         return;
       }
 
@@ -766,7 +808,6 @@
         const db = firestore.getFirestore(app);
         const provider = new authModule.GoogleAuthProvider();
 
-        elements.accountActions.hidden = false;
         elements.loginButton.addEventListener("click", () => {
           authModule.signInWithPopup(auth, provider).catch(() => {
             authModule.signInWithRedirect(auth, provider).catch(() => {
@@ -788,14 +829,11 @@
           remoteStore = null;
 
           if (!user) {
-            elements.loginButton.hidden = false;
-            elements.logoutButton.hidden = true;
-            setSyncStatus("ログインするとクラウド同期します");
+            setSignedOutUi();
             return;
           }
 
-          elements.loginButton.hidden = true;
-          elements.logoutButton.hidden = false;
+          setSignedInUi(user);
           setSyncStatus("同期を準備中...");
 
           const dataRef = firestore.doc(db, "users", user.uid, "promptCopyApp", SYNC_DOCUMENT_ID);
@@ -817,9 +855,10 @@
 
           setSyncStatus("クラウド同期中");
         });
-      } catch {
+      } catch (error) {
         remoteStore = null;
-        setSyncStatus("同期エラー: ローカル保存中");
+        const detail = error && error.message ? `: ${error.message}` : "";
+        setAuthErrorUi(`Firebase初期化エラー${detail}`);
       }
     }
 
