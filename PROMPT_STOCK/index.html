@@ -1342,6 +1342,10 @@
     async function refreshRemoteData(options = {}) {
       if (!currentUser) return;
       const silent = Boolean(options.silent);
+      if (editingId) {
+        if (!silent) setSyncStatus("編集中のため、再読み込みを一時停止しています");
+        return;
+      }
       try {
         if (!silent) setSyncStatus("クラウドから読み込み中...");
         const found = await readRemoteDataViaRest(currentUser);
