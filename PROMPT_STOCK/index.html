@@ -490,8 +490,10 @@
 
     .prompt-card {
       display: flex;
-      align-items: flex-start;
-      gap: 12px;
+      align-items: center;
+      gap: 10px;
+      min-height: 64px;
+      padding: 8px 14px;
       border: 1px solid rgba(207, 225, 244, 0.88);
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.72);
@@ -500,6 +502,10 @@
 
     .prompt-card.selected {
       background: rgba(25, 118, 210, 0.07);
+    }
+
+    .prompt-card.is-editing {
+      align-items: flex-start;
     }
 
     .prompt-card.is-dragging {
@@ -514,7 +520,7 @@
 
     .select-cell {
       flex: 0 0 auto;
-      padding: 5px 0 5px 14px;
+      padding: 0;
     }
 
     .select-cell input {
@@ -527,7 +533,6 @@
       display: block;
       width: 18px;
       height: 18px;
-      margin-top: 5px;
       border: 2px solid #7a8491;
       border-radius: 3px;
       background: #fff;
@@ -551,7 +556,7 @@
       display: grid;
       gap: 4px;
       justify-items: center;
-      padding: 5px 0;
+      padding: 0;
     }
 
     .drag-handle {
@@ -597,33 +602,42 @@
     .prompt-main {
       flex: 1 1 auto;
       min-width: 0;
-      padding: 3px 14px 3px 0;
+      padding: 0;
+    }
+
+    .prompt-main.is-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
     .category-cell {
-      flex: 0 0 140px;
+      flex: 0 0 clamp(92px, 14vw, 140px);
       min-width: 0;
-      padding: 5px 0 4px 0;
+      padding: 0;
       color: var(--blue-900);
       font-size: 13px;
       font-weight: 800;
       line-height: 1.5;
-      overflow-wrap: anywhere;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .content {
       display: block;
       width: 100%;
-      min-height: 28px;
-      padding: 2px 0;
+      min-height: 24px;
+      padding: 0;
       border-radius: 6px;
       background: transparent;
       color: #233a55;
       font-size: 16px;
       line-height: 1.45;
       text-align: left;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       transition: background 0.15s ease, color 0.15s ease;
     }
 
@@ -649,11 +663,9 @@
     }
 
     .long-summary {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 6px;
-      align-items: center;
-      padding: 2px 0 8px;
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 0;
     }
 
     .long-title {
@@ -661,7 +673,9 @@
       font-size: 15px;
       font-weight: 900;
       line-height: 1.35;
-      overflow-wrap: anywhere;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .long-actions {
@@ -674,10 +688,12 @@
 
     .row-actions {
       display: flex;
-      flex-wrap: wrap;
+      flex: 0 0 auto;
+      flex-wrap: nowrap;
       gap: 8px;
       justify-content: flex-end;
-      padding: 4px 0 6px;
+      padding: 0;
+      margin-left: auto;
     }
 
     .menu-wrap {
@@ -806,11 +822,12 @@
       }
 
       .prompt-card {
+        flex-wrap: wrap;
         gap: 8px;
       }
 
       .long-summary {
-        grid-template-columns: 1fr;
+        flex-basis: 100%;
       }
 
       .long-actions {
@@ -819,6 +836,8 @@
 
       .row-actions {
         justify-content: flex-start;
+        width: 100%;
+        margin-left: 0;
       }
 
       .mobile-order-actions {
@@ -833,6 +852,12 @@
       .category-cell {
         flex-basis: 96px;
         font-size: 12px;
+      }
+
+      .prompt-main.is-row {
+        flex: 1 1 100%;
+        order: 5;
+        flex-wrap: wrap;
       }
     }
 
@@ -1637,6 +1662,7 @@
         const isEditing = editingId === prompt.id;
         const card = document.createElement("article");
         card.className = selectedIds.has(prompt.id) ? "prompt-card selected" : "prompt-card";
+        card.classList.toggle("is-editing", isEditing);
         card.draggable = elements.sort.value === "manual" && !isEditing;
         card.dataset.promptId = prompt.id;
         card.addEventListener("dragstart", (event) => handleDragStart(event, prompt.id));
@@ -1753,6 +1779,7 @@
           editForm.append(textarea, actions);
           main = editForm;
         } else {
+          main.classList.add("is-row");
           const categoryName = getEffectiveCategory(prompt)?.name || "";
           categoryCell.textContent = categoryName || "カテゴリなし";
           if (!categoryName) {
