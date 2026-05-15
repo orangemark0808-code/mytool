@@ -248,8 +248,8 @@
     }
 
     .inline-editor textarea {
-      min-height: 44px;
-      padding: 6px 0;
+      min-height: 150px;
+      padding: 10px 12px;
       border: 0;
       border-radius: 0;
       background: transparent;
@@ -264,7 +264,7 @@
 
     .editor-fields {
       display: grid;
-      grid-template-columns: minmax(140px, 180px) 1fr;
+      grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
       gap: 10px;
       align-items: start;
     }
@@ -610,7 +610,7 @@
     }
 
     .card-edit-textarea {
-      min-height: 72px;
+      min-height: 150px;
       padding: 8px 10px;
       line-height: 1.45;
     }
@@ -823,7 +823,7 @@
               <div class="editor-fields">
                 <input class="title-field" id="promptTitle" type="text" autocomplete="off" aria-label="タイトル" placeholder="タイトルを入力">
                 <select class="category-select" id="promptCategory" aria-label="カテゴリ"></select>
-                <textarea id="promptBody" rows="1" aria-label="文言" placeholder="文言を入力"></textarea>
+                <textarea id="promptBody" rows="6" aria-label="文言" placeholder="文言を入力"></textarea>
               </div>
               <div class="form-actions">
                 <button class="btn btn-primary" id="submitButton" type="submit">追加</button>
@@ -1635,7 +1635,7 @@
           const textarea = document.createElement("textarea");
           textarea.className = "card-edit-textarea";
           textarea.value = prompt.body;
-          textarea.rows = 3;
+          textarea.rows = 6;
           textarea.setAttribute("aria-label", "文言を編集");
 
           const actions = document.createElement("div");
