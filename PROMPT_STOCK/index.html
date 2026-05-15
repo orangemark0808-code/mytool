@@ -1631,7 +1631,7 @@
         return;
       }
 
-      const isBulkSelecting = selectedIds.size > 0;
+      const isBulkSelecting = selectedIds.size > 1;
 
       visiblePrompts.forEach((prompt, index) => {
         const isEditing = editingId === prompt.id;
@@ -2192,10 +2192,11 @@
         showToast("ログインしてください");
         return;
       }
-      if (selectedIds.size > 0) {
-        showToast("選択中は一括操作のみできます");
+      if (selectedIds.size > 1) {
+        showToast("複数選択中は一括操作のみできます");
         return;
       }
+      selectedIds = new Set();
       const prompt = prompts.find((item) => item.id === id);
       if (!prompt) return;
 
@@ -2275,8 +2276,8 @@
         showToast("ログインしてください");
         return;
       }
-      if (selectedIds.size > 0) {
-        showToast("選択中は一括操作のみできます");
+      if (selectedIds.size > 1) {
+        showToast("複数選択中は一括操作のみできます");
         return;
       }
       const prompt = prompts.find((item) => item.id === id);
@@ -2301,8 +2302,8 @@
         showToast("ログインしてください");
         return;
       }
-      if (selectedIds.size > 0) {
-        showToast("選択中は一括操作のみできます");
+      if (selectedIds.size > 1) {
+        showToast("複数選択中は一括操作のみできます");
         return;
       }
       const prompt = prompts.find((item) => item.id === id);
@@ -2326,8 +2327,8 @@
         showToast("ログインしてください");
         return;
       }
-      if (selectedIds.size > 0) {
-        showToast("選択中は一括操作のみできます");
+      if (selectedIds.size > 1) {
+        showToast("複数選択中は一括操作のみできます");
         return;
       }
       const prompt = prompts.find((item) => item.id === id);
