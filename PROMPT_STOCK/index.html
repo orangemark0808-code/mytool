@@ -637,7 +637,7 @@
       display: block;
       width: auto;
       min-height: 24px;
-      padding: 0;
+      padding: 2px 6px;
       border-radius: 6px;
       background: transparent;
       color: #233a55;
@@ -647,6 +647,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      cursor: pointer;
       transition: background 0.15s ease, color 0.15s ease;
     }
 
@@ -1805,21 +1806,28 @@
             summary.append(title);
             main.append(summary);
           } else {
-            const content = document.createElement("div");
+            const content = document.createElement("button");
+            content.type = "button";
             content.className = "content prompt-preview";
             content.textContent = prompt.body;
+            content.setAttribute("aria-label", "本文をコピー");
+            content.disabled = isBulkSelecting;
+            content.addEventListener("click", () => copyPrompt(prompt.body));
             main.append(content);
           }
 
           const rowActions = document.createElement("div");
           rowActions.className = "row-actions";
 
-          const copyButton = document.createElement("button");
-          copyButton.type = "button";
-          copyButton.className = "btn btn-primary";
-          copyButton.textContent = "本文コピー";
-          copyButton.disabled = isBulkSelecting;
-          copyButton.addEventListener("click", () => copyPrompt(prompt.body));
+          if (prompt.type === "long") {
+            const copyButton = document.createElement("button");
+            copyButton.type = "button";
+            copyButton.className = "btn btn-primary";
+            copyButton.textContent = "本文コピー";
+            copyButton.disabled = isBulkSelecting;
+            copyButton.addEventListener("click", () => copyPrompt(prompt.body));
+            rowActions.append(copyButton);
+          }
 
           const editButton = document.createElement("button");
           editButton.type = "button";
@@ -1874,7 +1882,7 @@
           menuPanel.append(duplicateButton, categoryLabel, moveTypeButton, deleteButton);
           menu.append(menuSummary, menuPanel);
 
-          rowActions.append(copyButton, editButton, menu);
+          rowActions.append(editButton, menu);
           main.append(rowActions);
         }
 
