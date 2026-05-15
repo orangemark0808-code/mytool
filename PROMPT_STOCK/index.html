@@ -154,7 +154,7 @@
 
     .app-box {
       padding: 16px;
-      overflow: hidden;
+      overflow: visible;
     }
 
     input,
@@ -332,6 +332,24 @@
       display: flex;
       gap: 7px;
       align-items: center;
+    }
+
+    .bulk-status {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--blue-900);
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .bulk-status[hidden] {
+      display: none;
     }
 
     .icon-button {
@@ -654,7 +672,65 @@
       padding-top: 2px;
     }
 
+    .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+      padding: 4px 0 6px;
+    }
+
+    .menu-wrap {
+      position: relative;
+    }
+
+    .menu-wrap summary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .menu-wrap summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .menu-panel {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      z-index: 4;
+      display: grid;
+      gap: 6px;
+      min-width: 180px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .menu-label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .menu-panel .btn,
+    .menu-panel select {
+      width: 100%;
+    }
+
     .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+      transform: none;
+    }
+
+    .btn.is-disabled {
       cursor: not-allowed;
       opacity: 0.45;
       transform: none;
@@ -726,7 +802,7 @@
 
       .bulk-actions {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
 
       .prompt-card {
@@ -738,6 +814,10 @@
       }
 
       .long-actions {
+        justify-content: flex-start;
+      }
+
+      .row-actions {
         justify-content: flex-start;
       }
 
@@ -810,8 +890,8 @@
             </select>
             <div class="bulk-actions" aria-label="選択した文言の操作">
               <button class="btn btn-primary" id="openAddButton" type="button">追加</button>
-              <button class="btn btn-edit" id="editSelectedButton" type="button" disabled>編集</button>
-              <button class="btn btn-delete" id="deleteSelectedButton" type="button" disabled>削除</button>
+              <span class="bulk-status" id="bulkStatus" hidden>0件選択中</span>
+              <button class="btn btn-delete" id="deleteSelectedButton" type="button" disabled>一括削除</button>
             </div>
             <button class="btn btn-secondary icon-button" id="settingsButton" type="button" aria-label="設定">⚙</button>
           </div>
@@ -891,7 +971,7 @@
       settingsCategoryNameInput: document.getElementById("settingsCategoryNameInput"),
       addSettingsCategoryButton: document.getElementById("addSettingsCategoryButton"),
       settingsCategoryList: document.getElementById("settingsCategoryList"),
-      editSelectedButton: document.getElementById("editSelectedButton"),
+      bulkStatus: document.getElementById("bulkStatus"),
       deleteSelectedButton: document.getElementById("deleteSelectedButton"),
       list: document.getElementById("promptList"),
       count: document.getElementById("totalCount"),
@@ -1447,8 +1527,8 @@
       ));
     }
 
-    function getDefaultCategoryId() {
-      return getCategoriesByType(activeType).find((category) => category.name === "AI")?.id || "";
+    function getDefaultCategoryId(type = activeType) {
+      return getCategoriesByType(type).find((category) => category.name === "AI")?.id || "";
     }
 
     function createCategorySelect(selectedCategoryId, type = activeType) {
@@ -1550,6 +1630,8 @@
         elements.list.appendChild(empty);
         return;
       }
+
+      const isBulkSelecting = selectedIds.size > 0;
 
       visiblePrompts.forEach((prompt, index) => {
         const isEditing = editingId === prompt.id;
@@ -1685,26 +1767,80 @@
             title.className = "long-title";
             title.textContent = prompt.title || "タイトルなし";
 
-            const actions = document.createElement("div");
-            actions.className = "long-actions";
-
-            const bodyCopyButton = document.createElement("button");
-            bodyCopyButton.type = "button";
-            bodyCopyButton.className = "btn btn-primary";
-            bodyCopyButton.textContent = "本文コピー";
-            bodyCopyButton.addEventListener("click", () => copyPrompt(prompt.body));
-
-            actions.append(bodyCopyButton);
-            summary.append(title, actions);
+            summary.append(title);
             main.append(summary);
           } else {
-            const content = document.createElement("button");
-            content.type = "button";
+            const content = document.createElement("div");
             content.className = "content";
             content.textContent = prompt.body;
-            content.addEventListener("click", () => copyPrompt(prompt.body));
             main.append(content);
           }
+
+          const rowActions = document.createElement("div");
+          rowActions.className = "row-actions";
+
+          const copyButton = document.createElement("button");
+          copyButton.type = "button";
+          copyButton.className = "btn btn-primary";
+          copyButton.textContent = "本文コピー";
+          copyButton.disabled = isBulkSelecting;
+          copyButton.addEventListener("click", () => copyPrompt(prompt.body));
+
+          const editButton = document.createElement("button");
+          editButton.type = "button";
+          editButton.className = "btn btn-edit";
+          editButton.textContent = "編集";
+          editButton.disabled = isBulkSelecting;
+          editButton.addEventListener("click", () => startEdit(prompt.id));
+
+          const menu = document.createElement("details");
+          menu.className = "menu-wrap";
+
+          const menuSummary = document.createElement("summary");
+          menuSummary.className = "btn btn-secondary icon-button";
+          menuSummary.textContent = "...";
+          menuSummary.setAttribute("aria-label", "その他メニュー");
+          menuSummary.setAttribute("aria-disabled", String(isBulkSelecting));
+          menuSummary.classList.toggle("is-disabled", isBulkSelecting);
+          menuSummary.addEventListener("click", (event) => {
+            if (isBulkSelecting) {
+              event.preventDefault();
+            }
+          });
+
+          const menuPanel = document.createElement("div");
+          menuPanel.className = "menu-panel";
+
+          const duplicateButton = document.createElement("button");
+          duplicateButton.type = "button";
+          duplicateButton.className = "btn btn-secondary";
+          duplicateButton.textContent = "複製";
+          duplicateButton.addEventListener("click", () => duplicatePrompt(prompt.id));
+
+          const deleteButton = document.createElement("button");
+          deleteButton.type = "button";
+          deleteButton.className = "btn btn-delete";
+          deleteButton.textContent = "削除";
+          deleteButton.addEventListener("click", () => deletePrompt(prompt.id));
+
+          const categoryLabel = document.createElement("label");
+          categoryLabel.className = "menu-label";
+          categoryLabel.textContent = "カテゴリ変更";
+          const menuCategorySelect = createCategorySelect(prompt.categoryId, prompt.type);
+          menuCategorySelect.addEventListener("change", () => changePromptCategory(prompt.id, menuCategorySelect.value));
+          categoryLabel.append(menuCategorySelect);
+
+          const moveTypeButton = document.createElement("button");
+          moveTypeButton.type = "button";
+          moveTypeButton.className = "btn btn-secondary";
+          moveTypeButton.textContent = `${prompt.type === "long" ? "short" : "long"}へ移動`;
+          moveTypeButton.addEventListener("click", () => movePromptType(prompt.id));
+
+          menuPanel.append(duplicateButton, categoryLabel, moveTypeButton, deleteButton);
+          menu.append(menuSummary, menuPanel);
+
+          rowActions.append(copyButton, editButton, menu);
+          main.append(rowActions);
         }
 
         selectCell.append(checkbox, fakeCheckbox);
@@ -1840,21 +1976,24 @@
 
     function updateBulkActions() {
       if (isAuthLocked()) {
-        elements.editSelectedButton.disabled = true;
         elements.deleteSelectedButton.disabled = true;
-        elements.editSelectedButton.textContent = "編集";
-        elements.deleteSelectedButton.textContent = "削除";
+        elements.bulkStatus.hidden = true;
+        elements.bulkStatus.textContent = "0件選択中";
+        elements.deleteSelectedButton.textContent = "一括削除";
         return;
       }
       const selectedCount = selectedIds.size;
-      elements.editSelectedButton.disabled = selectedCount !== 1;
       elements.deleteSelectedButton.disabled = selectedCount === 0;
-      elements.editSelectedButton.textContent = selectedCount === 1 ? "編集" : "編集";
-      elements.deleteSelectedButton.textContent = selectedCount > 0 ? `削除 (${selectedCount})` : "削除";
+      elements.bulkStatus.hidden = selectedCount === 0;
+      elements.bulkStatus.textContent = `${selectedCount}件選択中`;
+      elements.deleteSelectedButton.textContent = selectedCount > 0 ? `一括削除 (${selectedCount})` : "一括削除";
     }
 
     function toggleSelection(id, checked) {
       if (checked) {
+        if (editingId) {
+          editingId = null;
+        }
         selectedIds.add(id);
       } else {
         selectedIds.delete(id);
@@ -2053,6 +2192,10 @@
         showToast("ログインしてください");
         return;
       }
+      if (selectedIds.size > 0) {
+        showToast("選択中は一括操作のみできます");
+        return;
+      }
       const prompt = prompts.find((item) => item.id === id);
       if (!prompt) return;
 
@@ -2127,12 +2270,88 @@
       showToast("削除しました");
     }
 
-    function editSelectedPrompt() {
-      if (selectedIds.size !== 1) {
-        showToast("編集する文言を1つだけ選択してください");
+    function duplicatePrompt(id) {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
         return;
       }
-      startEdit([...selectedIds][0]);
+      if (selectedIds.size > 0) {
+        showToast("選択中は一括操作のみできます");
+        return;
+      }
+      const prompt = prompts.find((item) => item.id === id);
+      if (!prompt) return;
+
+      const now = Date.now();
+      prompts.unshift({
+        ...prompt,
+        id: createId(),
+        title: prompt.type === "long" && prompt.title ? `${prompt.title} コピー` : prompt.title,
+        order: getNextOrder(prompt.type),
+        createdAt: now,
+        updatedAt: now,
+      });
+      savePrompts();
+      render();
+      showToast("複製しました");
+    }
+
+    function changePromptCategory(id, categoryId) {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
+      if (selectedIds.size > 0) {
+        showToast("選択中は一括操作のみできます");
+        return;
+      }
+      const prompt = prompts.find((item) => item.id === id);
+      if (!prompt) return;
+      if (categoryId && !categories.some((category) => category.id === categoryId && category.type === prompt.type)) {
+        showToast("この文言タイプのカテゴリを選択してください");
+        return;
+      }
+
+      const now = Date.now();
+      prompts = prompts.map((item) => (
+        item.id === id ? { ...item, categoryId, updatedAt: now } : item
+      ));
+      savePrompts();
+      render();
+      showToast("カテゴリを変更しました");
+    }
+
+    function movePromptType(id) {
+      if (isAuthLocked()) {
+        showToast("ログインしてください");
+        return;
+      }
+      if (selectedIds.size > 0) {
+        showToast("選択中は一括操作のみできます");
+        return;
+      }
+      const prompt = prompts.find((item) => item.id === id);
+      if (!prompt) return;
+
+      const nextType = prompt.type === "long" ? "short" : "long";
+      const now = Date.now();
+      prompts = prompts.map((item) => {
+        if (item.id !== id) return item;
+        return {
+          ...item,
+          type: nextType,
+          title: nextType === "long" ? item.title || item.body.slice(0, 40) : "",
+          categoryId: getDefaultCategoryId(nextType),
+          order: getNextOrder(nextType),
+          updatedAt: now,
+        };
+      });
+      selectedIds.delete(id);
+      savePrompts();
+      activeType = nextType;
+      resetForm();
+      render();
+      showToast(`${nextType}へ移動しました`);
     }
 
     function deleteSelectedPrompts() {
@@ -2346,7 +2565,6 @@
         addCategory();
       }
     });
-    elements.editSelectedButton.addEventListener("click", editSelectedPrompt);
     elements.deleteSelectedButton.addEventListener("click", deleteSelectedPrompts);
 
     render();
