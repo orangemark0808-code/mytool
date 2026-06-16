@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>mytool</title>
+  <title>OrangeMania.wdp Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=Nunito:wght@400;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    * {
+    *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
@@ -13,64 +16,154 @@
 
     body {
       min-height: 100vh;
-      font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", Meiryo, sans-serif;
-      color: #10243d;
-      background: #d9ecff;
-    }
-
-    main {
-      width: min(760px, calc(100% - 32px));
-      margin: 0 auto;
-      padding: 32px 0;
-    }
-
-    .eyebrow {
-      margin-bottom: 6px;
-      color: #0d63c7;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-    }
-
-    h1 {
-      margin-bottom: 20px;
-      color: #073b75;
-      font-size: clamp(22px, 2.4vw, 30px);
-      line-height: 1.1;
-    }
-
-    .tool-list {
-      display: grid;
-      gap: 10px;
-      padding: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.68);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.86);
-      box-shadow: 0 22px 60px rgba(14, 73, 135, 0.18);
-    }
-
-    a {
-      display: block;
-      padding: 12px 14px;
-      border-bottom: 1px solid #cfe1f4;
-      color: #073b75;
+      font-family: "Nunito", sans-serif;
       font-size: 16px;
-      font-weight: 800;
-      text-decoration: none;
+      line-height: 1.75;
+      color: #3a2a1a;
+      background-color: #FAF8F4;
     }
 
-    a:hover {
-      background: #f1f8ff;
+    .wrap {
+      width: min(760px, calc(100% - 48px));
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 48px 0 28px;
+      border-bottom: 1px solid #E8E3DC;
+    }
+
+    .site-label {
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #FF7F00;
+      margin-bottom: 8px;
+    }
+
+    .site-name {
+      font-family: "Lora", serif;
+      font-size: clamp(22px, 3.5vw, 30px);
+      font-weight: 600;
+      color: #3a2a1a;
+      line-height: 1.2;
+    }
+
+    .site-name span {
+      color: #FF7F00;
+    }
+
+    /* ── Main ── */
+    main {
+      padding: 28px 0 64px;
+    }
+
+    .section-label {
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #a08870;
+      margin-bottom: 16px;
+    }
+
+    .tool-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    /* ── Tool Card ── */
+    .tool-card {
+      display: block;
+      max-width: 360px;
+      margin-left: 0;
+      padding: 20px 24px;
+      border: 1px solid #E8E3DC;
+      border-radius: 14px;
+      background: #FFFFFF;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s ease;
+    }
+
+    .tool-card:hover {
+      border-color: #FF7F00;
+    }
+
+    @media (max-width: 480px) {
+      .tool-card { max-width: 100%; }
+    }
+
+    .tool-tag {
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #a08870;
+      margin-bottom: 4px;
+    }
+
+    .tool-name {
+      font-family: "Nunito", sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: #3a2a1a;
+      margin-bottom: 4px;
+    }
+
+    .tool-desc {
+      font-family: "Nunito", sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      color: #7a6050;
+      line-height: 1.7;
+    }
+
+    /* ── Footer ── */
+    footer {
+      padding: 20px 0;
+      border-top: 1px solid #E8E3DC;
+    }
+
+    .footer-text {
+      font-family: "DM Mono", monospace;
+      font-size: 12px;
+      font-weight: 400;
+      color: #b09880;
+      letter-spacing: 0.04em;
     }
   </style>
 </head>
 <body>
-  <main>
-    <div class="eyebrow">MY TOOL</div>
-    <h1>ツール目次</h1>
-    <section class="tool-list" aria-label="ツール一覧">
-      <a href="./PROMPT_STOCK/index.html">AI依頼文ストック</a>
-    </section>
-  </main>
+  <div class="wrap">
+
+    <header>
+      <p class="site-label">Studio</p>
+      <h1 class="site-name"><span>OrangeMania</span>.wdp Studio</h1>
+    </header>
+
+    <main>
+      <p class="section-label">Tools</p>
+      <div class="tool-grid">
+
+        <a class="tool-card" href="./horoscope/index.html">
+          <p class="tool-tag">Astrology</p>
+          <h2 class="tool-name">ホロスコープ</h2>
+          <p class="tool-desc">星座・惑星の配置から運勢を読む</p>
+        </a>
+
+      </div>
+    </main>
+
+    <footer>
+      <p class="footer-text">&copy; OrangeMania.wdp Studio</p>
+    </footer>
+
+  </div>
 </body>
 </html>
