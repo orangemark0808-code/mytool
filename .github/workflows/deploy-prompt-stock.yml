@@ -57,9 +57,12 @@ jobs:
           FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
         run: |
           mkdir -p dist/PROMPT_STOCK
+          mkdir -p dist/horoscope
           cp "index.html" "dist/index.html"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
           cp "PROMPT_STOCK/README.md" "dist/PROMPT_STOCK/README.md"
+          cp "horoscope/index.html" "dist/horoscope/index.html"
+          cp "horoscope/favicon.svg" "dist/horoscope/favicon.svg"
           cat > "dist/firebase-config.js" <<'EOF'
           window.PROMPT_STOCK_FIREBASE_CONFIG = {
             apiKey: "__FIREBASE_API_KEY__",
