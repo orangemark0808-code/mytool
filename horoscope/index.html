@@ -1,1 +1,819 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="ホロスコープの天体・星座・ハウスを、表テーマと裏テーマからやさしく理解するためのガイドです。">
+<title>ホロスコープ｜表テーマと裏テーマ</title>
+<style>
+:root {
+  --orange:#ff5a00;
+  --orange-soft:#ffe0c8;
+  --cream:#fffaf3;
+  --side:#fff7ee;
+  --paper:#fffdf8;
+  --line:#f3b487;
+  --line-soft:#f0d4bf;
+  --text:#3a2114;
+  --muted:#755646;
+}
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  margin:0;
+  background:var(--cream);
+  color:var(--text);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+  line-height:1.68;
+  letter-spacing:.02em;
+}
+a {
+  text-underline-offset:4px;
+}
+a:focus-visible {
+  outline:3px solid #fff;
+  outline-offset:4px;
+}
+.skip-link {
+  position:absolute;
+  left:16px;
+  top:12px;
+  z-index:20;
+  transform:translateY(-140%);
+  background:#fff;
+  color:var(--orange);
+  border:2px solid var(--orange);
+  border-radius:6px;
+  padding:8px 12px;
+  font-weight:900;
+  text-decoration:none;
+}
+.skip-link:focus {
+  transform:translateY(0);
+}
+.topbar {
+  min-height:66px;
+  background:var(--orange);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  padding:14px 30px;
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.brand { font-weight:800; font-size:20px; }
+.nav {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:10px 22px;
+  font-size:15px;
+  font-weight:800;
+}
+.nav a { color:#fff; text-decoration:none; }
+.nav a:hover {
+  text-decoration:underline;
+}
+.layout {
+  min-height:calc(100vh - 66px);
+}
+main {
+  width:min(1000px, calc(100% - 56px));
+  margin:0 auto;
+  padding:42px 0 56px;
+}
+h1 {
+  margin:0 0 12px;
+  color:var(--orange);
+  font-size:34px;
+  line-height:1.25;
+}
+.lead {
+  margin:0 0 28px;
+  font-size:15px;
+  font-weight:700;
+}
+section {
+  padding:26px 0 30px;
+  border-bottom:1px solid var(--line-soft);
+  scroll-margin-top:86px;
+}
+h2 {
+  margin:0 0 12px;
+  color:var(--orange);
+  font-size:26px;
+  line-height:1.35;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.heading-icon {
+  font-size:34px;
+  line-height:1;
+  font-weight:400;
+  color:var(--orange);
+}
+.desc {
+  margin:0 0 20px;
+  font-size:14px;
+  font-weight:700;
+}
+.selector-panel {
+  background:var(--paper);
+  border:1.5px solid var(--line);
+  border-radius:8px;
+  padding:22px;
+}
+.selector-grid {
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:14px;
+}
+.field label {
+  display:block;
+  margin:0 0 8px;
+  color:var(--orange);
+  font-size:13px;
+  font-weight:900;
+}
+.field select {
+  width:100%;
+  min-height:46px;
+  border:1.5px solid var(--line);
+  border-radius:6px;
+  background:#fff;
+  color:var(--text);
+  font:inherit;
+  font-weight:800;
+  padding:8px 12px;
+}
+.field select:focus-visible {
+  outline:3px solid var(--orange-soft);
+  outline-offset:2px;
+}
+.result-card {
+  margin-top:18px;
+  background:#fff1e4;
+  border:1.5px solid var(--line);
+  border-radius:8px;
+  padding:20px;
+}
+.result-title {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:0 0 12px;
+  color:var(--orange);
+  font-size:22px;
+  font-weight:900;
+  line-height:1.35;
+}
+.result-symbol {
+  font-family:"Times New Roman",serif;
+  font-size:34px;
+  line-height:1;
+}
+.result-lines {
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:10px;
+  margin:0 0 14px;
+}
+.result-line {
+  background:#fff;
+  border:1px solid var(--line-soft);
+  border-radius:6px;
+  padding:10px 12px;
+  font-size:13px;
+  font-weight:800;
+}
+.result-line span {
+  display:block;
+  margin-bottom:3px;
+  color:var(--orange);
+  font-size:11px;
+  font-weight:900;
+}
+.result-reading {
+  margin:0;
+  font-size:14px;
+  font-weight:800;
+}
+.reading-block {
+  margin:14px 0 0;
+  padding-top:14px;
+  border-top:1px solid var(--line-soft);
+}
+.reading-block:first-child {
+  margin-top:0;
+  padding-top:0;
+  border-top:0;
+}
+.reading-label {
+  display:inline-block;
+  margin:0 0 6px;
+  color:var(--orange);
+  font-size:13px;
+  font-weight:900;
+}
+.reading-block p {
+  margin:0;
+}
+.grid { display:grid; gap:14px; }
+.planets { grid-template-columns:repeat(5, 1fr); }
+.signs { grid-template-columns:repeat(3, 1fr); }
+.houses { grid-template-columns:repeat(3, 1fr); }
+.card {
+  background:var(--paper);
+  border:1.5px solid var(--line);
+  border-radius:8px;
+  box-shadow:none;
+}
+.mini-card, .sign-card {
+  min-height:154px;
+  padding:16px 14px;
+  text-align:center;
+}
+.planet-icon {
+  color:var(--orange);
+  font-family:"Times New Roman",serif;
+  font-size:45px;
+  line-height:1;
+  margin-bottom:8px;
+}
+.sign-icon {
+  width:64px;
+  height:64px;
+  border-radius:50%;
+  background:var(--orange);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 auto 8px;
+}
+.sign-icon svg {
+  width:42px;
+  height:42px;
+  fill:none;
+  stroke:#fff;
+  stroke-width:4.2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.card h3 {
+  margin:0 0 8px;
+  font-size:15px;
+  font-weight:900;
+  line-height:1.35;
+}
+.date {
+  margin:-4px 0 8px;
+  font-size:12px;
+  font-weight:800;
+}
+.card p {
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  margin:6px 0;
+  text-align:left;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.45;
+}
+.card p span {
+  flex:0 0 auto;
+  background:var(--orange);
+  color:#fff;
+  border-radius:4px;
+  padding:3px 7px;
+  font-size:11px;
+  line-height:1.2;
+  white-space:nowrap;
+}
+.card p span.pale {
+  background:var(--orange-soft);
+  color:var(--orange);
+}
+.house-card {
+  min-height:145px;
+  padding:16px 18px;
+}
+.house-head {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:8px;
+}
+.house-head strong {
+  color:var(--orange);
+  font-size:30px;
+  line-height:1;
+  font-weight:900;
+}
+.house-head h3 {
+  margin:0;
+  font-size:15px;
+  line-height:1.35;
+  font-weight:900;
+}
+.note {
+  display:flex;
+  align-items:center;
+  gap:22px;
+  margin-top:26px;
+  border:1.5px solid var(--line);
+  border-radius:8px;
+  background:#fff1e4;
+  padding:18px 26px;
+  font-weight:800;
+}
+.heart {
+  color:var(--orange);
+  font-size:38px;
+  line-height:1;
+}
+@media(max-width:980px) {
+  .layout { display:block; }
+  main { width:min(100% - 28px, 1000px); padding-top:28px; }
+  .selector-grid,
+  .result-lines {
+    grid-template-columns:1fr;
+  }
+  .planets { grid-template-columns:repeat(2, 1fr); }
+  .signs { grid-template-columns:repeat(2, 1fr); }
+  .houses { grid-template-columns:1fr; }
+}
+@media(max-width:560px) {
+  .topbar {
+    align-items:flex-start;
+    flex-direction:column;
+    padding:12px 18px;
+  }
+  .brand { font-size:18px; }
+  .nav {
+    justify-content:flex-start;
+    gap:8px 16px;
+    font-size:13px;
+  }
+  .planets, .signs { grid-template-columns:1fr; }
+  h1 { font-size:28px; }
+  h2 { font-size:22px; }
+  .selector-panel {
+    padding:16px;
+  }
+  .result-title {
+    font-size:19px;
+  }
+  .card p {
+    gap:7px;
+  }
+  .note {
+    align-items:flex-start;
+    gap:14px;
+    padding:16px;
+  }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#content">本文へ移動</a>
+<header class="topbar">
+  <div class="brand">Horoscope</div>
+  <nav class="nav" aria-label="ページ内メニュー">
+    <a href="#selector">選ぶ</a>
+    <a href="#planets">天体</a>
+    <a href="#signs">星座</a>
+    <a href="#houses">ハウス</a>
+    <a href="#hint">読むヒント</a>
+    <a href="#summary">まとめ</a>
+  </nav>
+</header>
 
+<div class="layout">
+  <main id="content">
+    <h1>表テーマと裏テーマを読む</h1>
+    <p class="lead">
+      ホロスコープは、たくさんの要素が組み合わさって「あなたらしさ」を描き出します。<br>
+      ここでは、3つの要素の表テーマと裏テーマをやさしく理解していきましょう。
+    </p>
+
+    <section id="selector">
+      <h2><span class="heading-icon">✦</span>3つを選んで読む</h2>
+      <p class="desc">天体・星座・ハウスを選ぶと、組み合わせた結果が下に表示されます。</p>
+      <div class="selector-panel">
+        <div class="selector-grid">
+          <div class="field">
+            <label for="planetSelect">天体</label>
+            <select id="planetSelect"></select>
+          </div>
+          <div class="field">
+            <label for="signSelect">星座</label>
+            <select id="signSelect"></select>
+          </div>
+          <div class="field">
+            <label for="houseSelect">ハウス</label>
+            <select id="houseSelect"></select>
+          </div>
+        </div>
+        <div id="result" class="result-card" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section id="planets">
+      <h2><span class="heading-icon">☉</span>天体は「登場人物の役割」</h2>
+      <p class="desc">天体は、物語の中であなたがどんな役割を持っているかを表します。<br>それぞれの天体が、あなたの中の違うテーマを担当しています。</p>
+      <div class="grid planets">
+        <article class="card mini-card">
+  <div class="planet-icon">☉</div>
+  <h3>太陽（主役）</h3>
+  <p><span>表テーマ</span>成長・自分らしさ</p>
+  <p><span class="pale">裏テーマ</span>本当に自分らしく生きたい</p>
+</article>
+<article class="card mini-card">
+  <div class="planet-icon">☽</div>
+  <h3>月（心の安心）</h3>
+  <p><span>表テーマ</span>安心・感情</p>
+  <p><span class="pale">裏テーマ</span>傷つきたくない</p>
+</article>
+<article class="card mini-card">
+  <div class="planet-icon">☿</div>
+  <h3>水星（伝える人）</h3>
+  <p><span>表テーマ</span>思考・言葉</p>
+  <p><span class="pale">裏テーマ</span>理解したい</p>
+</article>
+<article class="card mini-card">
+  <div class="planet-icon">♀</div>
+  <h3>金星（愛する人）</h3>
+  <p><span>表テーマ</span>愛・喜び</p>
+  <p><span class="pale">裏テーマ</span>愛されたい</p>
+</article>
+<article class="card mini-card">
+  <div class="planet-icon">♂</div>
+  <h3>火星（行動する人）</h3>
+  <p><span>表テーマ</span>行動・闘志</p>
+  <p><span class="pale">裏テーマ</span>負けたくない</p>
+</article>
+<article class="card mini-card">
+  <div class="planet-icon">♃</div>
+  <h3>木星（広げる人）</h3>
+  <p><span>表テーマ</span>発展・幸運</p>
+  <p><span class="pale">裏テーマ</span>可能性を信じたい</p>
+</article>
+<article class="card mini-card">
+  <div class="planet-icon">♄</div>
+  <h3>土星（先生）</h3>
+  <p><span>表テーマ</span>責任・熟成</p>
+  <p><span class="pale">裏テーマ</span>失敗したくない</p>
+</article>
+<article class="card mini-card">
+  <div class="planet-icon">♅</div>
+  <h3>天王星（改革者）</h3>
+  <p><span>表テーマ</span>革新・自由</p>
+  <p><span class="pale">裏テーマ</span>自由でいたい</p>
+</article>
+<article class="card mini-card">
+  <div class="planet-icon">♆</div>
+  <h3>海王星（夢見る人）</h3>
+  <p><span>表テーマ</span>夢・共感</p>
+  <p><span class="pale">裏テーマ</span>境界を超えたい</p>
+</article>
+<article class="card mini-card">
+  <div class="planet-icon">♇</div>
+  <h3>冥王星（変容させる人）</h3>
+  <p><span>表テーマ</span>変容・真実</p>
+  <p><span class="pale">裏テーマ</span>真実を知りたい</p>
+</article>
+      </div>
+    </section>
+
+    <section id="signs">
+      <h2><span class="heading-icon">☆</span>星座は「キャラクターの個性」</h2>
+      <p class="desc">12星座は、それぞれのキャラクターのようなもの。<br>あなたの中にある「らしさ」や「反応のクセ」を表します。</p>
+      <div class="grid signs">
+        <article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M32 54V26C32 12 23 8 16 12C9 16 8 27 15 34" /><path d="M32 26C32 12 41 8 48 12C55 16 56 27 49 34" /></svg></div>
+  <h3>牡羊座</h3>
+  <div class="date">3/21〜4/19</div>
+  <p><span>表テーマ</span>挑戦・スタート</p>
+  <p><span class="pale">裏テーマ</span>自分を見失いたくない</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><circle cx="32" cy="38" r="16"/><path d="M20 14c2 10 8 14 12 14s10-4 12-14"/><path d="M20 14c-5 0-9 4-10 9"/><path d="M44 14c5 0 9 4 10 9"/></svg></div>
+  <h3>牡牛座</h3>
+  <div class="date">4/20〜5/20</div>
+  <p><span>表テーマ</span>安定・五感</p>
+  <p><span class="pale">裏テーマ</span>失うことへの恐れ</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M20 12c8 4 16 4 24 0"/><path d="M20 52c8-4 16-4 24 0"/><path d="M24 16v32"/><path d="M40 16v32"/></svg></div>
+  <h3>双子座</h3>
+  <div class="date">5/21〜6/21</div>
+  <p><span>表テーマ</span>知性・会話</p>
+  <p><span class="pale">裏テーマ</span>わからないことへの不安</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M48 24c-8-7-25-6-33 5"/><circle cx="44" cy="24" r="7"/><path d="M16 40c8 7 25 6 33-5"/><circle cx="20" cy="40" r="7"/></svg></div>
+  <h3>蟹座</h3>
+  <div class="date">6/22〜7/22</div>
+  <p><span>表テーマ</span>共感・守る</p>
+  <p><span class="pale">裏テーマ</span>見捨てられたくない</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><circle cx="22" cy="40" r="10"/><path d="M30 39c8-6 9-18 17-20 7-2 12 6 7 12-4 5-10 5-10 12 0 7 7 9 12 4"/></svg></div>
+  <h3>獅子座</h3>
+  <div class="date">7/23〜8/22</div>
+  <p><span>表テーマ</span>創造・表現</p>
+  <p><span class="pale">裏テーマ</span>価値を認めてほしい</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M14 18v30"/><path d="M24 18v30"/><path d="M34 18v30"/><path d="M14 22c3-4 7-4 10 0"/><path d="M24 22c3-4 7-4 10 0"/><path d="M34 22c6-7 16 0 12 12l-6 18"/><path d="M39 42c5 8 13 8 17 0"/></svg></div>
+  <h3>乙女座</h3>
+  <div class="date">8/23〜9/22</div>
+  <p><span>表テーマ</span>分析・改善</p>
+  <p><span class="pale">裏テーマ</span>不完全さへの不安</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M10 44h44"/><path d="M10 52h44"/><path d="M18 36h8c-5-10 0-20 6-20s11 10 6 20h8"/></svg></div>
+  <h3>天秤座</h3>
+  <div class="date">9/23〜10/23</div>
+  <p><span>表テーマ</span>調和・バランス</p>
+  <p><span class="pale">裏テーマ</span>嫌われたくない</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M12 18v30"/><path d="M22 18v30"/><path d="M32 18v30"/><path d="M12 22c3-4 7-4 10 0"/><path d="M22 22c3-4 7-4 10 0"/><path d="M32 22c6-7 16-1 16 10v15"/><path d="M48 47h8l-6 6"/></svg></div>
+  <h3>蠍座</h3>
+  <div class="date">10/24〜11/22</div>
+  <p><span>表テーマ</span>探究・集中</p>
+  <p><span class="pale">裏テーマ</span>裏切られたくない</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M16 48L48 16"/><path d="M34 16h14v14"/><path d="M24 24l16 16"/></svg></div>
+  <h3>射手座</h3>
+  <div class="date">11/23〜12/21</div>
+  <p><span>表テーマ</span>冒険・自由</p>
+  <p><span class="pale">裏テーマ</span>閉じ込められたくない</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M12 18v30"/><path d="M12 22c7-8 16-1 16 10v10"/><path d="M28 32c4-10 18-9 18 3 0 8-7 13-14 13-9 0-12-8-6-14"/></svg></div>
+  <h3>山羊座</h3>
+  <div class="date">12/22〜1/19</div>
+  <p><span>表テーマ</span>実現・積み上げ</p>
+  <p><span class="pale">裏テーマ</span>無力でいたくない</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M10 25c6-6 10 6 16 0s10 6 16 0 6-3 12 0"/><path d="M10 41c6-6 10 6 16 0s10 6 16 0 6-3 12 0"/></svg></div>
+  <h3>水瓶座</h3>
+  <div class="date">1/20〜2/18</div>
+  <p><span>表テーマ</span>革新・独自性</p>
+  <p><span class="pale">裏テーマ</span>埋もれたくない</p>
+</article>
+<article class="card sign-card">
+  <div class="sign-icon"><svg viewBox="0 0 64 64"><path d="M20 12c10 10 10 30 0 40"/><path d="M44 12c-10 10-10 30 0 40"/><path d="M14 32h36"/></svg></div>
+  <h3>魚座</h3>
+  <div class="date">2/19〜3/20</div>
+  <p><span>表テーマ</span>癒し・直感</p>
+  <p><span class="pale">裏テーマ</span>分離されたくない</p>
+</article>
+      </div>
+    </section>
+
+    <section id="houses">
+      <h2><span class="heading-icon">⌂</span>ハウスは「舞台（ステージ）」</h2>
+      <p class="desc">12ハウスは、人生のどこでそのエネルギーを使うのかを示す舞台です。<br>同じキャラクターでも、舞台が違えば役割が変わります。</p>
+      <div class="grid houses">
+        <article class="card house-card">
+  <div class="house-head"><strong>1</strong><h3>ハウス　自分（自己表現）</h3></div>
+  <p><span>表テーマ</span>個性・外見・生き方を表す場</p>
+  <p><span class="pale">裏テーマ</span>私は存在していいのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>2</strong><h3>ハウス　価値（お金・才能）</h3></div>
+  <p><span>表テーマ</span>才能・お金・所有を育てる場</p>
+  <p><span class="pale">裏テーマ</span>私には価値があるのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>3</strong><h3>ハウス　学び（コミュニケーション）</h3></div>
+  <p><span>表テーマ</span>言葉・学び・情報交換の場</p>
+  <p><span class="pale">裏テーマ</span>理解されるのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>4</strong><h3>ハウス　安心（家庭・基盤）</h3></div>
+  <p><span>表テーマ</span>家庭・ルーツ・心の土台の場</p>
+  <p><span class="pale">裏テーマ</span>居場所はあるのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>5</strong><h3>ハウス　表現（創造・恋愛）</h3></div>
+  <p><span>表テーマ</span>遊び・創造・喜びを表す場</p>
+  <p><span class="pale">裏テーマ</span>本当の私を見せていいのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>6</strong><h3>ハウス　仕事（日常・健康）</h3></div>
+  <p><span>表テーマ</span>日常・仕事・健康管理の場</p>
+  <p><span class="pale">裏テーマ</span>役に立てるのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>7</strong><h3>ハウス　関係（パートナーシップ）</h3></div>
+  <p><span>表テーマ</span>対人関係・契約・協力の場</p>
+  <p><span class="pale">裏テーマ</span>愛されるのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>8</strong><h3>ハウス　深究（共有・変容）</h3></div>
+  <p><span>表テーマ</span>深い絆・共有・心理の場</p>
+  <p><span class="pale">裏テーマ</span>信頼して大丈夫か</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>9</strong><h3>ハウス　探究（学問・旅）</h3></div>
+  <p><span>表テーマ</span>哲学・学問・世界を広げる場</p>
+  <p><span class="pale">裏テーマ</span>人生に意味はあるのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>10</strong><h3>ハウス　社会（仕事・役割）</h3></div>
+  <p><span>表テーマ</span>仕事・使命・社会的評価の場</p>
+  <p><span class="pale">裏テーマ</span>社会に認められるのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>11</strong><h3>ハウス　仲間（理想・未来）</h3></div>
+  <p><span>表テーマ</span>仲間・理想・未来を作る場</p>
+  <p><span class="pale">裏テーマ</span>同じ理想を持つ人はいるのか</p>
+</article>
+<article class="card house-card">
+  <div class="house-head"><strong>12</strong><h3>ハウス　見えない世界（潜在意識）</h3></div>
+  <p><span>表テーマ</span>潜在意識・癒し・精神性の場</p>
+  <p><span class="pale">裏テーマ</span>私は何者なのか</p>
+</article>
+      </div>
+    </section>
+
+    <section id="hint">
+      <h2><span class="heading-icon">♧</span>読むヒント</h2>
+      <p class="desc">天体は「誰が」、星座は「どんな個性で」、ハウスは「どの舞台で」を表します。<br>表テーマだけでなく裏テーマを見ると、その配置がなぜ大切なのかが見えてきます。</p>
+    </section>
+
+    <section id="summary">
+      <div class="note">
+        <div class="heart">♡</div>
+        <div>ホロスコープは「未来を決めるもの」ではなく、「自分を理解するための地図」です。<br>この地図を使って、あなただけの人生を歩んでいきましょう。</div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+const planets = [
+  { value:"sun", symbol:"☉", name:"太陽（主役）", theme:"成長・自分らしさ", shadow:"本当に自分らしく生きたい", role:"人生の中心テーマや、自分らしく成長していく力" },
+  { value:"moon", symbol:"☽", name:"月（心の安心）", theme:"安心・感情", shadow:"傷つきたくない", role:"心の安心感や、素の感情の動き" },
+  { value:"mercury", symbol:"☿", name:"水星（伝える人）", theme:"思考・言葉", shadow:"理解したい", role:"考え方、話し方、学び方" },
+  { value:"venus", symbol:"♀", name:"金星（愛する人）", theme:"愛・喜び", shadow:"愛されたい", role:"好きなもの、楽しみ方、人を惹きつける感性" },
+  { value:"mars", symbol:"♂", name:"火星（行動する人）", theme:"行動・闘志", shadow:"負けたくない", role:"行動力、意欲、戦う力" },
+  { value:"jupiter", symbol:"♃", name:"木星（広げる人）", theme:"発展・幸運", shadow:"可能性を信じたい", role:"広がり、成長のチャンス、信頼する力" },
+  { value:"saturn", symbol:"♄", name:"土星（先生）", theme:"責任・熟成", shadow:"失敗したくない", role:"課題、責任、時間をかけて育てる力" },
+  { value:"uranus", symbol:"♅", name:"天王星（改革者）", theme:"革新・自由", shadow:"自由でいたい", role:"変化、独自性、古い形を壊す力" },
+  { value:"neptune", symbol:"♆", name:"海王星（夢見る人）", theme:"夢・共感", shadow:"境界を超えたい", role:"想像力、共感、目に見えないものへの感受性" },
+  { value:"pluto", symbol:"♇", name:"冥王星（変容させる人）", theme:"変容・真実", shadow:"真実を知りたい", role:"深い変化、再生、本質を見抜く力" }
+];
+
+const signs = [
+  { value:"aries", name:"牡羊座", period:"3/21〜4/19", polarity:"男性星座", mode:"活動宮", element:"火", phrase:"I am", theme:"挑戦・スタート", shadow:"自分を見失いたくない", style:"まっすぐに動き出す勢い" },
+  { value:"taurus", name:"牡牛座", period:"4/20〜5/20", polarity:"女性星座", mode:"固定宮", element:"地", phrase:"I have", theme:"安定・五感", shadow:"失うことへの恐れ", style:"じっくり味わい、確かなものを育てる感覚" },
+  { value:"gemini", name:"双子座", period:"5/21〜6/21", polarity:"男性星座", mode:"柔軟宮", element:"風", phrase:"I think", theme:"知性・会話", shadow:"わからないことへの不安", style:"軽やかに知り、伝え、つなげる動き" },
+  { value:"cancer", name:"蟹座", period:"6/22〜7/22", polarity:"女性星座", mode:"活動宮", element:"水", phrase:"I feel", theme:"共感・守る", shadow:"見捨てられたくない", style:"大切なものを包み込み、守る感受性" },
+  { value:"leo", name:"獅子座", period:"7/23〜8/22", polarity:"男性星座", mode:"固定宮", element:"火", phrase:"I will", theme:"創造・表現", shadow:"価値を認めてほしい", style:"自分の輝きを表に出す表現力" },
+  { value:"virgo", name:"乙女座", period:"8/23〜9/22", polarity:"女性星座", mode:"柔軟宮", element:"地", phrase:"I analyze", theme:"分析・改善", shadow:"不完全さへの不安", style:"細部を整え、よりよくしていく力" },
+  { value:"libra", name:"天秤座", period:"9/23〜10/23", polarity:"男性星座", mode:"活動宮", element:"風", phrase:"I balance", theme:"調和・バランス", shadow:"嫌われたくない", style:"人や物事の間に美しい均衡を作る感覚" },
+  { value:"scorpio", name:"蠍座", period:"10/24〜11/22", polarity:"女性星座", mode:"固定宮", element:"水", phrase:"I desire", theme:"探究・集中", shadow:"裏切られたくない", style:"深く入り込み、本質まで見つめる集中力" },
+  { value:"sagittarius", name:"射手座", period:"11/23〜12/21", polarity:"男性星座", mode:"柔軟宮", element:"火", phrase:"I understand", theme:"冒険・自由", shadow:"閉じ込められたくない", style:"広い世界へ向かい、意味を探す伸びやかさ" },
+  { value:"capricorn", name:"山羊座", period:"12/22〜1/19", polarity:"女性星座", mode:"活動宮", element:"地", phrase:"I use", theme:"実現・積み上げ", shadow:"無力でいたくない", style:"目標へ向けて現実的に積み上げる力" },
+  { value:"aquarius", name:"水瓶座", period:"1/20〜2/18", polarity:"男性星座", mode:"固定宮", element:"風", phrase:"I know", theme:"革新・独自性", shadow:"埋もれたくない", style:"常識から少し離れ、新しいつながりを作る視点" },
+  { value:"pisces", name:"魚座", period:"2/19〜3/20", polarity:"女性星座", mode:"柔軟宮", element:"水", phrase:"I believe", theme:"癒し・直感", shadow:"分離されたくない", style:"境界をやわらげ、感じ取って受け入れる力" }
+];
+
+const houses = [
+  { value:"1", name:"1ハウス　自分（自己表現）", theme:"個性・外見・生き方を表す場", shadow:"私は存在していいのか", stage:"自分自身の見せ方や生き方" },
+  { value:"2", name:"2ハウス　価値（お金・才能）", theme:"才能・お金・所有を育てる場", shadow:"私には価値があるのか", stage:"才能、収入、安心できる所有物" },
+  { value:"3", name:"3ハウス　学び（コミュニケーション）", theme:"言葉・学び・情報交換の場", shadow:"理解されるのか", stage:"学び、言葉、身近な人とのやりとり" },
+  { value:"4", name:"4ハウス　安心（家庭・基盤）", theme:"家庭・ルーツ・心の土台の場", shadow:"居場所はあるのか", stage:"家庭、居場所、心の土台" },
+  { value:"5", name:"5ハウス　表現（創造・恋愛）", theme:"遊び・創造・喜びを表す場", shadow:"本当の私を見せていいのか", stage:"創造、恋愛、遊び、自己表現" },
+  { value:"6", name:"6ハウス　仕事（日常・健康）", theme:"日常・仕事・健康管理の場", shadow:"役に立てるのか", stage:"日々の仕事、習慣、体調管理" },
+  { value:"7", name:"7ハウス　関係（パートナーシップ）", theme:"対人関係・契約・協力の場", shadow:"愛されるのか", stage:"パートナー、対人関係、契約" },
+  { value:"8", name:"8ハウス　深究（共有・変容）", theme:"深い絆・共有・心理の場", shadow:"信頼して大丈夫か", stage:"深い関係、共有、心理的な変容" },
+  { value:"9", name:"9ハウス　探究（学問・旅）", theme:"哲学・学問・世界を広げる場", shadow:"人生に意味はあるのか", stage:"旅、学問、哲学、遠い世界" },
+  { value:"10", name:"10ハウス　社会（仕事・役割）", theme:"仕事・使命・社会的評価の場", shadow:"社会に認められるのか", stage:"社会的な役割、仕事、達成" },
+  { value:"11", name:"11ハウス　仲間（理想・未来）", theme:"仲間・理想・未来を作る場", shadow:"同じ理想を持つ人はいるのか", stage:"仲間、コミュニティ、未来の理想" },
+  { value:"12", name:"12ハウス　見えない世界（潜在意識）", theme:"潜在意識・癒し・精神性の場", shadow:"私は何者なのか", stage:"潜在意識、癒し、見えない世界" }
+];
+
+const planetReadings = {
+  sun:{ surface:"人生の軸を育て、自分の意志で選び取る力", shadow:"本音を押し込めるほど、誰かの期待に合わせすぎて自分の輪郭がぼやけやすくなります" },
+  moon:{ surface:"安心できる居場所を求め、感情のリズムを整える力", shadow:"傷つくことを避けたい気持ちが強まると、必要な変化や本音の対話から距離を置きやすくなります" },
+  mercury:{ surface:"情報を読み解き、言葉にして世界とつながる力", shadow:"理解できない不安が強まると、考えすぎて心の感覚を置き去りにしやすくなります" },
+  venus:{ surface:"喜びや魅力を感じ取り、人や物事を愛する力", shadow:"愛されたい気持ちが強まると、自分の好きを相手の反応で測りすぎてしまうことがあります" },
+  mars:{ surface:"欲しい未来へ向かって動き出し、境界線を守る力", shadow:"負けたくない気持ちが強まると、焦りや対抗心で本来の目的を見失いやすくなります" },
+  jupiter:{ surface:"可能性を広げ、経験から豊かさを受け取る力", shadow:"信じたい気持ちが強まると、根拠のない楽観や広げすぎに気づきにくくなります" },
+  saturn:{ surface:"時間をかけて責任を引き受け、形にしていく力", shadow:"失敗を避けたい気持ちが強まると、挑戦する前から自分に厳しい制限をかけやすくなります" },
+  uranus:{ surface:"古い前提をほどき、自由な発想で流れを変える力", shadow:"自由でいたい気持ちが強まると、縛られる前に距離を取りすぎて孤立しやすくなります" },
+  neptune:{ surface:"見えない気配を感じ取り、夢や共感で世界を広げる力", shadow:"境界を超えたい気持ちが強まると、自分と相手の感情が混ざりすぎて疲れやすくなります" },
+  pluto:{ surface:"本質に触れ、古い自分を終わらせて再生する力", shadow:"真実を知りたい気持ちが強まると、白黒をつけすぎたり、深みに入り込みすぎたりしやすくなります" }
+};
+
+const signReadings = {
+  aries:{ surface:"直感が先に火をつけ、迷うより行動で答えを見つけます", shadow:"急いで自分を証明しようとすると、周りの反応を待てずに孤軍奮闘になりやすい面があります" },
+  taurus:{ surface:"感覚で確かめながら、時間をかけて信頼できる形に育てます", shadow:"失う怖さが強まると、変えるべきタイミングでも手放すことに抵抗が出やすくなります" },
+  gemini:{ surface:"軽やかに情報を集め、言葉や知識で可能性を増やします", shadow:"わからない不安が強まると、答えを探し続けてひとつの実感に着地しにくくなります" },
+  cancer:{ surface:"共感を通して大切なものを守り、安心の輪を育てます", shadow:"見捨てられたくない気持ちが強まると、守ることと抱え込むことの境目が曖昧になりやすいです" },
+  leo:{ surface:"自分の輝きを表に出し、創造する喜びで周囲を照らします", shadow:"認めてほしい気持ちが強まると、反応の薄さを自分の価値の低さと結びつけやすくなります" },
+  virgo:{ surface:"細部を整え、現実をよりよくするために役立つ形へ磨きます", shadow:"不完全さへの不安が強まると、十分できていることまで直し続けて疲れやすくなります" },
+  libra:{ surface:"人や物事の間に調和を作り、美しいバランスを探します", shadow:"嫌われたくない気持ちが強まると、自分の本音より場の空気を優先しすぎることがあります" },
+  scorpio:{ surface:"表面ではなく核心へ向かい、深いつながりや変化を求めます", shadow:"裏切られたくない気持ちが強まると、信頼する前に相手を試したくなることがあります" },
+  sagittarius:{ surface:"広い世界へ意識を伸ばし、経験から人生の意味を探します", shadow:"閉じ込められたくない気持ちが強まると、足元の責任や継続から逃げたくなりやすいです" },
+  capricorn:{ surface:"目標を現実に落とし込み、時間を味方につけて積み上げます", shadow:"無力でいたくない気持ちが強まると、成果や肩書きで自分を守ろうとしすぎることがあります" },
+  aquarius:{ surface:"個性を保ちながら、未来につながる新しい関係性を作ります", shadow:"埋もれたくない気持ちが強まると、普通であることを避けすぎて心の距離が生まれやすいです" },
+  pisces:{ surface:"境界をやわらげ、直感や癒しを通して全体とつながります", shadow:"分離されたくない気持ちが強まると、相手の痛みまで自分のものとして背負いやすくなります" }
+};
+
+const houseReadings = {
+  "1":{ surface:"存在感、第一印象、生き方そのものにあらわれます", shadow:"自分を出す場面で、ここにいていいのかという根源的な問いが浮かびやすいです" },
+  "2":{ surface:"才能、お金、身体感覚、自分の価値を育てる場であらわれます", shadow:"受け取ることや所有することに、私は本当に価値があるのかという不安が重なりやすいです" },
+  "3":{ surface:"学び、会話、発信、身近な人とのやりとりにあらわれます", shadow:"伝える場面で、理解されるだろうか、間違っていないだろうかという緊張が出やすいです" },
+  "4":{ surface:"家庭、居場所、ルーツ、心の土台にあらわれます", shadow:"安心を求めるほど、ここに自分の居場所はあるのかという問いが深まりやすいです" },
+  "5":{ surface:"創造、恋愛、遊び、自分を表現する喜びにあらわれます", shadow:"楽しむ場面で、本当の自分を見せても受け止められるのかという怖さが出やすいです" },
+  "6":{ surface:"仕事、習慣、健康管理、日々の役割にあらわれます", shadow:"役に立とうとするほど、自分は十分に貢献できているのかと自分を測りやすくなります" },
+  "7":{ surface:"パートナーシップ、対人関係、契約や協力にあらわれます", shadow:"人と向き合うほど、愛されるのか、選ばれるのかという不安が映し出されやすいです" },
+  "8":{ surface:"深い絆、共有、心理、受け継ぐものにあらわれます", shadow:"心を開くほど、信頼して大丈夫か、失うことにならないかという怖さに触れやすいです" },
+  "9":{ surface:"旅、学問、哲学、遠い世界への探究にあらわれます", shadow:"広い意味を求めるほど、自分の人生に本当に意味があるのかという問いが強まりやすいです" },
+  "10":{ surface:"仕事、使命、社会的な役割や評価にあらわれます", shadow:"社会へ出るほど、認められるのか、結果を出せるのかというプレッシャーが表れやすいです" },
+  "11":{ surface:"仲間、コミュニティ、理想、未来のビジョンにあらわれます", shadow:"理想を語るほど、同じ未来を見てくれる人がいるのかという孤独に触れやすいです" },
+  "12":{ surface:"潜在意識、癒し、見えない世界、内面の静けさにあらわれます", shadow:"深く感じるほど、自分は何者なのか、どこまでが自分なのかという問いが浮かびやすいです" }
+};
+
+const selectConfig = [
+  { id:"planetSelect", items:planets },
+  { id:"signSelect", items:signs },
+  { id:"houseSelect", items:houses }
+];
+
+function fillSelect(select, items) {
+  select.innerHTML = items.map(item => `<option value="${item.value}">${item.name}</option>`).join("");
+}
+
+function findSelected(items, select) {
+  return items.find(item => item.value === select.value) || items[0];
+}
+
+function shortName(name) {
+  return name.replace(/（.*?）/g, "").replace(/　/g, " ").trim();
+}
+
+function signDisplayName(sign) {
+  return `${sign.name}（${sign.phrase}）`;
+}
+
+function createReading(planet, sign, house) {
+  const planetText = planetReadings[planet.value];
+  const signText = signReadings[sign.value];
+  const houseText = houseReadings[house.value];
+  const planetName = shortName(planet.name);
+  const signName = signDisplayName(sign);
+  const houseName = shortName(house.name);
+  return {
+    surface:`${planetName}は、${planetText.surface}です。${signName}の質が加わることで、${signText.surface}。それは${houseName}の領域、つまり${houseText.surface}。この配置は、自分の中にある力をどこで、どんな表情で使うと自然に流れやすいかを示しています。`,
+    shadow:`裏テーマでは、${planetText.shadow}。さらに${signName}の影として、${signText.shadow}。${houseName}では、${houseText.shadow}。この不安は欠点ではなく、意識して扱うことで表テーマの力をより成熟させる入口になります。`
+  };
+}
+
+function updateResult() {
+  const planet = findSelected(planets, document.getElementById("planetSelect"));
+  const sign = findSelected(signs, document.getElementById("signSelect"));
+  const house = findSelected(houses, document.getElementById("houseSelect"));
+  const reading = createReading(planet, sign, house);
+  document.getElementById("result").innerHTML = `
+    <div class="result-title"><span class="result-symbol">${planet.symbol}</span>${planet.name} × ${signDisplayName(sign)} × ${house.name}</div>
+    <div class="result-lines">
+      <div class="result-line"><span>天体</span>${planet.theme}<br>${planet.shadow}</div>
+      <div class="result-line"><span>星座</span>${sign.polarity}・${sign.mode}・${sign.element}<br>${sign.theme}<br>${sign.shadow}</div>
+      <div class="result-line"><span>ハウス</span>${house.theme}<br>${house.shadow}</div>
+    </div>
+    <div class="result-reading">
+      <div class="reading-block">
+        <span class="reading-label">表テーマの解釈</span>
+        <p>${reading.surface}</p>
+      </div>
+      <div class="reading-block">
+        <span class="reading-label">裏テーマの解釈</span>
+        <p>${reading.shadow}</p>
+      </div>
+    </div>
+  `;
+}
+
+selectConfig.forEach(({ id, items }) => {
+  const select = document.getElementById(id);
+  fillSelect(select, items);
+  select.addEventListener("change", updateResult);
+});
+updateResult();
+</script>
+</body>
+</html>
