@@ -151,6 +151,12 @@ h2 {
   font-weight:800;
   padding:8px 12px;
 }
+.field select.is-placeholder {
+  color:#b08a76;
+}
+.field select option {
+  color:var(--text);
+}
 .field select:focus-visible {
   outline:3px solid var(--orange-soft);
   outline-offset:2px;
@@ -947,6 +953,10 @@ function fillSelect(select, items, type) {
   select.innerHTML = `<option value="">選んでください</option>` + items.map(item => `<option value="${item.value}">${selectDisplayName(item, type)}</option>`).join("");
 }
 
+function updateSelectPlaceholder(select) {
+  select.classList.toggle("is-placeholder", !select.value);
+}
+
 function findSelected(items, select) {
   return items.find(item => item.value === select.value) || null;
 }
@@ -1173,7 +1183,11 @@ function updateResult() {
 selectConfig.forEach(({ id, items, type }) => {
   const select = document.getElementById(id);
   fillSelect(select, items, type);
-  select.addEventListener("change", updateResult);
+  updateSelectPlaceholder(select);
+  select.addEventListener("change", () => {
+    updateSelectPlaceholder(select);
+    updateResult();
+  });
 });
 updateResult();
 
