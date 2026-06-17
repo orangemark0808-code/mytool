@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="ホロスコープの天体・星座・ハウスを、表テーマと裏テーマからやさしく理解するためのガイドです。">
-<title>ホロスコープ｜表テーマと裏テーマ</title>
+<title>ホロスコープ｜自分を読むための占星術ミニ辞典</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <style>
 :root {
@@ -233,6 +233,19 @@ h2 {
   border-radius:8px;
   box-shadow:none;
 }
+.card.is-clickable {
+  cursor:pointer;
+  transition:transform .18s ease, border-color .18s ease, background-color .18s ease;
+}
+.card.is-clickable:hover {
+  transform:translateY(-2px);
+  border-color:var(--orange);
+  background:#fff8f0;
+}
+.card.is-clickable:focus-visible {
+  outline:3px solid var(--orange-soft);
+  outline-offset:3px;
+}
 .mini-card, .sign-card {
   min-height:154px;
   padding:16px 14px;
@@ -388,11 +401,96 @@ h2 {
   font-size:38px;
   line-height:1;
 }
+.detail-section[hidden] {
+  display:none;
+}
+.detail-panel {
+  background:var(--paper);
+  border:1.5px solid var(--line);
+  border-radius:8px;
+  padding:22px;
+}
+.detail-kicker {
+  margin:0 0 6px;
+  color:var(--orange);
+  font-size:13px;
+  font-weight:900;
+}
+.detail-title {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:0 0 14px;
+  color:var(--orange);
+  font-size:26px;
+  font-weight:900;
+  line-height:1.35;
+}
+.detail-symbol {
+  font-family:"Times New Roman",serif;
+  font-size:40px;
+  line-height:1;
+}
+.detail-grid {
+  display:grid;
+  grid-template-columns:repeat(2, 1fr);
+  gap:12px;
+  margin:0 0 16px;
+}
+.detail-block {
+  background:#fff;
+  border:1px solid var(--line-soft);
+  border-radius:6px;
+  padding:12px 14px;
+}
+.detail-block h3 {
+  margin:0 0 6px;
+  color:var(--orange);
+  font-size:13px;
+  font-weight:900;
+}
+.detail-block p {
+  margin:0;
+  font-size:14px;
+  font-weight:800;
+}
+.detail-tags {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin:0 0 16px;
+}
+.detail-actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.detail-button {
+  min-height:42px;
+  border:1.5px solid var(--orange);
+  border-radius:6px;
+  background:var(--orange);
+  color:#fff;
+  font:inherit;
+  font-size:14px;
+  font-weight:900;
+  padding:8px 14px;
+  cursor:pointer;
+}
+.detail-button.secondary {
+  background:#fff;
+  color:var(--orange);
+}
+.detail-button:focus-visible {
+  outline:3px solid var(--orange-soft);
+  outline-offset:2px;
+}
 @media(max-width:980px) {
   .layout { display:block; }
   main { width:min(100% - 28px, 1000px); padding-top:28px; }
   .selector-grid,
-  .result-lines {
+  .result-lines,
+  .detail-grid {
     grid-template-columns:1fr;
   }
   .planets { grid-template-columns:repeat(2, 1fr); }
@@ -447,7 +545,7 @@ h2 {
 
 <div class="layout">
   <main id="content">
-    <h1>表テーマと裏テーマを読む</h1>
+    <h1>自分を読むための占星術ミニ辞典</h1>
     <p class="lead">
       ホロスコープは、たくさんの要素が組み合わさって「あなたらしさ」を描き出します。<br>
       ここでは、3つの要素の表テーマと裏テーマをやさしく理解していきましょう。
@@ -724,6 +822,11 @@ h2 {
       </div>
     </section>
 
+    <section id="detail" class="detail-section" hidden>
+      <h2><span class="heading-icon">✧</span>カードの詳細</h2>
+      <div id="detailPanel" class="detail-panel" aria-live="polite"></div>
+    </section>
+
     <section id="hint">
       <h2><span class="heading-icon">♧</span>読むヒント</h2>
       <p class="desc">天体は「誰が」、星座は「どんな個性で」、ハウスは「どの舞台で」を表します。<br>表テーマだけでなく裏テーマを見ると、その配置がなぜ大切なのかが見えてきます。</p>
@@ -865,6 +968,135 @@ function signTags(sign) {
   `;
 }
 
+const detailTypes = {
+  planet: { label:"天体", selectId:"planetSelect", items:planets, hashPrefix:"planet" },
+  sign: { label:"星座", selectId:"signSelect", items:signs, hashPrefix:"sign" },
+  house: { label:"ハウス", selectId:"houseSelect", items:houses, hashPrefix:"house" }
+};
+
+function detailHash(type, value) {
+  return `${detailTypes[type].hashPrefix}-${value}`;
+}
+
+function findDetailFromHash(hash) {
+  const currentHash = hash.replace(/^#/, "");
+  return Object.entries(detailTypes).reduce((found, [type, config]) => {
+    if (found || !currentHash.startsWith(`${config.hashPrefix}-`)) return found;
+    const value = currentHash.slice(config.hashPrefix.length + 1);
+    const item = config.items.find(entry => entry.value === value);
+    return item ? { type, item } : null;
+  }, null);
+}
+
+function detailTitle(type, item) {
+  if (type === "sign") return signDisplayName(item);
+  return item.name;
+}
+
+function detailIcon(type, item) {
+  if (type === "planet") return item.symbol;
+  if (type === "house") return item.value;
+  return "☆";
+}
+
+function detailSurface(type, item) {
+  if (type === "planet") return `${item.name}は、${planetReadings[item.value].surface}です。${item.role}を通して、人生の中で何を主役として育てるかを教えてくれます。`;
+  if (type === "sign") return `${item.name}は、${signReadings[item.value].surface}。${item.style}が、行動や反応の色合いとして表れます。`;
+  return `${item.name}は、${houseReadings[item.value].surface}。${item.stage}という舞台で、テーマが具体的な経験として動き出します。`;
+}
+
+function detailShadow(type, item) {
+  if (type === "planet") return `${item.shadow}という裏テーマが、${planetReadings[item.value].shadow}。`;
+  if (type === "sign") return `${item.shadow}という裏テーマが、${signReadings[item.value].shadow}。`;
+  return `${item.shadow}という裏テーマが、${houseReadings[item.value].shadow}。`;
+}
+
+function detailDeep(type, item) {
+  if (type === "planet") return `深く読むと、${shortName(item.name)}は「自分の中のどの力を意識して使うか」を示します。うまく働くほど、${item.theme}が自然な選択やふるまいに変わっていきます。`;
+  if (type === "sign") return `深く読むと、${item.name}は「どんな質感で世界に反応するか」を示します。${item.polarity}・${item.mode}・${item.element}の組み合わせが、${item.theme}の出方を決めます。`;
+  return `深く読むと、${shortName(item.name)}は「人生のどの領域でその力を学ぶか」を示します。ここで起きる出来事は、${item.theme}を育てるための具体的な教材になります。`;
+}
+
+function detailCare(type, item) {
+  if (type === "planet") return `${item.shadow}という願いを否定せず、まずは小さな行動で${item.theme}を試してみると扱いやすくなります。`;
+  if (type === "sign") return `${item.shadow}が強い時ほど、${item.style}を急がず丁寧に使うことが助けになります。`;
+  return `${item.shadow}が出る場面では、${item.stage}で起きている事実と気持ちを分けて見ると、テーマを現実的に扱えます。`;
+}
+
+function detailKeywords(type, item) {
+  if (type === "sign") return [item.theme, item.shadow, item.polarity, item.mode, item.element, item.phrase];
+  if (type === "planet") return [item.theme, item.shadow, item.role];
+  return [item.theme, item.shadow, item.stage];
+}
+
+function detailMeta(type, item) {
+  if (type !== "sign") return "";
+  return `
+    <div class="detail-tags" aria-label="星座の分類">
+      <span class="tag ${tagClass("polarity", item.polarity)}">${item.polarity}</span>
+      <span class="tag ${tagClass("mode", item.mode)}">${item.mode}</span>
+      <span class="tag ${tagClass("element", item.element)}">${item.element}</span>
+      <span class="tag">${item.phrase}</span>
+    </div>
+  `;
+}
+
+function showDetail(type, item, options = {}) {
+  const { scroll = true, updateHash = true } = options;
+  const detailSection = document.getElementById("detail");
+  const detailPanel = document.getElementById("detailPanel");
+  const keywords = detailKeywords(type, item).map(keyword => `<span class="tag">${keyword}</span>`).join("");
+  detailSection.hidden = false;
+  detailPanel.innerHTML = `
+    <div class="detail-kicker">${detailTypes[type].label}の詳細</div>
+    <div class="detail-title"><span class="detail-symbol">${detailIcon(type, item)}</span>${detailTitle(type, item)}</div>
+    ${detailMeta(type, item)}
+    <div class="detail-grid">
+      <div class="detail-block"><h3>表テーマ</h3><p>${detailSurface(type, item)}</p></div>
+      <div class="detail-block"><h3>裏テーマ</h3><p>${detailShadow(type, item)}</p></div>
+      <div class="detail-block"><h3>深い解釈</h3><p>${detailDeep(type, item)}</p></div>
+      <div class="detail-block"><h3>扱い方</h3><p>${detailCare(type, item)}</p></div>
+    </div>
+    <div class="detail-tags" aria-label="関連キーワード">${keywords}</div>
+    <div class="detail-actions">
+      <button class="detail-button" type="button" data-apply-detail="${type}" data-value="${item.value}">結果選択に反映</button>
+      <a class="detail-button secondary" href="#${type === "planet" ? "planets" : type === "sign" ? "signs" : "houses"}">一覧へ戻る</a>
+    </div>
+  `;
+  if (updateHash) history.pushState(null, "", `#${detailHash(type, item.value)}`);
+  if (scroll) detailSection.scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+function applyDetailToSelect(type, value) {
+  const select = document.getElementById(detailTypes[type].selectId);
+  select.value = value;
+  updateResult();
+  document.getElementById("selector").scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+function bindCards(selector, type, items) {
+  document.querySelectorAll(selector).forEach((card, index) => {
+    const item = items[index];
+    if (!item) return;
+    card.classList.add("is-clickable");
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", `${detailTitle(type, item)}の詳細を見る`);
+    card.addEventListener("click", () => showDetail(type, item));
+    card.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      showDetail(type, item);
+    });
+  });
+}
+
+function showDetailFromHash(scroll = false) {
+  const detail = findDetailFromHash(location.hash);
+  if (!detail) return;
+  showDetail(detail.type, detail.item, { scroll, updateHash:false });
+}
+
 function createReading(planet, sign, house) {
   const planetText = planetReadings[planet.value];
   const signText = signReadings[sign.value];
@@ -909,6 +1141,19 @@ selectConfig.forEach(({ id, items }) => {
   select.addEventListener("change", updateResult);
 });
 updateResult();
+
+bindCards(".planets .mini-card", "planet", planets);
+bindCards(".signs .sign-card", "sign", signs);
+bindCards(".houses .house-card", "house", houses);
+
+document.getElementById("detailPanel").addEventListener("click", event => {
+  const button = event.target.closest("[data-apply-detail]");
+  if (!button) return;
+  applyDetailToSelect(button.dataset.applyDetail, button.dataset.value);
+});
+
+window.addEventListener("hashchange", () => showDetailFromHash(true));
+showDetailFromHash(false);
 </script>
 </body>
 </html>
