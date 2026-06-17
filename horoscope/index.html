@@ -933,17 +933,22 @@ const houseReadings = {
 };
 
 const selectConfig = [
-  { id:"planetSelect", items:planets },
-  { id:"signSelect", items:signs },
-  { id:"houseSelect", items:houses }
+  { id:"planetSelect", items:planets, type:"planet" },
+  { id:"signSelect", items:signs, type:"sign" },
+  { id:"houseSelect", items:houses, type:"house" }
 ];
 
-function fillSelect(select, items) {
-  select.innerHTML = items.map(item => `<option value="${item.value}">${item.name}</option>`).join("");
+function selectDisplayName(item, type) {
+  if (type === "house") return item.name.replace(/（.*?）/g, "").trim();
+  return item.name;
+}
+
+function fillSelect(select, items, type) {
+  select.innerHTML = `<option value="">選んでください</option>` + items.map(item => `<option value="${item.value}">${selectDisplayName(item, type)}</option>`).join("");
 }
 
 function findSelected(items, select) {
-  return items.find(item => item.value === select.value) || items[0];
+  return items.find(item => item.value === select.value) || null;
 }
 
 function shortName(name) {
@@ -1137,6 +1142,13 @@ function updateResult() {
   const planet = findSelected(planets, document.getElementById("planetSelect"));
   const sign = findSelected(signs, document.getElementById("signSelect"));
   const house = findSelected(houses, document.getElementById("houseSelect"));
+  if (!planet || !sign || !house) {
+    document.getElementById("result").innerHTML = `
+      <div class="result-title">選んだ内容がここに表示されます</div>
+      <p class="result-reading">天体・星座・ハウスをそれぞれ選んでください。</p>
+    `;
+    return;
+  }
   const reading = createReading(planet, sign, house);
   document.getElementById("result").innerHTML = `
     <div class="result-title"><span class="result-symbol">${planet.symbol}</span>${planet.name} × ${signDisplayName(sign)} × ${house.name}</div>
@@ -1158,9 +1170,9 @@ function updateResult() {
   `;
 }
 
-selectConfig.forEach(({ id, items }) => {
+selectConfig.forEach(({ id, items, type }) => {
   const select = document.getElementById(id);
-  fillSelect(select, items);
+  fillSelect(select, items, type);
   select.addEventListener("change", updateResult);
 });
 updateResult();
