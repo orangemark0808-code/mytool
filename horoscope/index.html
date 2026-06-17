@@ -404,6 +404,11 @@ h2 {
 .detail-section[hidden] {
   display:none;
 }
+.detail-section {
+  grid-column:1 / -1;
+  padding:0;
+  border-bottom:0;
+}
 .detail-panel {
   background:var(--paper);
   border:1.5px solid var(--line);
@@ -969,10 +974,12 @@ function signTags(sign) {
 }
 
 const detailTypes = {
-  planet: { label:"天体", selectId:"planetSelect", items:planets, hashPrefix:"planet" },
-  sign: { label:"星座", selectId:"signSelect", items:signs, hashPrefix:"sign" },
-  house: { label:"ハウス", selectId:"houseSelect", items:houses, hashPrefix:"house" }
+  planet: { label:"天体", selectId:"planetSelect", items:planets, hashPrefix:"planet", cardSelector:".planets .mini-card" },
+  sign: { label:"星座", selectId:"signSelect", items:signs, hashPrefix:"sign", cardSelector:".signs .sign-card" },
+  house: { label:"ハウス", selectId:"houseSelect", items:houses, hashPrefix:"house", cardSelector:".houses .house-card" }
 };
+
+let activeDetailCard = null;
 
 function detailHash(type, value) {
   return `${detailTypes[type].hashPrefix}-${value}`;
@@ -1041,11 +1048,27 @@ function detailMeta(type, item) {
   `;
 }
 
+function findDetailCard(type, item) {
+  const config = detailTypes[type];
+  const index = config.items.findIndex(entry => entry.value === item.value);
+  return document.querySelectorAll(config.cardSelector)[index] || null;
+}
+
+function closeDetail() {
+  document.getElementById("detail").hidden = true;
+  if (activeDetailCard) activeDetailCard.focus();
+}
+
 function showDetail(type, item, options = {}) {
-  const { scroll = true, updateHash = true } = options;
+  const { sourceCard = null, scroll = false, updateHash = true } = options;
   const detailSection = document.getElementById("detail");
   const detailPanel = document.getElementById("detailPanel");
+  const detailCard = sourceCard || findDetailCard(type, item);
   const keywords = detailKeywords(type, item).map(keyword => `<span class="tag">${keyword}</span>`).join("");
+  if (detailCard) {
+    detailCard.insertAdjacentElement("afterend", detailSection);
+    activeDetailCard = detailCard;
+  }
   detailSection.hidden = false;
   detailPanel.innerHTML = `
     <div class="detail-kicker">${detailTypes[type].label}の詳細</div>
@@ -1060,18 +1083,18 @@ function showDetail(type, item, options = {}) {
     <div class="detail-tags" aria-label="関連キーワード">${keywords}</div>
     <div class="detail-actions">
       <button class="detail-button" type="button" data-apply-detail="${type}" data-value="${item.value}">結果選択に反映</button>
-      <a class="detail-button secondary" href="#${type === "planet" ? "planets" : type === "sign" ? "signs" : "houses"}">一覧へ戻る</a>
+      <button class="detail-button secondary" type="button" data-close-detail>詳細を閉じる</button>
     </div>
   `;
   if (updateHash) history.pushState(null, "", `#${detailHash(type, item.value)}`);
-  if (scroll) detailSection.scrollIntoView({ behavior:"smooth", block:"start" });
+  if (scroll) detailSection.scrollIntoView({ behavior:"auto", block:"nearest" });
 }
 
 function applyDetailToSelect(type, value) {
   const select = document.getElementById(detailTypes[type].selectId);
   select.value = value;
   updateResult();
-  document.getElementById("selector").scrollIntoView({ behavior:"smooth", block:"start" });
+  document.getElementById("selector").scrollIntoView({ behavior:"auto", block:"start" });
 }
 
 function bindCards(selector, type, items) {
@@ -1082,11 +1105,11 @@ function bindCards(selector, type, items) {
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-label", `${detailTitle(type, item)}の詳細を見る`);
-    card.addEventListener("click", () => showDetail(type, item));
+    card.addEventListener("click", () => showDetail(type, item, { sourceCard:card }));
     card.addEventListener("keydown", event => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      showDetail(type, item);
+      showDetail(type, item, { sourceCard:card });
     });
   });
 }
@@ -1147,6 +1170,10 @@ bindCards(".signs .sign-card", "sign", signs);
 bindCards(".houses .house-card", "house", houses);
 
 document.getElementById("detailPanel").addEventListener("click", event => {
+  if (event.target.closest("[data-close-detail]")) {
+    closeDetail();
+    return;
+  }
   const button = event.target.closest("[data-apply-detail]");
   if (!button) return;
   applyDetailToSelect(button.dataset.applyDetail, button.dataset.value);
