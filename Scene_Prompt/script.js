@@ -153,16 +153,20 @@ function generatePrompt() {
 
   const jpSubject = subject || "魅力的な被写体";
   const jpLocation = background ? `${background}を舞台にした` : "";
-  const jpPriority = "最優先: 被写体の表情、姿勢、視線、手元の動作を明確に描く。入力された被写体・動作の内容を省略しない。";
+  const jpAction = subject
+    ? `最重要の表情・動作指定: ${subject}。この表情と動作を必ず画面の主役として描く。`
+    : "";
+  const jpPriority = "最優先: 口の形、目、眉、姿勢、視線、両手の位置、手元の動作を大きく明確に描く。叫び、セリフ、感情語がある場合は、口を大きく開けた表情や短い吹き出しで分かるように表現する。";
   const jpEffectSentence = effect === "なし"
     ? `${depth}で、漫画演出は控えめにする。`
     : `${depth}で、${effect}を使った漫画演出を加える。`;
   const referenceNotes = getReferenceNotes(data);
 
   jpPrompt.value = compactJoin([
+    jpAction,
     jpPriority,
     referenceNotes.jp,
-    `${jpLocation}${jpSubject}を描いた漫画調のワンシーン画像。`,
+    `${jpLocation}${jpSubject}が一目で分かる漫画調のワンシーン画像。`,
     `アスペクト比は${aspect.value}。`,
     `${shot}、${direction}、${angle}、${composition}。`,
     jpEffectSentence,
@@ -172,9 +176,13 @@ function generatePrompt() {
   const enSubject = translateFreeText(subject, "the specified subject and action") || "an appealing subject";
   const enLocation = background ? `set in ${translateFreeText(background, "the specified location or background")}` : "";
   const enEffect = effect === "なし" ? "with subtle manga presentation and no special manga effects" : `with ${getOptionEnglish("effect", effect)}`;
-  const enPriority = "Top priority: clearly depict the subject's facial expression, pose, gaze, and hand/action details. Do not omit the specified subject or action.";
+  const enAction = subject
+    ? "Most important action and expression: depict the specified subject/action as the main focus of the image."
+    : "";
+  const enPriority = "Top priority: clearly show the mouth shape, eyes, eyebrows, pose, gaze, both hand positions, and hand/action details. If the input includes shouting, dialogue, or an emotion word, express it with a wide-open mouth and, if useful, a short speech bubble.";
 
   enPrompt.value = compactJoin([
+    enAction,
     enPriority,
     referenceNotes.en,
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
