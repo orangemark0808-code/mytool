@@ -66,12 +66,10 @@ const optionGroups = {
   ],
   motionBackground: [
     ["指定なし", ""],
-    ["被写体に合わせて背景を自然に調整", "adjust the background naturally to match the subject's action"],
     ["左右移動を横から見せる", "show left-to-right or right-to-left movement from the side"],
     ["手前から奥へ進む", "show movement from the foreground into the background"],
     ["奥から手前へ進む", "show movement from the background toward the foreground"],
-    ["背景を進行方向に流す", "let the background flow in the direction of movement"],
-    ["被写体を背景に自然に接地させる", "ground the subject naturally in the background space"]
+    ["背景を進行方向に流す", "let the background flow in the direction of movement"]
   ],
   effect: [
     ["なし", "no manga effects"],
@@ -117,10 +115,6 @@ function getOptionalJapanese(value) {
 
 function getMotionBackgroundNote(value) {
   const notes = {
-    "被写体に合わせて背景を自然に調整": [
-      "背景の向き、床や壁のライン、光源を被写体の動きに合わせて自然に調整する。",
-      "Adjust the direction of the background, floor and wall lines, and lighting naturally to match the subject's action."
-    ],
     "左右移動を横から見せる": [
       "左右方向の移動は横から見た構図で描き、背景の廊下、壁、窓、床のラインを進行方向に沿って横へ伸ばす。",
       "For sideways movement, use a side-view composition and extend the hallway, walls, windows, and floor lines horizontally along the direction of travel."
@@ -136,10 +130,6 @@ function getMotionBackgroundNote(value) {
     "背景を進行方向に流す": [
       "背景の線や配置を被写体の進行方向に流し、動きの方向が一目で分かるようにする。",
       "Flow the background lines and layout in the subject's direction of movement so the motion direction is immediately clear."
-    ],
-    "被写体を背景に自然に接地させる": [
-      "足元、影、床との接点を明確にし、被写体が背景から浮かず同じ空間にいるように描く。",
-      "Clearly show the feet, shadows, and contact with the floor so the subject feels grounded in the same space as the background."
     ]
   };
 
@@ -217,7 +207,7 @@ function generatePrompt() {
     ? `最重要の表情・動作指定: ${subjectPhrase}。この表情と動作を必ず画面の主役として描く。`
     : "";
   const jpPriority = "最優先: 口の形、目、眉、姿勢、視線、両手の位置、手元の動作を大きく明確に描く。叫び、セリフ、感情語がある場合は、口を大きく開けた表情や短い吹き出しで分かるように表現する。";
-  const jpSceneIntegration = "背景と被写体を同じカメラ位置、同じアイレベル、同じパース、同じ光源で統一する。足裏や体を床・机・壁など背景の空間に自然に接地させ、接地影と奥行きで浮いて見えないようにする。";
+  const jpSceneIntegration = "背景の向き、床や壁のライン、光源を被写体の動きに合わせて自然に調整する。背景と被写体を同じカメラ位置、同じアイレベル、同じパース、同じ光源で統一する。足裏や体を床・机・壁など背景の空間に自然に接地させ、接地影と奥行きで浮いて見えないようにする。";
   const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
   const [jpMotionBackground, enMotionBackground] = getMotionBackgroundNote(motionBackground);
   const jpEffectSentence = effect === "なし"
@@ -246,7 +236,7 @@ function generatePrompt() {
     ? "Most important action and expression: depict the specified subject/action as the main focus of the image."
     : "";
   const enPriority = "Top priority: clearly show the mouth shape, eyes, eyebrows, pose, gaze, both hand positions, and hand/action details. If the input includes shouting, dialogue, or an emotion word, express it with a wide-open mouth and, if useful, a short speech bubble.";
-  const enSceneIntegration = "Integrate the subject and background with the same camera position, eye level, perspective, and light direction. Ground the feet and body naturally in the space with contact shadows and depth so the subject does not look pasted on or floating.";
+  const enSceneIntegration = "Adjust the direction of the background, floor and wall lines, and lighting naturally to match the subject's action. Integrate the subject and background with the same camera position, eye level, perspective, and light direction. Ground the feet and body naturally in the space with contact shadows and depth so the subject does not look pasted on or floating.";
   const enCameraView = getOptionEnglish("cameraView", cameraView) ? `Camera view: ${getOptionEnglish("cameraView", cameraView)}.` : "";
 
   enPrompt.value = compactJoin([
