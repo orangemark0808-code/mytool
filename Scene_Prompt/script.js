@@ -163,9 +163,9 @@ function generatePrompt() {
   const referenceNotes = getReferenceNotes(data);
 
   jpPrompt.value = compactJoin([
+    referenceNotes.jp,
     jpAction,
     jpPriority,
-    referenceNotes.jp,
     `${jpLocation}${jpSubject}が一目で分かる漫画調のワンシーン画像。`,
     `アスペクト比は${aspect.value}。`,
     `${shot}、${direction}、${angle}、${composition}。`,
@@ -182,9 +182,9 @@ function generatePrompt() {
   const enPriority = "Top priority: clearly show the mouth shape, eyes, eyebrows, pose, gaze, both hand positions, and hand/action details. If the input includes shouting, dialogue, or an emotion word, express it with a wide-open mouth and, if useful, a short speech bubble.";
 
   enPrompt.value = compactJoin([
+    referenceNotes.en,
     enAction,
     enPriority,
-    referenceNotes.en,
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     `Use a ${aspect.en}.`,
     `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, ${getOptionEnglish("composition", composition)}.`,
