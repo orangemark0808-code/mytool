@@ -16,7 +16,7 @@
       <div>
         <p class="eyebrow">ORANGEMANIA TOOL</p>
         <h1>Scene Prompt</h1>
-        <p class="version-label">2026.06.18-11</p>
+        <p class="version-label">2026.06.18-12</p>
       </div>
       <p class="lead">
         カメラワーク、構図、漫画演出を選ぶだけで、日本語と英語の画像生成プロンプトを作れます。
@@ -35,10 +35,18 @@
             <label for="subject">被写体</label>
             <input id="subject" name="subject" type="text" value="オレンジ色のマスコットキャラクター" placeholder="例：オレンジ色のマスコットキャラクター">
             <div class="reference-upload">
-              <label class="sub-label" for="subjectReference">被写体の参照画像</label>
-              <input id="subjectReference" name="subjectReference" type="file" accept="image/*">
-              <p class="hint">被写体の画風・線・色味を参照します。</p>
-              <div class="image-preview" id="subjectPreview" hidden></div>
+              <p class="sub-label">被写体の参照画像</p>
+              <div class="segmented-control" role="radiogroup" aria-label="被写体の参照画像">
+                <label>
+                  <input type="radio" name="subjectReference" value="none" checked>
+                  <span>無</span>
+                </label>
+                <label>
+                  <input type="radio" name="subjectReference" value="yes">
+                  <span>有</span>
+                </label>
+              </div>
+              <p class="hint">有の場合、添付画像のキャラクター、画風、線、色味をプロンプトに反映します。</p>
             </div>
           </div>
 
@@ -46,10 +54,18 @@
             <label for="background">場所・背景</label>
             <input id="background" name="background" type="text" placeholder="例：明るいカフェ、夜の街、学校の廊下">
             <div class="reference-upload">
-              <label class="sub-label" for="backgroundReference">場所の参照画像</label>
-              <input id="backgroundReference" name="backgroundReference" type="file" accept="image/*">
-              <p class="hint">背景や空間の参考にします。画風は被写体参照を優先します。</p>
-              <div class="image-preview" id="backgroundPreview" hidden></div>
+              <p class="sub-label">場所・背景の参照画像</p>
+              <div class="segmented-control" role="radiogroup" aria-label="場所・背景の参照画像">
+                <label>
+                  <input type="radio" name="backgroundReference" value="none" checked>
+                  <span>無</span>
+                </label>
+                <label>
+                  <input type="radio" name="backgroundReference" value="yes">
+                  <span>有</span>
+                </label>
+              </div>
+              <p class="hint">有の場合、添付画像の場所・背景をプロンプトに反映します。</p>
             </div>
           </div>
 

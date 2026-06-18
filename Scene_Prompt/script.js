@@ -74,10 +74,6 @@ const aspectDescription = document.querySelector("#aspectDescription");
 const jpPrompt = document.querySelector("#jpPrompt");
 const enPrompt = document.querySelector("#enPrompt");
 const copyStatus = document.querySelector("#copyStatus");
-const subjectReference = document.querySelector("#subjectReference");
-const backgroundReference = document.querySelector("#backgroundReference");
-const subjectPreview = document.querySelector("#subjectPreview");
-const backgroundPreview = document.querySelector("#backgroundPreview");
 
 function fillSelect(selectId, options, defaultValue) {
   const select = document.querySelector(`#${selectId}`);
@@ -117,22 +113,28 @@ function translateFreeText(text, fallbackText) {
   return dictionary[text] || fallbackText;
 }
 
-function hasFile(input) {
-  return input.files && input.files.length > 0;
+function hasReference(data, name) {
+  return data.get(name) === "yes";
 }
 
-function getReferenceNotes() {
-  const hasSubjectReference = hasFile(subjectReference);
-  const hasBackgroundReference = hasFile(backgroundReference);
+function getReferenceNotes(data) {
+  const hasSubjectReference = hasReference(data, "subjectReference");
+  const hasBackgroundReference = hasReference(data, "backgroundReference");
+  const backgroundStyleNoteJp = hasSubjectReference
+    ? "背景画像が写真でも、画風、線のタッチ、色味は被写体の参照画像に合わせる。"
+    : "背景画像が写真でも、全体を漫画調の画風に統一する。";
+  const backgroundStyleNoteEn = hasSubjectReference
+    ? "Even if it is a photo, match the art style, linework, and color palette to the subject reference image."
+    : "Even if it is a photo, unify the entire image in a manga-style look.";
 
   return {
     jp: compactJoin([
-      hasSubjectReference ? "添付した被写体の参照画像から、画風、線のタッチ、色味、質感を参照する。" : "",
-      hasBackgroundReference ? "添付した場所の参照画像は背景や空間情報として使う。場所の画像が写真でも、画風は被写体の参照画像を優先する。" : ""
+      hasSubjectReference ? "被写体は添付画像を参照し、キャラクターの特徴、画風、線のタッチ、色味を反映する。" : "",
+      hasBackgroundReference ? `場所・背景は添付画像を参照する。${backgroundStyleNoteJp}` : ""
     ], "\n"),
     en: compactJoin([
-      hasSubjectReference ? "Use the attached subject reference image for the visual style, linework, color palette, and texture." : "",
-      hasBackgroundReference ? "Use the attached location reference image for the background and spatial information. Even if the location reference is a photo, keep the style based on the subject reference image." : ""
+      hasSubjectReference ? "Use the attached subject reference image to reflect the character design, art style, linework, and color palette." : "",
+      hasBackgroundReference ? `Use the attached location/background reference image for the setting. ${backgroundStyleNoteEn}` : ""
     ], "\n")
   };
 }
@@ -152,7 +154,7 @@ function generatePrompt() {
   const jpSubject = subject || "魅力的な被写体";
   const jpLocation = background ? `${background}を舞台にした` : "";
   const jpEffect = effect === "なし" ? "漫画演出は控えめに" : `${effect}を使った漫画演出`;
-  const referenceNotes = getReferenceNotes();
+  const referenceNotes = getReferenceNotes(data);
 
   jpPrompt.value = compactJoin([
     `${jpLocation}${jpSubject}の漫画調のワンシーン画像。`,
@@ -175,23 +177,6 @@ function generatePrompt() {
     `${getOptionEnglish("depth", depth)}, ${enEffect}.`,
     "Clean Japanese manga linework, readable silhouette, expressive mood, polished image-generation prompt style."
   ], "\n");
-}
-
-function updatePreview(input, preview) {
-  const file = input.files && input.files[0];
-  if (!file) {
-    preview.hidden = true;
-    preview.innerHTML = "";
-    return;
-  }
-
-  const image = document.createElement("img");
-  image.alt = file.name;
-  image.src = URL.createObjectURL(file);
-  image.onload = () => URL.revokeObjectURL(image.src);
-  preview.innerHTML = "";
-  preview.appendChild(image);
-  preview.hidden = false;
 }
 
 function updateAspectDescription() {
@@ -238,8 +223,6 @@ form.addEventListener("input", () => {
 
 form.addEventListener("change", () => {
   updateAspectDescription();
-  updatePreview(subjectReference, subjectPreview);
-  updatePreview(backgroundReference, backgroundPreview);
   generatePrompt();
 });
 
@@ -247,10 +230,6 @@ document.querySelector("#resetButton").addEventListener("click", () => {
   form.reset();
   document.querySelector("#subject").value = "オレンジ色のマスコットキャラクター";
   aspectSelect.value = "9:16 スマホ縦長";
-  subjectReference.value = "";
-  backgroundReference.value = "";
-  updatePreview(subjectReference, subjectPreview);
-  updatePreview(backgroundReference, backgroundPreview);
   updateAspectDescription();
   generatePrompt();
 });
