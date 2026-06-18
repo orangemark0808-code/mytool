@@ -73,9 +73,11 @@ const optionGroups = {
   motionBackground: [
     ["指定なし", ""],
     ["左右移動を横から見せる", "show left-to-right or right-to-left movement from the side"],
+    ["斜め奥へ移動する", "show diagonal movement into the depth of the scene"],
     ["手前から奥へ進む", "show movement from the foreground into the background"],
     ["奥から手前へ進む", "show movement from the background toward the foreground"],
-    ["背景を進行方向に流す", "let the background flow in the direction of movement"]
+    ["背景を進行方向に流す", "let the background flow in the direction of movement"],
+    ["カメラが回り込む", "show a slight orbiting camera feel around the subject"]
   ],
   effect: [
     ["なし", "no manga effects"],
@@ -125,6 +127,10 @@ function getMotionBackgroundNote(value) {
       "左右方向の移動は横から見た構図で描き、背景の廊下、壁、窓、床のラインを進行方向に沿って横へ伸ばす。",
       "For sideways movement, use a side-view composition and extend the hallway, walls, windows, and floor lines horizontally along the direction of travel."
     ],
+    "斜め奥へ移動する": [
+      "被写体が画面の斜め方向に奥へ進むように、床、壁、机、窓などの背景要素を一点透視に近い流れで配置する。",
+      "Arrange the floor, walls, tables, windows, and other background elements with near one-point perspective so the subject moves diagonally deeper into the scene."
+    ],
     "手前から奥へ進む": [
       "被写体が画面手前から奥へ進むように、背景のパース線と床の奥行きを進行方向に合わせる。",
       "Align the background perspective lines and floor depth so the subject moves from the foreground into the background."
@@ -136,6 +142,10 @@ function getMotionBackgroundNote(value) {
     "背景を進行方向に流す": [
       "背景の線や配置を被写体の進行方向に流し、動きの方向が一目で分かるようにする。",
       "Flow the background lines and layout in the subject's direction of movement so the motion direction is immediately clear."
+    ],
+    "カメラが回り込む": [
+      "被写体の周囲をカメラが少し回り込むように、背景の水平線と床のパースをゆるくカーブさせ、立体感を出す。",
+      "Create a slight orbiting camera feel around the subject by gently curving the horizon and floor perspective to emphasize dimensionality."
     ]
   };
 
@@ -164,6 +174,10 @@ function translateFreeText(text, fallbackText) {
 
   if (!text) return "";
   return dictionary[text] || fallbackText;
+}
+
+function preserveOriginalText(text, label) {
+  return text ? `${label}: "${text}"` : "";
 }
 
 function hasReference(data, name) {
@@ -209,18 +223,21 @@ function generatePrompt() {
   const effect = data.get("effect");
 
   const jpSubject = subjectPhrase || "魅力的な被写体";
-  const jpLocation = background ? `${background}を舞台にした` : "";
   const jpAction = subjectPhrase
     ? `最重要の表情・動作指定: ${subjectPhrase}。この表情と動作を必ず画面の主役として描く。`
     : "";
   const jpPriority = "最優先: 口の形、目、眉、姿勢、視線、両手の位置、手元の動作を大きく明確に描く。叫び、セリフ、感情語がある場合は、口を大きく開けた表情や短い吹き出しで分かるように表現する。";
-  const jpSceneIntegration = "背景の向き、床や壁のライン、光源を被写体の動きに合わせて自然に調整する。背景と被写体を同じカメラ位置、同じアイレベル、同じパース、同じ光源で統一する。足裏や体を床・机・壁など背景の空間に自然に接地させ、接地影と奥行きで浮いて見えないようにする。";
+  const jpSceneIntegration = "背景を単なる模様にせず、場所の構造が分かるように描く。背景の向き、床や壁のライン、光源を被写体の動きに合わせて自然に調整する。背景と被写体を同じカメラ位置、同じアイレベル、同じパース、同じ光源で統一する。足裏や体を床・机・壁など背景の空間に自然に接地させ、接地影と奥行きで浮いて見えないようにする。";
   const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
   const [jpMotionBackground, enMotionBackground] = getMotionBackgroundNote(motionBackground);
   const jpEffectSentence = effect === "なし"
     ? `${depth}で、漫画演出は控えめにする。`
     : `${depth}で、${effect}を使った漫画演出を加える。`;
   const referenceNotes = getReferenceNotes(data);
+  const jpSceneSubject = subjectPhrase ? `${subjectPhrase}シーン` : jpSubject;
+  const jpSceneSentence = background
+    ? `${background}を舞台に、${jpSceneSubject}を描いた漫画調のワンシーン画像。`
+    : `${jpSceneSubject}を描いた漫画調のワンシーン画像。`;
 
   jpPrompt.value = compactJoin([
     referenceNotes.jp,
@@ -229,21 +246,21 @@ function generatePrompt() {
     jpSceneIntegration,
     jpCameraView,
     jpMotionBackground,
-    `${jpLocation}${jpSubject}が一目で分かる漫画調のワンシーン画像。`,
+    jpSceneSentence,
     `アスペクト比は${aspect.value}。`,
     `${shot}、${direction}、${angle}、被写体は${subjectPlacement}、画面全体は${screenComposition}。`,
     jpEffectSentence,
     "自然な日本の漫画らしい線、読みやすいシルエット、表情と空気感が伝わる仕上がり。"
   ], "\n");
 
-  const enSubject = translateFreeText(subjectPhrase, "the specified subject and action") || "an appealing subject";
-  const enLocation = background ? `set in ${translateFreeText(background, "the specified location or background")}` : "";
+  const enSubject = translateFreeText(subjectPhrase, preserveOriginalText(subjectPhrase, "the subject and action described in Japanese")) || "an appealing subject";
+  const enLocation = background ? `set in ${translateFreeText(background, preserveOriginalText(background, "the location/background described in Japanese"))}` : "";
   const enEffect = effect === "なし" ? "with subtle manga presentation and no special manga effects" : `with ${getOptionEnglish("effect", effect)}`;
   const enAction = subjectPhrase
     ? "Most important action and expression: depict the specified subject/action as the main focus of the image."
     : "";
   const enPriority = "Top priority: clearly show the mouth shape, eyes, eyebrows, pose, gaze, both hand positions, and hand/action details. If the input includes shouting, dialogue, or an emotion word, express it with a wide-open mouth and, if useful, a short speech bubble.";
-  const enSceneIntegration = "Adjust the direction of the background, floor and wall lines, and lighting naturally to match the subject's action. Integrate the subject and background with the same camera position, eye level, perspective, and light direction. Ground the feet and body naturally in the space with contact shadows and depth so the subject does not look pasted on or floating.";
+  const enSceneIntegration = "Do not render the background as a flat pattern; make the structure of the location readable. Adjust the direction of the background, floor and wall lines, and lighting naturally to match the subject's action. Integrate the subject and background with the same camera position, eye level, perspective, and light direction. Ground the feet and body naturally in the space with contact shadows and depth so the subject does not look pasted on or floating.";
   const enCameraView = getOptionEnglish("cameraView", cameraView) ? `Camera view: ${getOptionEnglish("cameraView", cameraView)}.` : "";
 
   enPrompt.value = compactJoin([
