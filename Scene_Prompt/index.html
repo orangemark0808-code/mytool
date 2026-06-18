@@ -1,1 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scene Prompt</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Nunito:wght@300;400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">ORANGEMANIA TOOL</p>
+        <h1>Scene Prompt</h1>
+        <p class="version-label">2026.06.18-10</p>
+      </div>
+      <p class="lead">
+        カメラワーク、構図、漫画演出を選ぶだけで、日本語と英語の画像生成プロンプトを作れます。
+      </p>
+    </header>
 
+    <div class="workspace">
+      <section class="panel input-panel" aria-labelledby="form-title">
+        <div class="panel-heading">
+          <p class="eyebrow">INPUT</p>
+          <h2 id="form-title">シーン設定</h2>
+        </div>
+
+        <form id="promptForm">
+          <div class="field-card">
+            <label for="subject">被写体</label>
+            <input id="subject" name="subject" type="text" value="オレンジ色のマスコットキャラクター" placeholder="例：オレンジ色のマスコットキャラクター">
+            <div class="reference-upload">
+              <label class="sub-label" for="subjectReference">被写体の参照画像</label>
+              <input id="subjectReference" name="subjectReference" type="file" accept="image/*">
+              <p class="hint">被写体の画風・線・色味を参照します。</p>
+              <div class="image-preview" id="subjectPreview" hidden></div>
+            </div>
+          </div>
+
+          <div class="field-card">
+            <label for="background">場所・背景</label>
+            <input id="background" name="background" type="text" placeholder="例：明るいカフェ、夜の街、学校の廊下">
+            <div class="reference-upload">
+              <label class="sub-label" for="backgroundReference">場所の参照画像</label>
+              <input id="backgroundReference" name="backgroundReference" type="file" accept="image/*">
+              <p class="hint">背景や空間の参考にします。画風は被写体参照を優先します。</p>
+              <div class="image-preview" id="backgroundPreview" hidden></div>
+            </div>
+          </div>
+
+          <div class="field-card field-card-wide">
+            <label for="aspect">アスペクト比</label>
+            <select id="aspect" name="aspect"></select>
+            <p class="hint" id="aspectDescription">スマホ表示や縦長SNS投稿に向いた比率です。</p>
+          </div>
+
+          <div class="field-grid">
+            <div class="field-card">
+              <label for="shot">ショットサイズ</label>
+              <select id="shot" name="shot"></select>
+            </div>
+
+            <div class="field-card">
+              <label for="direction">被写体の向き</label>
+              <select id="direction" name="direction"></select>
+            </div>
+
+            <div class="field-card">
+              <label for="angle">カメラ角度</label>
+              <select id="angle" name="angle"></select>
+            </div>
+
+            <div class="field-card">
+              <label for="composition">構図</label>
+              <select id="composition" name="composition"></select>
+            </div>
+
+            <div class="field-card">
+              <label for="depth">奥行き・レンズ感</label>
+              <select id="depth" name="depth"></select>
+            </div>
+
+            <div class="field-card">
+              <label for="effect">漫画演出</label>
+              <select id="effect" name="effect"></select>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="button button-primary" type="submit">生成する</button>
+            <button class="button button-secondary" type="button" id="resetButton">リセット</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel output-panel" aria-labelledby="output-title">
+        <div class="panel-heading">
+          <p class="eyebrow">OUTPUT</p>
+          <h2 id="output-title">生成結果</h2>
+        </div>
+
+        <article class="prompt-card">
+          <div class="prompt-header">
+            <div>
+              <p class="eyebrow">JAPANESE</p>
+              <h3>日本語プロンプト</h3>
+            </div>
+            <button class="copy-button" type="button" data-copy-target="jpPrompt">日本語コピー</button>
+          </div>
+          <textarea id="jpPrompt" readonly></textarea>
+        </article>
+
+        <article class="prompt-card">
+          <div class="prompt-header">
+            <div>
+              <p class="eyebrow">ENGLISH</p>
+              <h3>英語プロンプト</h3>
+            </div>
+            <button class="copy-button" type="button" data-copy-target="enPrompt">英語コピー</button>
+          </div>
+          <textarea id="enPrompt" readonly></textarea>
+        </article>
+
+        <p class="copy-status" id="copyStatus" aria-live="polite"></p>
+      </section>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
