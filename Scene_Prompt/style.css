@@ -152,8 +152,7 @@ form {
 }
 
 .field-card-wide {
-  grid-column: 1 / -1;
-  grid-template-columns: minmax(140px, 210px) 240px minmax(0, 1fr);
+  grid-template-columns: minmax(140px, 210px) minmax(240px, 1fr);
   gap: 8px 18px;
   align-items: center;
   justify-content: start;
@@ -165,7 +164,7 @@ form {
 }
 
 .field-card-wide .hint {
-  grid-column: 2 / -1;
+  grid-column: 1 / -1;
 }
 
 .field-grid .field-card label,
