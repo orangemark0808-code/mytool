@@ -57,10 +57,15 @@ jobs:
           FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
         run: |
           mkdir -p dist/PROMPT_STOCK
+          mkdir -p dist/Scene_Prompt
           mkdir -p dist/horoscope
           cp "index.html" "dist/index.html"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
           cp "PROMPT_STOCK/README.md" "dist/PROMPT_STOCK/README.md"
+          cp "Scene_Prompt/index.html" "dist/Scene_Prompt/index.html"
+          cp "Scene_Prompt/style.css" "dist/Scene_Prompt/style.css"
+          cp "Scene_Prompt/script.js" "dist/Scene_Prompt/script.js"
+          cp "Scene_Prompt/favicon.svg" "dist/Scene_Prompt/favicon.svg"
           cp "horoscope/index.html" "dist/horoscope/index.html"
           cp "horoscope/favicon.svg" "dist/horoscope/favicon.svg"
           cat > "dist/firebase-config.js" <<'EOF'
