@@ -36,6 +36,15 @@ const optionGroups = {
     ["あおり", "dramatic low-angle shot"],
     ["真上", "top-down view"]
   ],
+  cameraView: [
+    ["指定なし", ""],
+    ["正面ビュー", "front view"],
+    ["サイドビュー", "side view"],
+    ["斜めサイドビュー", "three-quarter side view"],
+    ["背後から追う", "follow shot from behind"],
+    ["肩越し", "over-the-shoulder view"],
+    ["主観視点", "first-person point of view"]
+  ],
   composition: [
     ["中央配置", "centered composition"],
     ["左寄せ", "left-weighted composition"],
@@ -54,6 +63,15 @@ const optionGroups = {
     ["望遠っぽい圧縮感", "telephoto compression"],
     ["背景をぼかす", "softly blurred background"],
     ["背景まで描き込む", "detailed background rendering"]
+  ],
+  motionBackground: [
+    ["指定なし", ""],
+    ["被写体に合わせて背景を自然に調整", "adjust the background naturally to match the subject's action"],
+    ["左右移動を横から見せる", "show left-to-right or right-to-left movement from the side"],
+    ["手前から奥へ進む", "show movement from the foreground into the background"],
+    ["奥から手前へ進む", "show movement from the background toward the foreground"],
+    ["背景を進行方向に流す", "let the background flow in the direction of movement"],
+    ["被写体を背景に自然に接地させる", "ground the subject naturally in the background space"]
   ],
   effect: [
     ["なし", "no manga effects"],
@@ -91,6 +109,41 @@ function fillSelect(selectId, options, defaultValue) {
 function getOptionEnglish(group, value) {
   const found = optionGroups[group].find((option) => option[0] === value);
   return found ? found[1] : value;
+}
+
+function getOptionalJapanese(value) {
+  return value && value !== "指定なし" ? value : "";
+}
+
+function getMotionBackgroundNote(value) {
+  const notes = {
+    "被写体に合わせて背景を自然に調整": [
+      "背景の向き、床や壁のライン、光源を被写体の動きに合わせて自然に調整する。",
+      "Adjust the direction of the background, floor and wall lines, and lighting naturally to match the subject's action."
+    ],
+    "左右移動を横から見せる": [
+      "左右方向の移動は横から見た構図で描き、背景の廊下、壁、窓、床のラインを進行方向に沿って横へ伸ばす。",
+      "For sideways movement, use a side-view composition and extend the hallway, walls, windows, and floor lines horizontally along the direction of travel."
+    ],
+    "手前から奥へ進む": [
+      "被写体が画面手前から奥へ進むように、背景のパース線と床の奥行きを進行方向に合わせる。",
+      "Align the background perspective lines and floor depth so the subject moves from the foreground into the background."
+    ],
+    "奥から手前へ進む": [
+      "被写体が奥から手前へ向かってくるように、背景のパース線と床の奥行きを進行方向に合わせる。",
+      "Align the background perspective lines and floor depth so the subject moves from the background toward the foreground."
+    ],
+    "背景を進行方向に流す": [
+      "背景の線や配置を被写体の進行方向に流し、動きの方向が一目で分かるようにする。",
+      "Flow the background lines and layout in the subject's direction of movement so the motion direction is immediately clear."
+    ],
+    "被写体を背景に自然に接地させる": [
+      "足元、影、床との接点を明確にし、被写体が背景から浮かず同じ空間にいるように描く。",
+      "Clearly show the feet, shadows, and contact with the floor so the subject feels grounded in the same space as the background."
+    ]
+  };
+
+  return notes[value] || ["", ""];
 }
 
 function getAspect() {
@@ -152,8 +205,10 @@ function generatePrompt() {
   const shot = data.get("shot");
   const direction = data.get("direction");
   const angle = data.get("angle");
+  const cameraView = data.get("cameraView");
   const composition = data.get("composition");
   const depth = data.get("depth");
+  const motionBackground = data.get("motionBackground");
   const effect = data.get("effect");
 
   const jpSubject = subjectPhrase || "魅力的な被写体";
@@ -163,6 +218,8 @@ function generatePrompt() {
     : "";
   const jpPriority = "最優先: 口の形、目、眉、姿勢、視線、両手の位置、手元の動作を大きく明確に描く。叫び、セリフ、感情語がある場合は、口を大きく開けた表情や短い吹き出しで分かるように表現する。";
   const jpSceneIntegration = "背景と被写体を同じカメラ位置、同じアイレベル、同じパース、同じ光源で統一する。足裏や体を床・机・壁など背景の空間に自然に接地させ、接地影と奥行きで浮いて見えないようにする。";
+  const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
+  const [jpMotionBackground, enMotionBackground] = getMotionBackgroundNote(motionBackground);
   const jpEffectSentence = effect === "なし"
     ? `${depth}で、漫画演出は控えめにする。`
     : `${depth}で、${effect}を使った漫画演出を加える。`;
@@ -173,6 +230,8 @@ function generatePrompt() {
     jpAction,
     jpPriority,
     jpSceneIntegration,
+    jpCameraView,
+    jpMotionBackground,
     `${jpLocation}${jpSubject}が一目で分かる漫画調のワンシーン画像。`,
     `アスペクト比は${aspect.value}。`,
     `${shot}、${direction}、${angle}、${composition}。`,
@@ -188,12 +247,15 @@ function generatePrompt() {
     : "";
   const enPriority = "Top priority: clearly show the mouth shape, eyes, eyebrows, pose, gaze, both hand positions, and hand/action details. If the input includes shouting, dialogue, or an emotion word, express it with a wide-open mouth and, if useful, a short speech bubble.";
   const enSceneIntegration = "Integrate the subject and background with the same camera position, eye level, perspective, and light direction. Ground the feet and body naturally in the space with contact shadows and depth so the subject does not look pasted on or floating.";
+  const enCameraView = getOptionEnglish("cameraView", cameraView) ? `Camera view: ${getOptionEnglish("cameraView", cameraView)}.` : "";
 
   enPrompt.value = compactJoin([
     referenceNotes.en,
     enAction,
     enPriority,
     enSceneIntegration,
+    enCameraView,
+    enMotionBackground,
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     `Use a ${aspect.en}.`,
     `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, ${getOptionEnglish("composition", composition)}.`,
@@ -228,8 +290,10 @@ fillSelect("aspect", aspectOptions, "9:16 スマホ縦長");
 fillSelect("shot", optionGroups.shot, "上半身");
 fillSelect("direction", optionGroups.direction, "斜め前");
 fillSelect("angle", optionGroups.angle, "アイレベル");
+fillSelect("cameraView", optionGroups.cameraView, "指定なし");
 fillSelect("composition", optionGroups.composition, "中央配置");
 fillSelect("depth", optionGroups.depth, "自然な奥行き");
+fillSelect("motionBackground", optionGroups.motionBackground, "指定なし");
 fillSelect("effect", optionGroups.effect, "なし");
 updateAspectDescription();
 generatePrompt();
