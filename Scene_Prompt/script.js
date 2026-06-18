@@ -105,7 +105,7 @@ function compactJoin(parts, separator) {
   return parts.filter(Boolean).join(separator);
 }
 
-function translateFreeText(text, fallbackPrefix) {
+function translateFreeText(text, fallbackText) {
   const dictionary = {
     "オレンジ色のマスコットキャラクター": "an orange mascot character",
     "明るいカフェ": "a bright cafe",
@@ -114,7 +114,7 @@ function translateFreeText(text, fallbackPrefix) {
   };
 
   if (!text) return "";
-  return dictionary[text] || `${fallbackPrefix} "${text}"`;
+  return dictionary[text] || fallbackText;
 }
 
 function hasFile(input) {
@@ -163,13 +163,13 @@ function generatePrompt() {
     "自然な日本の漫画らしい線、読みやすいシルエット、表情と空気感が伝わる仕上がり。"
   ], "\n");
 
-  const enSubject = translateFreeText(subject, "the subject described as") || "an appealing subject";
-  const enLocation = background ? `set in ${translateFreeText(background, "the location described as")}` : "";
+  const enSubject = translateFreeText(subject, "the specified subject") || "an appealing subject";
+  const enLocation = background ? `set in ${translateFreeText(background, "the specified location or background")}` : "";
   const enEffect = effect === "なし" ? "with subtle manga presentation and no special manga effects" : `with ${getOptionEnglish("effect", effect)}`;
 
   enPrompt.value = compactJoin([
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
-    `Use a ${aspect.en} (${aspect.value}).`,
+    `Use a ${aspect.en}.`,
     referenceNotes.en,
     `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, ${getOptionEnglish("composition", composition)}.`,
     `${getOptionEnglish("depth", depth)}, ${enEffect}.`,
