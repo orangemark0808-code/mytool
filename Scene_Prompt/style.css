@@ -117,7 +117,7 @@ h3 {
 }
 
 .panel {
-  padding: 22px;
+  padding: 28px 34px;
 }
 
 .panel-heading {
@@ -137,15 +137,15 @@ form {
 .field-card {
   display: grid;
   gap: 8px;
-  padding: 14px;
+  padding: 18px 20px;
 }
 
 .field-grid .field-card {
-  grid-template-columns: minmax(130px, 180px) minmax(220px, 420px);
-  gap: 14px;
+  grid-template-columns: minmax(140px, 210px) minmax(240px, 1fr);
+  gap: 18px;
   align-items: center;
   justify-content: start;
-  min-height: 64px;
+  min-height: 72px;
 }
 
 .field-grid .field-card label {
@@ -183,7 +183,7 @@ select {
 }
 
 .field-grid select {
-  width: min(100%, 420px);
+  width: 100%;
 }
 
 input[type="file"] {
@@ -217,8 +217,8 @@ textarea:focus {
 }
 
 .segmented-control {
-  display: inline-grid;
-  grid-template-columns: repeat(2, 96px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   padding: 4px;
   border: 1px solid var(--border);
@@ -392,7 +392,7 @@ textarea {
   }
 
   .panel {
-    padding: 14px;
+    padding: 16px;
   }
 
   .field-grid {
