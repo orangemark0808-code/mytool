@@ -151,7 +151,25 @@ form {
   min-height: 60px;
 }
 
-.field-grid .field-card label {
+.field-card-wide {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(140px, 210px) 240px minmax(0, 1fr);
+  gap: 8px 18px;
+  align-items: center;
+  justify-content: start;
+  min-height: 60px;
+}
+
+.field-card-wide select {
+  grid-column: 2;
+}
+
+.field-card-wide .hint {
+  grid-column: 2 / -1;
+}
+
+.field-grid .field-card label,
+.field-card-wide label {
   line-height: 1.4;
 }
 
@@ -410,6 +428,19 @@ textarea {
   .field-grid .field-card {
     grid-template-columns: 1fr;
     min-height: auto;
+  }
+
+  .field-card-wide {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .field-card-wide select {
+    grid-column: auto;
+  }
+
+  .field-card-wide .hint {
+    grid-column: auto;
   }
 
   .actions,
