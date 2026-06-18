@@ -101,6 +101,10 @@ function compactJoin(parts, separator) {
   return parts.filter(Boolean).join(separator);
 }
 
+function stripTrailingPunctuation(text) {
+  return text.replace(/[。．.、,\s]+$/g, "");
+}
+
 function translateFreeText(text, fallbackText) {
   const dictionary = {
     "オレンジ色のマスコットキャラクター": "an orange mascot character",
@@ -142,6 +146,7 @@ function getReferenceNotes(data) {
 function generatePrompt() {
   const data = new FormData(form);
   const subject = String(data.get("subject") || "").trim();
+  const subjectPhrase = stripTrailingPunctuation(subject);
   const background = String(data.get("background") || "").trim();
   const aspect = getAspect();
   const shot = data.get("shot");
@@ -151,12 +156,13 @@ function generatePrompt() {
   const depth = data.get("depth");
   const effect = data.get("effect");
 
-  const jpSubject = subject || "魅力的な被写体";
+  const jpSubject = subjectPhrase || "魅力的な被写体";
   const jpLocation = background ? `${background}を舞台にした` : "";
-  const jpAction = subject
-    ? `最重要の表情・動作指定: ${subject}。この表情と動作を必ず画面の主役として描く。`
+  const jpAction = subjectPhrase
+    ? `最重要の表情・動作指定: ${subjectPhrase}。この表情と動作を必ず画面の主役として描く。`
     : "";
   const jpPriority = "最優先: 口の形、目、眉、姿勢、視線、両手の位置、手元の動作を大きく明確に描く。叫び、セリフ、感情語がある場合は、口を大きく開けた表情や短い吹き出しで分かるように表現する。";
+  const jpSceneIntegration = "背景と被写体を同じカメラ位置、同じアイレベル、同じパース、同じ光源で統一する。足裏や体を床・机・壁など背景の空間に自然に接地させ、接地影と奥行きで浮いて見えないようにする。";
   const jpEffectSentence = effect === "なし"
     ? `${depth}で、漫画演出は控えめにする。`
     : `${depth}で、${effect}を使った漫画演出を加える。`;
@@ -166,6 +172,7 @@ function generatePrompt() {
     referenceNotes.jp,
     jpAction,
     jpPriority,
+    jpSceneIntegration,
     `${jpLocation}${jpSubject}が一目で分かる漫画調のワンシーン画像。`,
     `アスペクト比は${aspect.value}。`,
     `${shot}、${direction}、${angle}、${composition}。`,
@@ -173,18 +180,20 @@ function generatePrompt() {
     "自然な日本の漫画らしい線、読みやすいシルエット、表情と空気感が伝わる仕上がり。"
   ], "\n");
 
-  const enSubject = translateFreeText(subject, "the specified subject and action") || "an appealing subject";
+  const enSubject = translateFreeText(subjectPhrase, "the specified subject and action") || "an appealing subject";
   const enLocation = background ? `set in ${translateFreeText(background, "the specified location or background")}` : "";
   const enEffect = effect === "なし" ? "with subtle manga presentation and no special manga effects" : `with ${getOptionEnglish("effect", effect)}`;
-  const enAction = subject
+  const enAction = subjectPhrase
     ? "Most important action and expression: depict the specified subject/action as the main focus of the image."
     : "";
   const enPriority = "Top priority: clearly show the mouth shape, eyes, eyebrows, pose, gaze, both hand positions, and hand/action details. If the input includes shouting, dialogue, or an emotion word, express it with a wide-open mouth and, if useful, a short speech bubble.";
+  const enSceneIntegration = "Integrate the subject and background with the same camera position, eye level, perspective, and light direction. Ground the feet and body naturally in the space with contact shadows and depth so the subject does not look pasted on or floating.";
 
   enPrompt.value = compactJoin([
     referenceNotes.en,
     enAction,
     enPriority,
+    enSceneIntegration,
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     `Use a ${aspect.en}.`,
     `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, ${getOptionEnglish("composition", composition)}.`,
