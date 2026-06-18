@@ -45,16 +45,22 @@ const optionGroups = {
     ["肩越し", "over-the-shoulder view"],
     ["主観視点", "first-person point of view"]
   ],
-  composition: [
+  subjectPlacement: [
     ["中央配置", "centered composition"],
     ["左寄せ", "left-weighted composition"],
     ["右寄せ", "right-weighted composition"],
+    ["被写体大きめ", "large subject framing"],
+    ["被写体小さめ", "small subject framing"],
+    ["表情が分かる大きさ", "large enough for the facial expression to be readable"]
+  ],
+  screenComposition: [
+    ["自然な構図", "natural overall composition"],
     ["余白多め", "composition with generous negative space"],
     ["斜め構図", "diagonal composition"],
     ["奥行き構図", "composition with strong depth"],
     ["対称構図", "symmetrical composition"],
     ["背景広め", "wide background composition"],
-    ["被写体大きめ", "large subject framing"]
+    ["横方向に流れる構図", "horizontally flowing composition"]
   ],
   depth: [
     ["自然な奥行き", "natural depth"],
@@ -196,7 +202,8 @@ function generatePrompt() {
   const direction = data.get("direction");
   const angle = data.get("angle");
   const cameraView = data.get("cameraView");
-  const composition = data.get("composition");
+  const subjectPlacement = data.get("subjectPlacement");
+  const screenComposition = data.get("screenComposition");
   const depth = data.get("depth");
   const motionBackground = data.get("motionBackground");
   const effect = data.get("effect");
@@ -224,7 +231,7 @@ function generatePrompt() {
     jpMotionBackground,
     `${jpLocation}${jpSubject}が一目で分かる漫画調のワンシーン画像。`,
     `アスペクト比は${aspect.value}。`,
-    `${shot}、${direction}、${angle}、${composition}。`,
+    `${shot}、${direction}、${angle}、被写体は${subjectPlacement}、画面全体は${screenComposition}。`,
     jpEffectSentence,
     "自然な日本の漫画らしい線、読みやすいシルエット、表情と空気感が伝わる仕上がり。"
   ], "\n");
@@ -248,7 +255,7 @@ function generatePrompt() {
     enMotionBackground,
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     `Use a ${aspect.en}.`,
-    `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, ${getOptionEnglish("composition", composition)}.`,
+    `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, subject placement: ${getOptionEnglish("subjectPlacement", subjectPlacement)}, overall composition: ${getOptionEnglish("screenComposition", screenComposition)}.`,
     `${getOptionEnglish("depth", depth)}, ${enEffect}.`,
     "Clean Japanese manga linework, readable silhouette, expressive mood, polished image-generation prompt style."
   ], "\n");
@@ -281,7 +288,8 @@ fillSelect("shot", optionGroups.shot, "上半身");
 fillSelect("direction", optionGroups.direction, "斜め前");
 fillSelect("angle", optionGroups.angle, "アイレベル");
 fillSelect("cameraView", optionGroups.cameraView, "指定なし");
-fillSelect("composition", optionGroups.composition, "中央配置");
+fillSelect("subjectPlacement", optionGroups.subjectPlacement, "中央配置");
+fillSelect("screenComposition", optionGroups.screenComposition, "自然な構図");
 fillSelect("depth", optionGroups.depth, "自然な奥行き");
 fillSelect("motionBackground", optionGroups.motionBackground, "指定なし");
 fillSelect("effect", optionGroups.effect, "なし");
