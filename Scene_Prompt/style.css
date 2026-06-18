@@ -102,7 +102,7 @@ h3 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(360px, 0.92fr) minmax(420px, 1.08fr);
+  grid-template-columns: 1fr;
   gap: 20px;
   align-items: start;
 }
@@ -309,8 +309,6 @@ textarea:focus {
 }
 
 .output-panel {
-  position: sticky;
-  top: 20px;
   display: grid;
   gap: 16px;
 }
