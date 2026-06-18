@@ -16,7 +16,7 @@
       <div>
         <p class="eyebrow">ORANGEMANIA TOOL</p>
         <h1>Scene Prompt</h1>
-        <p class="version-label">2026.06.18-12</p>
+        <p class="version-label">2026.06.18-14</p>
       </div>
       <p class="lead">
         カメラワーク、構図、漫画演出を選ぶだけで、日本語と英語の画像生成プロンプトを作れます。
@@ -33,7 +33,6 @@
         <form id="promptForm">
           <div class="field-card">
             <label for="subject">被写体</label>
-            <input id="subject" name="subject" type="text" value="オレンジ色のマスコットキャラクター" placeholder="例：オレンジ色のマスコットキャラクター">
             <div class="reference-upload">
               <p class="sub-label">被写体の参照画像</p>
               <div class="segmented-control" role="radiogroup" aria-label="被写体の参照画像">
@@ -48,11 +47,11 @@
               </div>
               <p class="hint">有の場合、添付画像のキャラクター、画風、線、色味をプロンプトに反映します。</p>
             </div>
+            <input id="subject" name="subject" type="text" placeholder="例：オレンジ色のマスコットキャラクター">
           </div>
 
           <div class="field-card">
             <label for="background">場所・背景</label>
-            <input id="background" name="background" type="text" placeholder="例：明るいカフェ、夜の街、学校の廊下">
             <div class="reference-upload">
               <p class="sub-label">場所・背景の参照画像</p>
               <div class="segmented-control" role="radiogroup" aria-label="場所・背景の参照画像">
@@ -67,6 +66,7 @@
               </div>
               <p class="hint">有の場合、添付画像の場所・背景をプロンプトに反映します。</p>
             </div>
+            <input id="background" name="background" type="text" placeholder="例：明るいカフェ、夜の街、学校の廊下">
           </div>
 
           <div class="field-card field-card-wide">

@@ -157,9 +157,9 @@ function generatePrompt() {
   const referenceNotes = getReferenceNotes(data);
 
   jpPrompt.value = compactJoin([
+    referenceNotes.jp,
     `${jpLocation}${jpSubject}の漫画調のワンシーン画像。`,
     `アスペクト比は${aspect.value}。`,
-    referenceNotes.jp,
     `${shot}、${direction}、${angle}、${composition}。`,
     `${depth}で、${jpEffect}を加える。`,
     "自然な日本の漫画らしい線、読みやすいシルエット、表情と空気感が伝わる仕上がり。"
@@ -170,9 +170,9 @@ function generatePrompt() {
   const enEffect = effect === "なし" ? "with subtle manga presentation and no special manga effects" : `with ${getOptionEnglish("effect", effect)}`;
 
   enPrompt.value = compactJoin([
+    referenceNotes.en,
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     `Use a ${aspect.en}.`,
-    referenceNotes.en,
     `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, ${getOptionEnglish("composition", composition)}.`,
     `${getOptionEnglish("depth", depth)}, ${enEffect}.`,
     "Clean Japanese manga linework, readable silhouette, expressive mood, polished image-generation prompt style."
@@ -228,7 +228,7 @@ form.addEventListener("change", () => {
 
 document.querySelector("#resetButton").addEventListener("click", () => {
   form.reset();
-  document.querySelector("#subject").value = "オレンジ色のマスコットキャラクター";
+  document.querySelector("#subject").value = "";
   aspectSelect.value = "9:16 スマホ縦長";
   updateAspectDescription();
   generatePrompt();
