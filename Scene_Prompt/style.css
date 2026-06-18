@@ -33,9 +33,9 @@ textarea {
 }
 
 .app-shell {
-  width: min(1180px, calc(100% - 32px));
+  width: min(1040px, calc(100% - 96px));
   margin: 0 auto;
-  padding: 40px 0;
+  padding: 44px 0;
 }
 
 .app-header {
@@ -137,10 +137,10 @@ form {
 .field-card {
   display: grid;
   gap: 8px;
-  padding: 16px 0;
-  border-width: 1px 0 0;
-  border-radius: 0;
-  background: transparent;
+  padding: 18px 20px;
+  border-width: 1px;
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .field-grid .field-card {
@@ -224,9 +224,9 @@ textarea:focus {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   padding: 4px;
-  border: 0;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--surface2);
+  background: var(--bg);
 }
 
 .segmented-control label {
@@ -386,7 +386,7 @@ textarea {
 
 @media (max-width: 620px) {
   .app-shell {
-    width: min(100% - 20px, 1180px);
+    width: min(100% - 20px, 1040px);
     padding: 22px 0;
   }
 
