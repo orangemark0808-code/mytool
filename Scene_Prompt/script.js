@@ -300,7 +300,7 @@ async function copyText(targetId) {
   }, 1800);
 }
 
-fillSelect("aspect", aspectOptions, "9:16 スマホ縦長");
+fillSelect("aspect", aspectOptions, "4:3 標準横構図");
 fillSelect("shot", optionGroups.shot, "上半身");
 fillSelect("direction", optionGroups.direction, "斜め前");
 fillSelect("angle", optionGroups.angle, "アイレベル");
@@ -331,7 +331,7 @@ form.addEventListener("change", () => {
 document.querySelector("#resetButton").addEventListener("click", () => {
   form.reset();
   document.querySelector("#subject").value = "";
-  aspectSelect.value = "9:16 スマホ縦長";
+  aspectSelect.value = "4:3 標準横構図";
   updateAspectDescription();
   generatePrompt();
 });
