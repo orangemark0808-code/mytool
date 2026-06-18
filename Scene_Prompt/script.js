@@ -121,15 +121,15 @@ function getReferenceNotes(data) {
   const hasSubjectReference = hasReference(data, "subjectReference");
   const hasBackgroundReference = hasReference(data, "backgroundReference");
   const backgroundStyleNoteJp = hasSubjectReference
-    ? "背景画像が写真でも、画風、線のタッチ、色味は被写体の参照画像に合わせる。"
+    ? "背景画像が写真でも、画面全体の画風、線のタッチ、色味は被写体の参照画像に合わせる。背景だけ別画風にしない。"
     : "背景画像が写真でも、全体を漫画調の画風に統一する。";
   const backgroundStyleNoteEn = hasSubjectReference
-    ? "Even if it is a photo, match the art style, linework, and color palette to the subject reference image."
+    ? "Even if it is a photo, match the entire image's art style, linework, and color palette to the subject reference image. Do not render the background in a separate style."
     : "Even if it is a photo, unify the entire image in a manga-style look.";
 
   return {
     jp: compactJoin([
-      hasSubjectReference ? "被写体は添付画像を参照し、キャラクターの特徴、画風、線のタッチ、色味を反映する。" : "",
+      hasSubjectReference ? "被写体は添付画像を参照し、キャラクターの特徴、画風、線のタッチ、色味を画面全体に反映する。" : "",
       hasBackgroundReference ? `場所・背景は添付画像を参照する。${backgroundStyleNoteJp}` : ""
     ], "\n"),
     en: compactJoin([
@@ -153,23 +153,29 @@ function generatePrompt() {
 
   const jpSubject = subject || "魅力的な被写体";
   const jpLocation = background ? `${background}を舞台にした` : "";
-  const jpEffect = effect === "なし" ? "漫画演出は控えめに" : `${effect}を使った漫画演出`;
+  const jpPriority = "最優先: 被写体の表情、姿勢、視線、手元の動作を明確に描く。入力された被写体・動作の内容を省略しない。";
+  const jpEffectSentence = effect === "なし"
+    ? `${depth}で、漫画演出は控えめにする。`
+    : `${depth}で、${effect}を使った漫画演出を加える。`;
   const referenceNotes = getReferenceNotes(data);
 
   jpPrompt.value = compactJoin([
+    jpPriority,
     referenceNotes.jp,
-    `${jpLocation}${jpSubject}の漫画調のワンシーン画像。`,
+    `${jpLocation}${jpSubject}を描いた漫画調のワンシーン画像。`,
     `アスペクト比は${aspect.value}。`,
     `${shot}、${direction}、${angle}、${composition}。`,
-    `${depth}で、${jpEffect}を加える。`,
+    jpEffectSentence,
     "自然な日本の漫画らしい線、読みやすいシルエット、表情と空気感が伝わる仕上がり。"
   ], "\n");
 
-  const enSubject = translateFreeText(subject, "the specified subject") || "an appealing subject";
+  const enSubject = translateFreeText(subject, "the specified subject and action") || "an appealing subject";
   const enLocation = background ? `set in ${translateFreeText(background, "the specified location or background")}` : "";
   const enEffect = effect === "なし" ? "with subtle manga presentation and no special manga effects" : `with ${getOptionEnglish("effect", effect)}`;
+  const enPriority = "Top priority: clearly depict the subject's facial expression, pose, gaze, and hand/action details. Do not omit the specified subject or action.";
 
   enPrompt.value = compactJoin([
+    enPriority,
     referenceNotes.en,
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     `Use a ${aspect.en}.`,
