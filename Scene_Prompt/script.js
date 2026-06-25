@@ -223,6 +223,55 @@ function getMotionBackgroundNote(value) {
   return notes[value] || ["", ""];
 }
 
+function getPersonMotionNote(value) {
+  const notes = {
+    "左右移動を横から見せる": [
+      "左右方向の動きが分かるように、体の傾き、足運び、腕の振り、視線を明確に描く。",
+      "Show sideways motion through the body lean, foot placement, arm swing, and gaze direction."
+    ],
+    "斜め奥へ移動する": [
+      "斜め方向へ進む動きが分かるように、ポーズ、視線、手足の向きで奥行き感を出す。",
+      "Show diagonal movement through the pose, gaze, hand direction, and foot direction."
+    ],
+    "手前から奥へ進む": [
+      "手前から奥へ進む動きが分かるように、体の向き、足元、視線で進行方向を表現する。",
+      "Show movement away from the viewer through body orientation, feet, and gaze direction."
+    ],
+    "奥から手前へ進む": [
+      "手前へ向かってくる動きが分かるように、表情、手元、足元、体の重心を強調する。",
+      "Show movement toward the viewer by emphasizing expression, hands, feet, and body weight."
+    ],
+    "背景を進行方向に流す": [
+      "背景は描かず、ポーズ、髪や服の動き、効果線だけで進行方向を表現する。",
+      "Do not draw background scenery; show the motion direction only through the pose, hair and clothing movement, and motion lines."
+    ],
+    "カメラが回り込む": [
+      "人物の立体感が伝わるように、顔、肩、胴体、手足の向きに自然な回り込みを出す。",
+      "Give the character dimensionality by showing a natural turn in the face, shoulders, torso, hands, and legs."
+    ]
+  };
+
+  return notes[value] || ["", ""];
+}
+
+function getPersonDepthJapanese(value) {
+  const map = {
+    "背景をぼかす": "人物の輪郭と表情をくっきり見せ、背景は白地または単色のままにする",
+    "背景まで描き込む": "人物の線、服、手元、表情を丁寧に描き込み、背景は描き込まない"
+  };
+
+  return map[value] || value;
+}
+
+function getPersonDepthEnglish(value) {
+  const map = {
+    "背景をぼかす": "crisp character focus with a plain white or simple solid-color background",
+    "背景まで描き込む": "detailed character linework, clothing, hands, and expression, with no detailed background"
+  };
+
+  return map[value] || getOptionEnglish("depth", value);
+}
+
 function getAspect() {
   return aspectOptions.find((option) => option.value === aspectSelect.value) || aspectOptions[0];
 }
@@ -404,11 +453,22 @@ function getBackgroundOnlyPrompt(data) {
 
 function generatePrompt() {
   const data = new FormData(form);
-  if (data.get("generationMode") === "background") {
+  const generationMode = data.get("generationMode");
+
+  if (generationMode === "background") {
     getBackgroundOnlyPrompt(data);
     return;
   }
 
+  if (generationMode === "person") {
+    getPersonOnlyPrompt(data);
+    return;
+  }
+
+  getPersonBackgroundPrompt(data);
+}
+
+function getPersonBackgroundPrompt(data) {
   const subject = String(data.get("subject") || "").trim();
   const subjectPhrase = stripTrailingPunctuation(subject);
   const background = String(data.get("background") || "").trim();
@@ -503,34 +563,127 @@ function generatePrompt() {
   ], "\n");
 }
 
+function getPersonOnlyPrompt(data) {
+  const subject = String(data.get("subject") || "").trim();
+  const subjectPhrase = stripTrailingPunctuation(subject);
+  const aspect = getAspect();
+  const shot = data.get("shot");
+  const direction = data.get("direction");
+  const angle = data.get("angle");
+  const cameraView = data.get("cameraView");
+  const subjectPlacement = data.get("subjectPlacement");
+  const screenComposition = data.get("screenComposition");
+  const depth = data.get("depth");
+  const motionBackground = data.get("motionBackground");
+  const effect = data.get("effect");
+  const timeOfDay = data.get("timeOfDay");
+  const weatherLight = data.get("weatherLight");
+  const atmosphere = data.get("atmosphere");
+  const hasSubjectReference = hasReference(data, "subjectReference");
+
+  const jpSubject = subjectPhrase || "魅力的な人物・キャラクター";
+  const jpAction = subjectPhrase
+    ? `最重要の表情・動作指定: ${subjectPhrase}。この表情と動作を必ず画面の主役として描く。`
+    : "";
+  const jpReference = hasSubjectReference
+    ? "被写体は添付画像を参照し、キャラクターの特徴、画風、線のタッチ、色味を反映する。"
+    : "";
+  const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
+  const [jpMotionBackground, enMotionBackground] = getPersonMotionNote(motionBackground);
+  const jpEnvironment = getBackgroundEnvironmentJapanese(timeOfDay, weatherLight, atmosphere);
+  const jpEffectSentence = effect === "なし"
+    ? `${getPersonDepthJapanese(depth)}で、漫画演出は控えめにする。`
+    : `${getPersonDepthJapanese(depth)}で、${effect}を使った漫画演出を加える。`;
+
+  jpPrompt.value = compactJoin([
+    jpReference,
+    "人物のみを生成する。",
+    "背景、場所、部屋、家具、風景を描かない。",
+    "背景は白地または単色のシンプルな背景にする。",
+    "透過背景にはしない。",
+    jpAction,
+    "被写体の表情、動作、ポーズ、視線、手元を最優先で描く。",
+    jpCameraView,
+    jpMotionBackground,
+    jpEnvironment,
+    `${jpSubject}を描いた人物のみの漫画調画像。`,
+    `アスペクト比は${aspect.value}。`,
+    `${shot}、${direction}、${angle}、被写体は${subjectPlacement}、画面全体は${screenComposition}。`,
+    jpEffectSentence,
+    "自然な日本の漫画らしい線、読みやすいシルエット、表情と動作が伝わる仕上がり。"
+  ], "\n");
+
+  const enSubject = translateFreeText(subjectPhrase, preserveOriginalText(subjectPhrase, "the subject and action described in Japanese")) || "an appealing character";
+  const enReference = hasSubjectReference
+    ? "Use the attached subject reference image to reflect the character design, art style, linework, and color palette."
+    : "";
+  const enAction = subjectPhrase
+    ? "Most important action and expression: depict the specified subject/action as the main focus of the image."
+    : "";
+  const enCameraView = getOptionEnglish("cameraView", cameraView) ? `Camera view: ${getOptionEnglish("cameraView", cameraView)}.` : "";
+  const enEnvironment = getBackgroundEnvironmentEnglish(timeOfDay, weatherLight, atmosphere);
+  const enEffect = effect === "なし" ? "with subtle manga presentation and no special manga effects" : `with ${getOptionEnglish("effect", effect)}`;
+
+  enPrompt.value = compactJoin([
+    enReference,
+    "Generate a character-only image.",
+    "No background scenery, no room, no furniture, no environment.",
+    "Use a plain white or simple solid-color background.",
+    "Do not use a transparent background.",
+    enAction,
+    "Focus on the character, pose, expression, gaze, hands, and action.",
+    enCameraView,
+    enMotionBackground,
+    enEnvironment,
+    `A manga-style character-only image of ${enSubject}.`,
+    `Use a ${aspect.en}.`,
+    `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, subject placement: ${getOptionEnglish("subjectPlacement", subjectPlacement)}, overall composition: ${getOptionEnglish("screenComposition", screenComposition)}.`,
+    `${getPersonDepthEnglish(depth)}, ${enEffect}.`,
+    "Clean Japanese manga linework, readable silhouette, expressive pose and emotion, polished image-generation prompt style."
+  ], "\n");
+}
+
 function updateAspectDescription() {
   aspectDescription.textContent = getAspect().description;
 }
 
 function updateModeUi() {
   const data = new FormData(form);
-  const isBackgroundMode = data.get("generationMode") === "background";
+  const generationMode = data.get("generationMode");
+  const isPersonBackgroundMode = generationMode === "personBackground";
+  const isPersonMode = generationMode === "person";
+  const isBackgroundMode = generationMode === "background";
+
+  const setFieldDisabled = (field, disabled) => {
+    field.hidden = false;
+    field.classList.toggle("is-mode-disabled", disabled);
+    field.setAttribute("aria-disabled", String(disabled));
+    field.querySelectorAll("input, select, textarea").forEach((control) => {
+      control.disabled = disabled;
+    });
+  };
 
   document.querySelectorAll("[data-person-field]").forEach((field) => {
-    field.hidden = false;
-    field.classList.toggle("is-mode-disabled", isBackgroundMode);
-    field.setAttribute("aria-disabled", String(isBackgroundMode));
-    field.querySelectorAll("input, select, textarea").forEach((control) => {
-      control.disabled = isBackgroundMode;
-    });
+    setFieldDisabled(field, isBackgroundMode);
+  });
+
+  document.querySelectorAll("[data-background-section]").forEach((field) => {
+    setFieldDisabled(field, isPersonMode);
   });
 
   document.querySelectorAll("[data-background-field]").forEach((field) => {
-    field.hidden = false;
-    field.classList.toggle("is-mode-disabled", !isBackgroundMode);
-    field.setAttribute("aria-disabled", String(!isBackgroundMode));
-    field.querySelectorAll("input, select, textarea").forEach((control) => {
-      control.disabled = !isBackgroundMode;
-    });
+    setFieldDisabled(field, !isBackgroundMode);
   });
+
+  const effectField = document.querySelector("#effect")?.closest(".field-card");
+  if (effectField) {
+    setFieldDisabled(effectField, isBackgroundMode);
+  }
 
   backgroundReferenceHint.textContent = isBackgroundMode
     ? "有の場合、添付画像の人物は参照せず、場所・背景・空間構成だけを参考にして別アングルの背景を作ります。"
+    : isPersonBackgroundMode
+      ? "有の場合、添付画像の場所・背景をプロンプトに反映します。"
     : "有の場合、添付画像の場所・背景をプロンプトに反映します。";
 }
 

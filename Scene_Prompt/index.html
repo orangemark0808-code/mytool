@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Nunito:wght@300;400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2026.06.25-bg12">
+  <link rel="stylesheet" href="style.css?v=2026.06.26-person01">
 </head>
 <body>
   <main class="app-shell">
@@ -16,10 +16,10 @@
       <div>
         <p class="eyebrow">ORANGEMANIA TOOL</p>
         <h1>Scene Prompt</h1>
-        <p class="version-label">2026.06.25-bg12</p>
+        <p class="version-label">2026.06.26-person01</p>
       </div>
       <p class="lead">
-        人物あり・背景のみを切り替えながら、カメラワーク、構図、空間演出を選んで画像生成プロンプトを作れます。
+        人物＋背景、人物のみ、背景のみを切り替えながら、カメラワーク、構図、空間演出を選んで画像生成プロンプトを作れます。
       </p>
     </header>
 
@@ -35,12 +35,16 @@
             <label>生成対象</label>
             <div class="segmented-control mode-control" role="radiogroup" aria-label="生成対象">
               <label>
-                <input type="radio" name="generationMode" value="person" checked>
-                <span>人物あり</span>
+                <input type="radio" name="generationMode" value="personBackground" checked>
+                <span>人物＋背景</span>
+              </label>
+              <label>
+                <input type="radio" name="generationMode" value="person">
+                <span>人物</span>
               </label>
               <label>
                 <input type="radio" name="generationMode" value="background">
-                <span>背景のみ</span>
+                <span>背景</span>
               </label>
             </div>
           </div>
@@ -64,7 +68,7 @@
             <textarea id="subject" name="subject" class="prompt-input" rows="2" placeholder="例：添付のキャラクターが頭を抱えて「うぉー！」と叫びながらパソコンに向かっている"></textarea>
           </div>
 
-          <div class="field-card background-card">
+          <div class="field-card background-card" data-background-section>
             <label for="background">場所・背景</label>
             <div class="reference-upload">
               <p class="sub-label">場所・背景の参照画像</p>
@@ -196,6 +200,6 @@
     </div>
   </main>
 
-  <script src="script.js?v=2026.06.25-bg12"></script>
+  <script src="script.js?v=2026.06.26-person01"></script>
 </body>
 </html>

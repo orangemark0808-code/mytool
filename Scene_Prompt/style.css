@@ -354,6 +354,10 @@ textarea:focus {
   background: var(--bg);
 }
 
+.mode-control {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .segmented-control label {
   min-width: 0;
 }
@@ -374,6 +378,14 @@ textarea:focus {
   font-weight: 700;
   line-height: 24px;
   cursor: pointer;
+}
+
+.mode-control span {
+  min-height: 34px;
+  padding: 6px 6px;
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 22px;
 }
 
 .segmented-control input:checked + span {
@@ -555,6 +567,11 @@ textarea:focus {
   .background-card {
     grid-column: auto;
     grid-row: auto;
+  }
+
+  .mode-control span {
+    padding: 5px 4px;
+    font-size: 13px;
   }
 
   .actions,
