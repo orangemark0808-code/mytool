@@ -104,6 +104,7 @@ const optionGroups = {
     ["机側から見る", "view from the desk side"]
   ],
   timeOfDay: [
+    ["なし", ""],
     ["朝", "morning"],
     ["昼", "daytime"],
     ["夕方", "evening"],
@@ -111,6 +112,7 @@ const optionGroups = {
     ["深夜", "late night"]
   ],
   weatherLight: [
+    ["なし", ""],
     ["晴れ", "clear weather"],
     ["曇り", "cloudy light"],
     ["雨", "rainy ambience"],
@@ -122,6 +124,7 @@ const optionGroups = {
     ["暗めの照明", "dim lighting"]
   ],
   atmosphere: [
+    ["なし", ""],
     ["静か", "quiet atmosphere"],
     ["温かい", "warm atmosphere"],
     ["清潔感がある", "clean atmosphere"],
@@ -161,8 +164,32 @@ function getOptionEnglish(group, value) {
   return found ? found[1] : value;
 }
 
+function isOptionalChoice(value) {
+  return value && value !== "指定なし" && value !== "なし";
+}
+
 function getOptionalJapanese(value) {
-  return value && value !== "指定なし" ? value : "";
+  return isOptionalChoice(value) ? value : "";
+}
+
+function getBackgroundEnvironmentJapanese(timeOfDay, weatherLight, atmosphere) {
+  const details = compactJoin([
+    isOptionalChoice(timeOfDay) ? `時間帯は${timeOfDay}` : "",
+    isOptionalChoice(weatherLight) ? `天気・光は${weatherLight}` : "",
+    isOptionalChoice(atmosphere) ? `雰囲気は${atmosphere}` : ""
+  ], "、");
+
+  return details ? `${details}。` : "";
+}
+
+function getBackgroundEnvironmentEnglish(timeOfDay, weatherLight, atmosphere) {
+  const details = compactJoin([
+    getOptionEnglish("timeOfDay", timeOfDay),
+    getOptionEnglish("weatherLight", weatherLight),
+    getOptionEnglish("atmosphere", atmosphere)
+  ], ", ");
+
+  return details ? `${details}.` : "";
 }
 
 function getMotionBackgroundNote(value) {
@@ -335,7 +362,7 @@ function getBackgroundOnlyPrompt(data) {
     jpCameraView,
     `${angle}、${screenComposition}、${depth}。`,
     jpMotionComposition,
-    `時間帯は${timeOfDay}、天気・光は${weatherLight}、雰囲気は${atmosphere}。`,
+    getBackgroundEnvironmentJapanese(timeOfDay, weatherLight, atmosphere),
     `アスペクト比は${aspect.value}。`,
     "背景素材、漫画背景、イラスト背景、フォトリアル背景に使いやすい、空間の構造が読み取れる仕上がり。"
   ], "\n");
@@ -369,7 +396,7 @@ function getBackgroundOnlyPrompt(data) {
     getBackgroundCameraViewEnglish(cameraView) ? `Camera view: ${getBackgroundCameraViewEnglish(cameraView)}.` : "",
     `${getOptionEnglish("angle", angle)}, ${getOptionEnglish("screenComposition", screenComposition)}, ${getOptionEnglish("depth", depth)}.`,
     enMotionComposition ? `${enMotionComposition}.` : "",
-    `${getOptionEnglish("timeOfDay", timeOfDay)}, ${getOptionEnglish("weatherLight", weatherLight)}, ${getOptionEnglish("atmosphere", atmosphere)}.`,
+    getBackgroundEnvironmentEnglish(timeOfDay, weatherLight, atmosphere),
     `Use a ${aspect.en}.`,
     "Clean, versatile background image prompt for manga backgrounds, illustrated backgrounds, photorealistic backgrounds, and reusable environment art, no people, no characters."
   ], "\n");
@@ -402,6 +429,22 @@ function generatePrompt() {
     : "";
   const jpPriority = "最優先: 口の形、目、眉、姿勢、視線、両手の位置、手元の動作を大きく明確に描く。叫び、セリフ、感情語がある場合は、口を大きく開けた表情や短い吹き出しで分かるように表現する。";
   const jpSceneIntegration = "背景を単なる模様にせず、場所の構造が分かるように描く。背景の向き、床や壁のライン、光源を被写体の動きに合わせて自然に調整する。背景と被写体を同じカメラ位置、同じアイレベル、同じパース、同じ光源で統一する。足裏や体を床・机・壁など背景の空間に自然に接地させ、接地影と奥行きで浮いて見えないようにする。";
+  const jpScaleLock = compactJoin([
+    "【人物と部屋のスケール固定】",
+    "主人公の頭身、体型、手足の長さ、デフォルメ度は添付の被写体参照画像を基準にする。",
+    "背景・家具・机・椅子・PCの大きさは、参照画像の主人公が自然に座れるサイズに調整する。",
+    "人物の体型に対して机や椅子が大きすぎたり小さすぎたりしないようにする。",
+    "机、椅子、PC、ベッド、本棚、クローゼットは、主人公との大きさの関係が自然に見えるようにする。",
+    "座った主人公の机天板の高さは、体型に対して自然な作業姿勢になる高さにする。",
+    "椅子の背もたれは、主人公の背中に対して自然な高さにする。",
+    "13インチPCは主人公の手元に対して自然な大きさにし、両手を置いて作業できるサイズにする。",
+    "ベッドは人物より奥にある大きな家具として描き、人物と同じ平面に貼り付けたようにしない。",
+    "人物、机、椅子、床、背景家具の接地感と奥行きを一致させる。",
+    "人物をミニチュア化しない。",
+    "人物を部屋に対して大きくしすぎない。",
+    "家具を巨大化しない。",
+    "PCを巨大化しない。"
+  ], "\n");
   const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
   const [jpMotionBackground, enMotionBackground] = getMotionBackgroundNote(motionBackground);
   const jpEffectSentence = effect === "なし"
@@ -418,6 +461,7 @@ function generatePrompt() {
     jpAction,
     jpPriority,
     jpSceneIntegration,
+    jpScaleLock,
     jpCameraView,
     jpMotionBackground,
     jpSceneSentence,
@@ -508,9 +552,9 @@ fillSelect("depth", optionGroups.depth, "自然な奥行き");
 fillSelect("motionBackground", optionGroups.motionBackground, "指定なし");
 fillSelect("effect", optionGroups.effect, "なし");
 fillSelect("alternateViewpoint", optionGroups.alternateViewpoint, "斜め前");
-fillSelect("timeOfDay", optionGroups.timeOfDay, "昼");
-fillSelect("weatherLight", optionGroups.weatherLight, "自然光");
-fillSelect("atmosphere", optionGroups.atmosphere, "落ち着いた");
+fillSelect("timeOfDay", optionGroups.timeOfDay, "なし");
+fillSelect("weatherLight", optionGroups.weatherLight, "なし");
+fillSelect("atmosphere", optionGroups.atmosphere, "なし");
 updateAspectDescription();
 updateModeUi();
 generatePrompt();
