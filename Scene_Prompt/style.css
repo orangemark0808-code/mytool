@@ -40,10 +40,23 @@ textarea {
 
 .app-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.78fr);
+  grid-template-columns: 1fr;
+  gap: 6px;
+  align-items: start;
+  margin-bottom: 22px;
+}
+
+.app-header > div {
+  display: grid;
+  grid-template-columns: max-content max-content;
   gap: 28px;
   align-items: center;
-  margin-bottom: 36px;
+}
+
+.app-header .eyebrow {
+  display: block;
+  grid-column: 1 / -1;
+  margin: 0 0 -18px;
 }
 
 .eyebrow {
@@ -82,15 +95,15 @@ h3 {
 
 .lead {
   margin: 0;
-  max-width: 460px;
+  max-width: none;
   color: var(--muted);
   font-size: 17px;
-  justify-self: end;
+  justify-self: start;
 }
 
 .version-label {
   display: inline-flex;
-  margin: 12px 0 0;
+  margin: 0;
   padding: 4px 9px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -141,6 +154,66 @@ form {
   border-width: 1px;
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+.field-card[data-background-field] {
+  border-left: 4px solid var(--accent);
+  background: var(--accent-light);
+}
+
+.field-card[data-background-field] label::after {
+  content: "背景用";
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border: 1px solid rgba(255, 127, 0, 0.35);
+  border-radius: 999px;
+  color: var(--accent-deep);
+  background: var(--surface);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+
+.mode-card {
+  grid-column: 1;
+  padding: 10px 20px;
+  align-content: start;
+}
+
+.subject-card {
+  grid-column: 1;
+}
+
+.background-card {
+  grid-column: 2;
+  grid-row: 2;
+  align-content: start;
+}
+
+.subject-card .reference-upload,
+.background-card .reference-upload {
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 10px;
+}
+
+.subject-card .segmented-control span,
+.background-card .segmented-control span {
+  min-height: 30px;
+  padding: 3px 10px;
+}
+
+.subject-card .prompt-input,
+.background-card .prompt-input {
+  min-height: 74px;
+  max-height: 74px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  resize: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .field-grid .field-card {
@@ -362,7 +435,7 @@ textarea:focus {
   font-size: 14px;
 }
 
-textarea {
+.prompt-card textarea {
   min-height: 190px;
   resize: vertical;
   padding: 14px;
@@ -384,7 +457,7 @@ textarea {
   }
 
   .app-header {
-    gap: 16px;
+    gap: 8px;
     align-items: start;
   }
 
@@ -440,6 +513,13 @@ textarea {
 
   .field-card-wide .hint {
     grid-column: auto;
+  }
+
+  .mode-card,
+  .subject-card,
+  .background-card {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .actions,

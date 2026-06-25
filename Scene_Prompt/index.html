@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Nunito:wght@300;400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2026.06.18-30">
+  <link rel="stylesheet" href="style.css?v=2026.06.25-bg10">
 </head>
 <body>
   <main class="app-shell">
@@ -16,10 +16,10 @@
       <div>
         <p class="eyebrow">ORANGEMANIA TOOL</p>
         <h1>Scene Prompt</h1>
-        <p class="version-label">2026.06.18-30</p>
+        <p class="version-label">2026.06.25-bg10</p>
       </div>
       <p class="lead">
-        カメラワーク、構図、漫画演出を選ぶだけで、日本語と英語の画像生成プロンプトを作れます。
+        人物あり・背景のみを切り替えながら、カメラワーク、構図、空間演出を選んで画像生成プロンプトを作れます。
       </p>
     </header>
 
@@ -31,7 +31,21 @@
         </div>
 
         <form id="promptForm">
-          <div class="field-card">
+          <div class="field-card mode-card">
+            <label>生成対象</label>
+            <div class="segmented-control mode-control" role="radiogroup" aria-label="生成対象">
+              <label>
+                <input type="radio" name="generationMode" value="person" checked>
+                <span>人物あり</span>
+              </label>
+              <label>
+                <input type="radio" name="generationMode" value="background">
+                <span>背景のみ</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field-card subject-card" data-person-field>
             <label for="subject">被写体・表情・動作</label>
             <div class="reference-upload">
               <p class="sub-label">被写体の参照画像</p>
@@ -47,10 +61,10 @@
               </div>
               <p class="hint">有の場合、添付画像のキャラクター、画風、線、色味をプロンプトに反映します。</p>
             </div>
-            <input id="subject" name="subject" type="text" placeholder="例：添付のキャラクターが頭を抱えて「うぉー！」と叫びながらパソコンに向かっている">
+            <textarea id="subject" name="subject" class="prompt-input" rows="2" placeholder="例：添付のキャラクターが頭を抱えて「うぉー！」と叫びながらパソコンに向かっている"></textarea>
           </div>
 
-          <div class="field-card">
+          <div class="field-card background-card">
             <label for="background">場所・背景</label>
             <div class="reference-upload">
               <p class="sub-label">場所・背景の参照画像</p>
@@ -64,9 +78,9 @@
                   <span>有</span>
                 </label>
               </div>
-              <p class="hint">有の場合、添付画像の場所・背景をプロンプトに反映します。</p>
+              <p class="hint" id="backgroundReferenceHint">有の場合、添付画像の場所・背景をプロンプトに反映します。</p>
             </div>
-            <input id="background" name="background" type="text" placeholder="例：明るいカフェ、夜の街、学校の廊下">
+            <textarea id="background" name="background" class="prompt-input" rows="2" placeholder="例：明るいカフェ店内、木製の机、大きな窓、観葉植物、本棚、生活感がある"></textarea>
           </div>
 
           <div class="field-card field-card-wide">
@@ -76,19 +90,24 @@
           </div>
 
           <div class="field-grid">
-            <div class="field-card">
+            <div class="field-card" data-person-field>
               <label for="shot">映す範囲（ショット）</label>
               <select id="shot" name="shot"></select>
             </div>
 
-            <div class="field-card">
+            <div class="field-card" data-person-field>
               <label for="direction">被写体の向き</label>
               <select id="direction" name="direction"></select>
             </div>
 
-            <div class="field-card">
+            <div class="field-card" data-person-field>
               <label for="subjectPlacement">被写体の配置</label>
               <select id="subjectPlacement" name="subjectPlacement"></select>
+            </div>
+
+            <div class="field-card" data-background-field>
+              <label for="alternateViewpoint">別アングル</label>
+              <select id="alternateViewpoint" name="alternateViewpoint"></select>
             </div>
 
             <div class="field-card">
@@ -117,13 +136,28 @@
             </div>
 
             <div class="field-card">
-              <label for="depth">奥行き・距離感</label>
+              <label for="depth">レンズ感・奥行き</label>
               <select id="depth" name="depth"></select>
+            </div>
+
+            <div class="field-card" data-background-field>
+              <label for="timeOfDay">時間帯</label>
+              <select id="timeOfDay" name="timeOfDay"></select>
+            </div>
+
+            <div class="field-card" data-background-field>
+              <label for="weatherLight">天気・光</label>
+              <select id="weatherLight" name="weatherLight"></select>
+            </div>
+
+            <div class="field-card" data-background-field>
+              <label for="atmosphere">雰囲気</label>
+              <select id="atmosphere" name="atmosphere"></select>
             </div>
           </div>
 
           <div class="actions">
-            <button class="button button-primary" type="submit">生成する</button>
+            <button class="button button-primary" type="submit">再生成</button>
             <button class="button button-secondary" type="button" id="resetButton">リセット</button>
           </div>
         </form>
@@ -162,6 +196,6 @@
     </div>
   </main>
 
-  <script src="script.js?v=2026.06.18-30"></script>
+  <script src="script.js?v=2026.06.25-bg10"></script>
 </body>
 </html>

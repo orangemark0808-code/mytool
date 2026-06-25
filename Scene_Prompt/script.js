@@ -89,6 +89,49 @@ const optionGroups = {
     ["背景白抜き", "white cutout background effect"],
     ["黒ベタ背景", "solid black manga background"],
     ["トーン背景", "screen-tone background"]
+  ],
+  alternateViewpoint: [
+    ["正面", "front viewpoint"],
+    ["横", "side viewpoint"],
+    ["斜め前", "diagonal front viewpoint"],
+    ["斜め後ろ", "diagonal back viewpoint"],
+    ["俯瞰", "bird's-eye viewpoint"],
+    ["あおり", "low-angle viewpoint"],
+    ["アイレベル", "eye-level viewpoint"],
+    ["部屋の入口側から見る", "view from the room entrance"],
+    ["部屋の奥側から見る", "view from the back of the room"],
+    ["窓側から見る", "view from the window side"],
+    ["机側から見る", "view from the desk side"]
+  ],
+  timeOfDay: [
+    ["朝", "morning"],
+    ["昼", "daytime"],
+    ["夕方", "evening"],
+    ["夜", "night"],
+    ["深夜", "late night"]
+  ],
+  weatherLight: [
+    ["晴れ", "clear weather"],
+    ["曇り", "cloudy light"],
+    ["雨", "rainy ambience"],
+    ["自然光", "natural light"],
+    ["逆光", "backlight"],
+    ["柔らかい光", "soft light"],
+    ["暖色照明", "warm lighting"],
+    ["蛍光灯", "fluorescent lighting"],
+    ["暗めの照明", "dim lighting"]
+  ],
+  atmosphere: [
+    ["静か", "quiet atmosphere"],
+    ["温かい", "warm atmosphere"],
+    ["清潔感がある", "clean atmosphere"],
+    ["レトロ", "retro atmosphere"],
+    ["生活感がある", "lived-in atmosphere"],
+    ["不穏", "uneasy atmosphere"],
+    ["かわいい", "cute atmosphere"],
+    ["シンプル", "simple atmosphere"],
+    ["落ち着いた", "calm atmosphere"],
+    ["物語性がある", "story-rich atmosphere"]
   ]
 };
 
@@ -98,6 +141,7 @@ const aspectDescription = document.querySelector("#aspectDescription");
 const jpPrompt = document.querySelector("#jpPrompt");
 const enPrompt = document.querySelector("#enPrompt");
 const copyStatus = document.querySelector("#copyStatus");
+const backgroundReferenceHint = document.querySelector("#backgroundReferenceHint");
 
 function fillSelect(selectId, options, defaultValue) {
   const select = document.querySelector(`#${selectId}`);
@@ -169,7 +213,25 @@ function translateFreeText(text, fallbackText) {
     "オレンジ色のマスコットキャラクター": "an orange mascot character",
     "明るいカフェ": "a bright cafe",
     "夜の街": "a city street at night",
-    "学校の廊下": "a school hallway"
+    "学校の廊下": "a school hallway",
+    "日本のワンルーム": "a Japanese one-room apartment",
+    "教室": "a classroom",
+    "カフェ店内": "a cafe interior",
+    "オフィス": "an office",
+    "駅ホーム": "a train station platform",
+    "夜の路地裏": "a narrow alley at night",
+    "公園": "a park",
+    "森の中": "inside a forest",
+    "和室": "a traditional Japanese room",
+    "北欧風の部屋": "a Scandinavian-style room",
+    "木製の机がある": "with wooden desks",
+    "大きな窓がある": "with large windows",
+    "観葉植物がある": "with houseplants",
+    "本棚がある": "with bookshelves",
+    "生活感がある": "with a lived-in feeling",
+    "整理された部屋": "an organized room",
+    "古い建物": "an old building",
+    "近未来的な内装": "a near-futuristic interior"
   };
 
   if (!text) return "";
@@ -206,8 +268,120 @@ function getReferenceNotes(data) {
   };
 }
 
+function getBackgroundCameraViewEnglish(value) {
+  const map = {
+    "指定なし": "",
+    "正面ビュー": "front view",
+    "サイドビュー": "side view",
+    "斜めサイドビュー": "three-quarter side view",
+    "背後から追う": "view from deeper inside the space",
+    "肩越し": "view from behind a foreground object",
+    "主観視点": "first-person environmental viewpoint"
+  };
+
+  return map[value] || getOptionEnglish("cameraView", value);
+}
+
+function getBackgroundMotionComposition(value) {
+  const notes = {
+    "左右移動を横から見せる": ["横方向の流れを感じる背景構図。", "side-flowing background composition"],
+    "斜め奥へ移動する": ["斜め奥へ視線が抜ける背景構図。", "diagonal depth background composition"],
+    "手前から奥へ進む": ["手前から奥へパースが伸びる背景構図。", "foreground-to-background perspective composition"],
+    "奥から手前へ進む": ["奥から手前へ空間が広がる背景構図。", "background-to-foreground perspective composition"],
+    "背景を進行方向に流す": ["空間の線がゆるやかに流れる背景構図。", "gently flowing environmental composition"],
+    "カメラが回り込む": ["少し回り込んだカメラ感のある背景構図。", "subtle orbit-like background composition"]
+  };
+
+  return notes[value] || ["", ""];
+}
+
+function getBackgroundOnlyPrompt(data) {
+  const background = String(data.get("background") || "").trim();
+  const backgroundDetail = String(data.get("backgroundDetail") || "").trim();
+  const aspect = getAspect();
+  const cameraView = data.get("cameraView");
+  const angle = data.get("angle");
+  const screenComposition = data.get("screenComposition");
+  const depth = data.get("depth");
+  const motionBackground = data.get("motionBackground");
+  const alternateViewpoint = data.get("alternateViewpoint");
+  const timeOfDay = data.get("timeOfDay");
+  const weatherLight = data.get("weatherLight");
+  const atmosphere = data.get("atmosphere");
+  const hasBackgroundReference = hasReference(data, "backgroundReference");
+  const [jpMotionComposition, enMotionComposition] = getBackgroundMotionComposition(motionBackground);
+
+  const jpReference = hasBackgroundReference
+    ? compactJoin([
+      "添付画像は場所・背景・空間構成だけの参照として使う。",
+      "添付画像内に人物やキャラクターが写っていても参照せず、生成にも含めない。",
+      "添付画像と同じカメラアングルや同じ構図は避ける。",
+      "同じ場所を別視点から見た背景として、家具、部屋構造、光、色味、雰囲気を参考にする。",
+      "新しい視点から環境を生成し、添付画像と同じ視点は使わない。"
+    ], "\n")
+    : "人物なしの背景専用シーンを生成する。";
+  const jpLocation = background || "指定された場所・背景";
+  const jpDetail = backgroundDetail ? `背景の詳細: ${backgroundDetail}。` : "";
+  const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
+  const jpViewpoint = `別アングルは${alternateViewpoint}。`;
+
+  jpPrompt.value = compactJoin([
+    jpReference,
+    "人物を含めない。キャラクターを含めない。",
+    "背景、場所、空間、レイアウト、家具、構造、光、雰囲気だけを中心に描写する。",
+    `${jpLocation}の背景画像。`,
+    jpDetail,
+    jpViewpoint,
+    jpCameraView,
+    `${angle}、${screenComposition}、${depth}。`,
+    jpMotionComposition,
+    `時間帯は${timeOfDay}、天気・光は${weatherLight}、雰囲気は${atmosphere}。`,
+    `アスペクト比は${aspect.value}。`,
+    "背景素材、漫画背景、イラスト背景、フォトリアル背景に使いやすい、空間の構造が読み取れる仕上がり。"
+  ], "\n");
+
+  const enReference = hasBackgroundReference
+    ? compactJoin([
+      "Use the attached image as a reference for the location and background only.",
+      "Refer to the environment, room structure, furniture placement, lighting, colors, and atmosphere.",
+      "Do not reference or include any people or characters from the attached image.",
+      "Do not include any people or characters.",
+      "Generate the same environment from a different angle than the attached image.",
+      "Avoid recreating the exact same camera angle or composition as the reference image.",
+      "Generate the environment from a new viewpoint.",
+      "Do not use the same viewpoint as the attached image.",
+      "Focus only on the background, environment, space, layout, furniture, lighting, and atmosphere."
+    ], "\n")
+    : compactJoin([
+      "Generate a background-only scene with no people.",
+      "Do not include any people or characters.",
+      "Depict the specified location and environment.",
+      "Focus only on the background, environment, space, layout, furniture, lighting, and atmosphere."
+    ], "\n");
+  const enLocation = translateFreeText(background, preserveOriginalText(background, "specified location/background")) || "the specified location and environment";
+  const enDetail = backgroundDetail ? `Background details: ${translateFreeText(backgroundDetail, preserveOriginalText(backgroundDetail, "specified background details"))}.` : "";
+
+  enPrompt.value = compactJoin([
+    enReference,
+    `A background-only scene of ${enLocation}.`,
+    enDetail,
+    `New viewpoint: ${getOptionEnglish("alternateViewpoint", alternateViewpoint)}.`,
+    getBackgroundCameraViewEnglish(cameraView) ? `Camera view: ${getBackgroundCameraViewEnglish(cameraView)}.` : "",
+    `${getOptionEnglish("angle", angle)}, ${getOptionEnglish("screenComposition", screenComposition)}, ${getOptionEnglish("depth", depth)}.`,
+    enMotionComposition ? `${enMotionComposition}.` : "",
+    `${getOptionEnglish("timeOfDay", timeOfDay)}, ${getOptionEnglish("weatherLight", weatherLight)}, ${getOptionEnglish("atmosphere", atmosphere)}.`,
+    `Use a ${aspect.en}.`,
+    "Clean, versatile background image prompt for manga backgrounds, illustrated backgrounds, photorealistic backgrounds, and reusable environment art, no people, no characters."
+  ], "\n");
+}
+
 function generatePrompt() {
   const data = new FormData(form);
+  if (data.get("generationMode") === "background") {
+    getBackgroundOnlyPrompt(data);
+    return;
+  }
+
   const subject = String(data.get("subject") || "").trim();
   const subjectPhrase = stripTrailingPunctuation(subject);
   const background = String(data.get("background") || "").trim();
@@ -282,6 +456,29 @@ function updateAspectDescription() {
   aspectDescription.textContent = getAspect().description;
 }
 
+function updateModeUi() {
+  const data = new FormData(form);
+  const isBackgroundMode = data.get("generationMode") === "background";
+
+  document.querySelectorAll("[data-person-field]").forEach((field) => {
+    field.hidden = isBackgroundMode;
+    field.querySelectorAll("input, select, textarea").forEach((control) => {
+      control.disabled = isBackgroundMode;
+    });
+  });
+
+  document.querySelectorAll("[data-background-field]").forEach((field) => {
+    field.hidden = !isBackgroundMode;
+    field.querySelectorAll("input, select, textarea").forEach((control) => {
+      control.disabled = !isBackgroundMode;
+    });
+  });
+
+  backgroundReferenceHint.textContent = isBackgroundMode
+    ? "有の場合、添付画像の人物は参照せず、場所・背景・空間構成だけを参考にして別アングルの背景を作ります。"
+    : "有の場合、添付画像の場所・背景をプロンプトに反映します。";
+}
+
 async function copyText(targetId) {
   const textarea = document.querySelector(`#${targetId}`);
   textarea.select();
@@ -310,7 +507,12 @@ fillSelect("screenComposition", optionGroups.screenComposition, "自然な構図
 fillSelect("depth", optionGroups.depth, "自然な奥行き");
 fillSelect("motionBackground", optionGroups.motionBackground, "指定なし");
 fillSelect("effect", optionGroups.effect, "なし");
+fillSelect("alternateViewpoint", optionGroups.alternateViewpoint, "斜め前");
+fillSelect("timeOfDay", optionGroups.timeOfDay, "昼");
+fillSelect("weatherLight", optionGroups.weatherLight, "自然光");
+fillSelect("atmosphere", optionGroups.atmosphere, "落ち着いた");
 updateAspectDescription();
+updateModeUi();
 generatePrompt();
 
 form.addEventListener("submit", (event) => {
@@ -320,19 +522,24 @@ form.addEventListener("submit", (event) => {
 
 form.addEventListener("input", () => {
   updateAspectDescription();
+  updateModeUi();
   generatePrompt();
 });
 
 form.addEventListener("change", () => {
   updateAspectDescription();
+  updateModeUi();
   generatePrompt();
 });
 
 document.querySelector("#resetButton").addEventListener("click", () => {
   form.reset();
   document.querySelector("#subject").value = "";
+  const backgroundDetailInput = document.querySelector("#backgroundDetail");
+  if (backgroundDetailInput) backgroundDetailInput.value = "";
   aspectSelect.value = "4:3 標準横構図";
   updateAspectDescription();
+  updateModeUi();
   generatePrompt();
 });
 
