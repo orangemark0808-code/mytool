@@ -422,6 +422,9 @@ function generatePrompt() {
   const depth = data.get("depth");
   const motionBackground = data.get("motionBackground");
   const effect = data.get("effect");
+  const timeOfDay = data.get("timeOfDay");
+  const weatherLight = data.get("weatherLight");
+  const atmosphere = data.get("atmosphere");
 
   const jpSubject = subjectPhrase || "魅力的な被写体";
   const jpAction = subjectPhrase
@@ -447,6 +450,7 @@ function generatePrompt() {
   ], "\n");
   const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
   const [jpMotionBackground, enMotionBackground] = getMotionBackgroundNote(motionBackground);
+  const jpEnvironment = getBackgroundEnvironmentJapanese(timeOfDay, weatherLight, atmosphere);
   const jpEffectSentence = effect === "なし"
     ? `${depth}で、漫画演出は控えめにする。`
     : `${depth}で、${effect}を使った漫画演出を加える。`;
@@ -464,6 +468,7 @@ function generatePrompt() {
     jpScaleLock,
     jpCameraView,
     jpMotionBackground,
+    jpEnvironment,
     jpSceneSentence,
     `アスペクト比は${aspect.value}。`,
     `${shot}、${direction}、${angle}、被写体は${subjectPlacement}、画面全体は${screenComposition}。`,
@@ -480,6 +485,7 @@ function generatePrompt() {
   const enPriority = "Top priority: clearly show the mouth shape, eyes, eyebrows, pose, gaze, both hand positions, and hand/action details. If the input includes shouting, dialogue, or an emotion word, express it with a wide-open mouth and, if useful, a short speech bubble.";
   const enSceneIntegration = "Do not render the background as a flat pattern; make the structure of the location readable. Adjust the direction of the background, floor and wall lines, and lighting naturally to match the subject's action. Integrate the subject and background with the same camera position, eye level, perspective, and light direction. Ground the feet and body naturally in the space with contact shadows and depth so the subject does not look pasted on or floating.";
   const enCameraView = getOptionEnglish("cameraView", cameraView) ? `Camera view: ${getOptionEnglish("cameraView", cameraView)}.` : "";
+  const enEnvironment = getBackgroundEnvironmentEnglish(timeOfDay, weatherLight, atmosphere);
 
   enPrompt.value = compactJoin([
     referenceNotes.en,
@@ -488,6 +494,7 @@ function generatePrompt() {
     enSceneIntegration,
     enCameraView,
     enMotionBackground,
+    enEnvironment,
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     `Use a ${aspect.en}.`,
     `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, subject placement: ${getOptionEnglish("subjectPlacement", subjectPlacement)}, overall composition: ${getOptionEnglish("screenComposition", screenComposition)}.`,
@@ -505,14 +512,18 @@ function updateModeUi() {
   const isBackgroundMode = data.get("generationMode") === "background";
 
   document.querySelectorAll("[data-person-field]").forEach((field) => {
-    field.hidden = isBackgroundMode;
+    field.hidden = false;
+    field.classList.toggle("is-mode-disabled", isBackgroundMode);
+    field.setAttribute("aria-disabled", String(isBackgroundMode));
     field.querySelectorAll("input, select, textarea").forEach((control) => {
       control.disabled = isBackgroundMode;
     });
   });
 
   document.querySelectorAll("[data-background-field]").forEach((field) => {
-    field.hidden = !isBackgroundMode;
+    field.hidden = false;
+    field.classList.toggle("is-mode-disabled", !isBackgroundMode);
+    field.setAttribute("aria-disabled", String(!isBackgroundMode));
     field.querySelectorAll("input, select, textarea").forEach((control) => {
       control.disabled = !isBackgroundMode;
     });

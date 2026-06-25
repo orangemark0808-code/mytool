@@ -176,6 +176,41 @@ form {
   vertical-align: middle;
 }
 
+.field-card.is-mode-disabled,
+.field-card[data-background-field].is-mode-disabled {
+  border-color: #b8b0a4;
+  border-left-color: #9a9288;
+  border-style: dashed;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(58, 42, 26, 0.035) 0,
+      rgba(58, 42, 26, 0.035) 8px,
+      transparent 8px,
+      transparent 16px
+    ),
+    #ebe7df;
+  color: #6f665d;
+}
+
+.field-card.is-mode-disabled label {
+  color: #6f665d;
+}
+
+.field-card.is-mode-disabled input,
+.field-card.is-mode-disabled select,
+.field-card.is-mode-disabled textarea {
+  border-color: #b8b0a4;
+  background: #ded9cf;
+  color: #6f665d;
+  cursor: not-allowed;
+}
+
+.field-card.is-mode-disabled .hint,
+.field-card.is-mode-disabled .sub-label {
+  color: #6f665d;
+}
+
 .mode-card {
   grid-column: 1;
   padding: 10px 20px;
