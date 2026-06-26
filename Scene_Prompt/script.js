@@ -742,6 +742,7 @@ form.addEventListener("change", () => {
 
 document.querySelector("#resetButton").addEventListener("click", () => {
   form.reset();
+  document.querySelector(".advanced-settings")?.removeAttribute("open");
   document.querySelector("#subject").value = "";
   const backgroundDetailInput = document.querySelector("#backgroundDetail");
   if (backgroundDetailInput) backgroundDetailInput.value = "";

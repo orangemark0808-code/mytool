@@ -251,12 +251,78 @@ form {
   overflow-wrap: anywhere;
 }
 
-.field-grid .field-card {
+.field-grid .field-card,
+.advanced-grid .field-card {
   grid-template-columns: minmax(140px, 210px) minmax(240px, 1fr);
   gap: 18px;
   align-items: center;
   justify-content: start;
   min-height: 60px;
+}
+
+.advanced-settings {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 14px;
+}
+
+.advanced-settings summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.advanced-settings summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-settings summary:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.summary-icon {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.summary-icon::before,
+.summary-icon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent-deep);
+  transform: translate(-50%, -50%);
+}
+
+.summary-icon::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.advanced-settings[open] .summary-icon::after {
+  opacity: 0;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
 }
 
 .field-card-wide {
@@ -535,18 +601,19 @@ textarea:focus {
     padding: 16px;
   }
 
-  .field-grid {
-    grid-template-columns: 1fr;
-  }
-
   form,
   .output-panel {
     grid-template-columns: 1fr;
   }
 
-  .field-grid .field-card {
+  .field-grid .field-card,
+  .advanced-grid .field-card {
     grid-template-columns: 1fr;
     min-height: auto;
+  }
+
+  .advanced-grid {
+    grid-template-columns: 1fr;
   }
 
   .field-card-wide {
