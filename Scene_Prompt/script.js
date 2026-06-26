@@ -55,6 +55,7 @@ const optionGroups = {
   ],
   screenComposition: [
     ["自然な構図", "natural overall composition"],
+    ["デフォルメキャラ優先", "composition prioritized for deformed character proportions"],
     ["余白多め", "composition with generous negative space"],
     ["斜め構図", "diagonal composition"],
     ["奥行き構図", "composition with strong depth"],
@@ -64,6 +65,7 @@ const optionGroups = {
   ],
   depth: [
     ["自然な奥行き", "natural depth"],
+    ["デフォルメ向け浅い奥行き", "shallow depth for deformed characters"],
     ["遠近感を強調", "emphasized perspective"],
     ["広角っぽい迫力", "wide-angle impact"],
     ["望遠っぽい圧縮感", "telephoto compression"],
@@ -135,8 +137,63 @@ const optionGroups = {
     ["シンプル", "simple atmosphere"],
     ["落ち着いた", "calm atmosphere"],
     ["物語性がある", "story-rich atmosphere"]
+  ],
+  scalePreset: [
+    ["指定なし", ""],
+    ["参照画像の体型を維持", "preserve the body proportions from the subject reference"],
+    ["5頭身デフォルメ", "five-head-tall deformed character proportions"],
+    ["ちびキャラ", "chibi character proportions"],
+    ["マスコット体型", "mascot-like body proportions"],
+    ["通常人物", "standard human proportions"]
+  ],
+  workSurfaceHeight: [
+    ["指定なし", ""],
+    ["手元の動作に合わせる", "fit the work or contact surface height to the character's hand action"],
+    ["主人公サイズの適正高さの作業面", "character-scaled work surface at an appropriate height"],
+    ["接触面を人物サイズにする", "scale contact surfaces to the character"],
+    ["大人用の高い作業面を避ける", "avoid adult-sized high work surfaces"],
+    ["立ち作業：肘の少し下", "standing work surface slightly below the elbows"],
+    ["立ち作業：みぞおち下", "standing work surface below the solar plexus"],
+    ["立ち作業：腰より少し上", "standing work surface slightly above the waist"],
+    ["座り作業：自然な机高", "natural desk height for a seated posture"]
+  ],
+  propScale: [
+    ["指定なし", ""],
+    ["手の大きさに合わせる", "scale props and tools to the character's hands"],
+    ["背景小物を控えめにする", "keep background props modest in size"],
+    ["人物基準で小さめ", "make props slightly smaller based on the character scale"],
+    ["巨大化禁止", "avoid oversized props and tools"]
+  ],
+  unwantedFurniture: [
+    ["指定なし", ""],
+    ["入力にない物を追加しない", "do not add furniture, tools, or objects that are not requested"],
+    ["座る指定がない場合は椅子を描かない", "do not draw chairs, stools, or benches unless the character is sitting"],
+    ["椅子・スツールを目立たせない", "do not make chairs or stools visually prominent"],
+    ["人物スケールの基準にしない", "do not use chairs, stools, or background furniture as the main scale reference"]
+  ],
+  backgroundStructureScale: [
+    ["指定なし", ""],
+    ["人物に合わせた背景スケール", "scale the background structure to the character"],
+    ["背景家具を高くしすぎない", "do not make background furniture too tall"],
+    ["背景設備を大きくしすぎない", "do not make background fixtures oversized"],
+    ["背景で人物を小さく見せない", "do not make the character look small because of the background scale"]
   ]
 };
+
+const personBackgroundScaleDefaults = {
+  scalePreset: "指定なし",
+  workSurfaceHeight: "指定なし",
+  propScale: "指定なし",
+  unwantedFurniture: "指定なし",
+  backgroundStructureScale: "指定なし"
+};
+
+const deformedScalePresets = new Set([
+  "参照画像の体型を維持",
+  "5頭身デフォルメ",
+  "ちびキャラ",
+  "マスコット体型"
+]);
 
 const form = document.querySelector("#promptForm");
 const aspectSelect = document.querySelector("#aspect");
@@ -154,7 +211,10 @@ function fillSelect(selectId, options, defaultValue) {
     const value = Array.isArray(option) ? option[0] : option.value;
     item.value = value;
     item.textContent = value;
-    if (value === defaultValue) item.selected = true;
+    if (value === defaultValue) {
+      item.selected = true;
+      item.defaultSelected = true;
+    }
     select.appendChild(item);
   });
 }
@@ -170,6 +230,107 @@ function isOptionalChoice(value) {
 
 function getOptionalJapanese(value) {
   return isOptionalChoice(value) ? value : "";
+}
+
+function resetPersonBackgroundScaleDefaults() {
+  Object.entries(personBackgroundScaleDefaults).forEach(([selectId, value]) => {
+    const select = document.querySelector(`#${selectId}`);
+    if (select) select.value = value;
+  });
+}
+
+function getDetailedScaleJapanese(scaleData) {
+  const scalePresetMap = {
+    "参照画像の体型を維持": "参照画像の体型を維持し、胴体を背景や接触面に合わせて伸ばさない。",
+    "5頭身デフォルメ": "5頭身デフォルメとして、頭を大きく、首と胴体を短く保つ。",
+    "ちびキャラ": "ちびキャラ体型として、体を小さくまとめ、胴体を伸ばさない。",
+    "マスコット体型": "マスコット風の体型を保ち、背景や小物に合わせて長身化しない。",
+    "通常人物": "主人公は通常人物に近い自然な体型として描く。"
+  };
+  const workSurfaceHeightMap = {
+    "手元の動作に合わせる": "接触面は現在のポーズと手元の動作に合う高さ・位置にする。",
+    "主人公サイズの適正高さの作業面": "机、台、カウンターは標準成人サイズではなく、主人公サイズの適正高さの作業面として描く。",
+    "接触面を人物サイズにする": "接触面は人物サイズにし、主人公が自然に届く位置に置く。",
+    "大人用の高い作業面を避ける": "大人用の高すぎるカウンターや胸の高さの作業台を基準にしない。",
+    "立ち作業：肘の少し下": "立ち作業の接触面は主人公の肘の少し下に置く。",
+    "立ち作業：みぞおち下": "立ち作業の接触面は主人公のみぞおち下あたりに置く。",
+    "立ち作業：腰より少し上": "立ち作業の接触面は主人公の腰より少し上に置く。",
+    "座り作業：自然な机高": "座り作業の机や接触面は主人公の肘の少し下に置く。"
+  };
+  const propScaleMap = {
+    "手の大きさに合わせる": "手で触れる道具や小物は主人公の手の大きさに合わせる。",
+    "背景小物を控えめにする": "背景小物は控えめな大きさと情報量にする。",
+    "人物基準で小さめ": "小物や周辺物は人物基準でやや小さめに描く。",
+    "巨大化禁止": "道具、小物、持ち物、周辺物を巨大化しない。"
+  };
+  const unwantedFurnitureMap = {
+    "入力にない物を追加しない": "入力にない家具、道具、小物、背景要素を無理に追加しない。",
+    "座る指定がない場合は椅子を描かない": "座る指定がない場合、椅子、スツール、ベンチを描かない。",
+    "椅子・スツールを目立たせない": "椅子やスツールを主人公の近くに大きく描かない。",
+    "人物スケールの基準にしない": "椅子や背景要素を人物スケールの基準にしない。"
+  };
+  const backgroundStructureScaleMap = {
+    "人物に合わせた背景スケール": "背景構造は人物がミニチュアに見えないスケールにする。",
+    "背景家具を高くしすぎない": "棚、机、台、看板、手すりなどの背景要素を高くしすぎない。",
+    "背景設備を大きくしすぎない": "窓、ドア、設備、自然物、背景小物を大きくしすぎない。",
+    "背景で人物を小さく見せない": "背景の高さや奥行きで主人公を小さく見せない。"
+  };
+
+  return compactJoin([
+    "【詳細スケール補正】",
+    scalePresetMap[scaleData.scalePreset],
+    workSurfaceHeightMap[scaleData.workSurfaceHeight],
+    propScaleMap[scaleData.propScale],
+    unwantedFurnitureMap[scaleData.unwantedFurniture],
+    backgroundStructureScaleMap[scaleData.backgroundStructureScale]
+  ], "\n");
+}
+
+function getDetailedScaleEnglish(scaleData) {
+  const scalePresetMap = {
+    "参照画像の体型を維持": "Preserve the body proportions from the subject reference and do not lengthen the torso to fit the background or contact surfaces.",
+    "5頭身デフォルメ": "Keep five-head-tall deformed proportions with a large head, short neck, and short torso.",
+    "ちびキャラ": "Keep compact chibi proportions and do not stretch the torso.",
+    "マスコット体型": "Keep mascot-like proportions and do not shift into a taller human balance.",
+    "通常人物": "Draw the character with natural proportions close to a standard human."
+  };
+  const workSurfaceHeightMap = {
+    "手元の動作に合わせる": "Set contact surfaces to the height and position required by the current hand action.",
+    "主人公サイズの適正高さの作業面": "Draw desks, tables, counters, and platforms as character-scaled work surfaces at an appropriate height.",
+    "接触面を人物サイズにする": "Scale contact surfaces to the character and place them within natural reach.",
+    "大人用の高い作業面を避ける": "Do not use adult-sized high counters or chest-height workbenches as the scale reference.",
+    "立ち作業：肘の少し下": "For standing work, keep the contact surface slightly below the character's elbows.",
+    "立ち作業：みぞおち下": "For standing work, keep the contact surface below the character's solar plexus.",
+    "立ち作業：腰より少し上": "For standing work, keep the work surface or contact surface slightly above the character's waist.",
+    "座り作業：自然な机高": "For seated work, keep the desk or contact surface slightly below the character's elbows."
+  };
+  const propScaleMap = {
+    "手の大きさに合わせる": "Scale handled tools and props to the character's hands.",
+    "背景小物を控えめにする": "Keep background props modest in size and visual weight.",
+    "人物基準で小さめ": "Make props and surrounding objects slightly smaller based on the character scale.",
+    "巨大化禁止": "Do not make tools, props, handheld objects, or surrounding objects oversized."
+  };
+  const unwantedFurnitureMap = {
+    "入力にない物を追加しない": "Do not add unrequested furniture, tools, props, or background elements.",
+    "座る指定がない場合は椅子を描かない": "Do not add chairs, stools, or benches unless the character is sitting.",
+    "椅子・スツールを目立たせない": "Do not draw chairs or stools large near the character.",
+    "人物スケールの基準にしない": "Do not use chairs or background elements as the main scale reference."
+  };
+  const backgroundStructureScaleMap = {
+    "人物に合わせた背景スケール": "Keep the background structure scaled so the character does not look miniature.",
+    "背景家具を高くしすぎない": "Do not make shelves, desks, signs, railings, or other background elements too tall.",
+    "背景設備を大きくしすぎない": "Do not make fixtures, doors, windows, natural objects, or background props oversized.",
+    "背景で人物を小さく見せない": "Do not make the character look small because of background height or depth."
+  };
+
+  return compactJoin([
+    "Detailed scale correction:",
+    scalePresetMap[scaleData.scalePreset],
+    workSurfaceHeightMap[scaleData.workSurfaceHeight],
+    propScaleMap[scaleData.propScale],
+    unwantedFurnitureMap[scaleData.unwantedFurniture],
+    backgroundStructureScaleMap[scaleData.backgroundStructureScale]
+  ], "\n");
 }
 
 function getBackgroundEnvironmentJapanese(timeOfDay, weatherLight, atmosphere) {
@@ -325,23 +486,266 @@ function hasReference(data, name) {
 function getReferenceNotes(data) {
   const hasSubjectReference = hasReference(data, "subjectReference");
   const hasBackgroundReference = hasReference(data, "backgroundReference");
-  const backgroundStyleNoteJp = hasSubjectReference
-    ? "背景画像が写真でも、画面全体の画風、線のタッチ、色味は被写体の参照画像に合わせる。背景だけ別画風にしない。"
-    : "背景画像が写真でも、全体を漫画調の画風に統一する。";
-  const backgroundStyleNoteEn = hasSubjectReference
-    ? "Even if it is a photo, match the entire image's art style, linework, and color palette to the subject reference image. Do not render the background in a separate style."
-    : "Even if it is a photo, unify the entire image in a manga-style look.";
 
   return {
     jp: compactJoin([
-      hasSubjectReference ? "被写体は添付画像を参照し、キャラクターの特徴、画風、線のタッチ、色味を画面全体に反映する。" : "",
-      hasBackgroundReference ? `場所・背景は添付画像を参照する。${backgroundStyleNoteJp}` : ""
+      hasSubjectReference ? "被写体は添付画像を参照する。" : "",
+      hasBackgroundReference ? "場所・背景は添付画像を参照する。" : ""
     ], "\n"),
     en: compactJoin([
-      hasSubjectReference ? "Use the attached subject reference image to reflect the character design, art style, linework, and color palette." : "",
-      hasBackgroundReference ? `Use the attached location/background reference image for the setting. ${backgroundStyleNoteEn}` : ""
+      hasSubjectReference ? "Use the attached subject reference image." : "",
+      hasBackgroundReference ? "Use the attached location/background reference image for the setting." : ""
     ], "\n")
   };
+}
+
+function getStyleLockJapanese(data) {
+  const hasSubjectReference = hasReference(data, "subjectReference");
+  const hasBackgroundReference = hasReference(data, "backgroundReference");
+  if (!hasSubjectReference) return "";
+
+  const styleLock = [
+    "【画風固定】",
+    "添付の被写体参照画像は、人物の体型だけでなく、画面全体の画風の最優先基準として使う。",
+    "人物の顔立ち、目の描き方、髪の描き方、線の太さ、線の柔らかさ、黒の置き方、グレーのトーン量、陰影、白地の残し方を参照画像に合わせる。",
+    "背景だけ写実的・細密・高密度にしない。",
+    "背景要素・環境要素・家具・床・壁・道具・周辺物も、被写体参照画像と同じ簡略化レベル、線画密度、トーン量にする。"
+  ].join("\n");
+  const backgroundPriority = hasBackgroundReference
+    ? [
+      "背景の場所・構造は背景参照画像を参照する。",
+      "ただし、画風、線のタッチ、トーン量、簡略化レベルは被写体参照画像を最優先で合わせる。"
+    ].join("\n")
+    : "";
+
+  return compactJoin([styleLock, backgroundPriority], "\n");
+}
+
+function getStyleLockEnglish(data) {
+  const hasSubjectReference = hasReference(data, "subjectReference");
+  const hasBackgroundReference = hasReference(data, "backgroundReference");
+  if (!hasSubjectReference) return "";
+
+  const styleLock = [
+    "Style lock:",
+    "Use the attached subject reference not only for the character design and body proportions, but also as the top-priority style reference for the entire image.",
+    "Match the face design, eye style, hair rendering, line thickness, line softness, black placement, gray tone amount, shading style, and white-space balance to the subject reference.",
+    "Do not make the background realistic, highly detailed, or visually denser than the character.",
+    "Keep background elements, environmental elements, furniture, floors, walls, tools, and surrounding objects at the same simplification level, line density, and tone density as the subject reference."
+  ].join("\n");
+  const backgroundPriority = hasBackgroundReference
+    ? [
+      "Use the background reference for the location and spatial structure.",
+      "However, match the overall art style, linework, tone density, and simplification level to the subject reference as the top priority."
+    ].join("\n")
+    : "";
+
+  return compactJoin([styleLock, backgroundPriority], "\n");
+}
+
+function getBodyProportionLockJapanese(data, includeEnvironment = true) {
+  const hasRef = hasReference(data, "subjectReference");
+  const isDeformed = deformedScalePresets.has(data.get("scalePreset"));
+  if (!hasRef && !isDeformed) return "";
+
+  const sharedLines = [
+    "【胴長防止・体型固定】",
+    "全身でも、添付参照画像の頭身と体型を最優先で維持する。",
+    "頭を大きく、首を短く、肩から腰までの胴体を短く描く。",
+    "首下から腰までを縦に伸ばさない。",
+    "腰位置を低くしない。",
+    "服装が変わっても、体の内部構造として肩から腰までを短く保つ。",
+    "上半身の服や衣服の胴部分を縦に伸ばして、胴長に見せない。"
+  ];
+  const environmentLines = includeEnvironment
+    ? [
+      "胴体を伸ばして接触面や背景要素に合わせない。",
+      "必要な場合は、腕・肩・手元・接触面・小物側を調整して動作を成立させる。"
+    ]
+    : [];
+
+  return compactJoin([...sharedLines, ...environmentLines], "\n");
+}
+
+function getBodyProportionLockEnglish(data, includeEnvironment = true) {
+  const hasRef = hasReference(data, "subjectReference");
+  const isDeformed = deformedScalePresets.has(data.get("scalePreset"));
+  if (!hasRef && !isDeformed) return "";
+
+  const sharedLines = [
+    "Anti-long-torso body lock:",
+    "The character has a large head (approximately 1/5 of total body height), a short neck, and a short torso from shoulders to waist.",
+    "Even in a full-body composition, preserve the head-to-body ratio and body proportions.",
+    "Keep the head large, the neck short, and the torso from shoulders to waist short.",
+    "Do not vertically stretch the neck-to-waist area.",
+    "Do not lower the waist position.",
+    "Regardless of outfit, keep the internal shoulder-to-waist structure short.",
+    "Do not stretch upper-body clothing so the torso looks long."
+  ];
+  const environmentLines = includeEnvironment
+    ? [
+      "Do not lengthen the torso to fit contact surfaces or background elements.",
+      "Adjust arms, shoulders, hands, contact surfaces, and props instead."
+    ]
+    : [];
+
+  return compactJoin([...sharedLines, ...environmentLines], "\n");
+}
+
+function shouldUseDeformedComposition(data, includeAutoSupplement = false) {
+  const isSelected = data.get("screenComposition") === "デフォルメキャラ優先";
+  if (isSelected) return true;
+  return includeAutoSupplement && hasReference(data, "subjectReference") && deformedScalePresets.has(data.get("scalePreset"));
+}
+
+function getDeformedCompositionJapanese(data, includeEnvironment = true, includeAutoSupplement = false) {
+  if (!shouldUseDeformedComposition(data, includeAutoSupplement)) return "";
+
+  const sharedLines = [
+    "【デフォルメキャラ優先構図】",
+    "デフォルメキャラの頭身と体型を最優先にした構図にする。",
+    "人物の頭を大きく、首を短く、肩から腰までを短く保つ。",
+    "全身を描く場合でも、人物を縦に引き伸ばして画面に収めない。",
+    "画面内に余白を残してよいので、人物の体型比率を優先する。"
+  ];
+  const environmentLines = includeEnvironment
+    ? [
+      "背景、接触面、作業面、小物、周辺物は、人物の体型を崩さない位置と大きさに配置する。",
+      "机、台、カウンター、床、地面、壁、段差、手すり、持ち物などは、固定された人物のポーズに合わせて配置する。",
+      "余白を使ってよいが、背景を完全に省略しすぎない。",
+      "人物の体型比率を優先しつつ、場所が分かる最低限の背景要素は残す。",
+      "背景の情報量や奥行きより、頭・首・肩・腰の比率が読みやすい構図を優先する。",
+      "強い遠近感や深い背景パースで人物を縦に伸ばさない。"
+    ]
+    : [];
+
+  return compactJoin([...sharedLines, ...environmentLines], "\n");
+}
+
+function getDeformedCompositionEnglish(data, includeEnvironment = true, includeAutoSupplement = false) {
+  if (!shouldUseDeformedComposition(data, includeAutoSupplement)) return "";
+
+  const sharedLines = [
+    "Composition prioritized for deformed character proportions:",
+    "Build the composition around the deformed character's head-to-body ratio and body proportions as the top priority.",
+    "Keep the head large, neck short, and torso from shoulders to waist short.",
+    "Even in a full-body composition, do not vertically stretch the character to fill the frame.",
+    "Leave empty space if needed, and prioritize preserving the character's body proportions."
+  ];
+  const environmentLines = includeEnvironment
+    ? [
+      "Place the background, contact surfaces, work surfaces, props, and surrounding objects around the character without changing the character's proportions.",
+      "Desks, tables, counters, floors, ground, walls, steps, railings, handheld objects, and touched objects should be positioned to match the fixed character pose.",
+      "Leave empty space if needed, but do not remove the background too much.",
+      "Prioritize the character's proportions while keeping enough background elements to understand the location.",
+      "Prioritize a readable head, neck, shoulder, and waist relationship over background density or deep perspective.",
+      "Do not use strong perspective or deep background depth to vertically stretch the character."
+    ]
+    : [];
+
+  return compactJoin([...sharedLines, ...environmentLines], "\n");
+}
+
+function shouldUseContactSurfaceReplacement(data) {
+  if (!hasReference(data, "subjectReference")) return false;
+  const scalePreset = data.get("scalePreset");
+  const workSurfaceHeight = data.get("workSurfaceHeight");
+  return deformedScalePresets.has(scalePreset) || isOptionalChoice(workSurfaceHeight);
+}
+
+function getContactSurfaceReplacementJapanese(data) {
+  if (!shouldUseContactSurfaceReplacement(data)) return "";
+
+  return [
+    "【接触面の高さ調整】",
+    "机、台、作業台、カウンター、テーブル、床、地面、壁、段差、手すり、道具、持ち物など、主人公が触れるものは、固定された主人公の体型とポーズに合う接触面として描く。",
+    "作業面の天板や接触面は、主人公が胴体や腕を伸ばさず自然に扱える高さにする。",
+    "立ち作業では、作業面が低すぎたり高すぎたりしないようにし、手元の動作が自然に見える高さにする。",
+    "標準成人サイズの高い設備を基準にしない。",
+    "接触面が合わない場合は、人物ではなく接触面・道具・小物・周辺物の高さ、位置、大きさを調整する。"
+  ].join("\n");
+}
+
+function getContactSurfaceReplacementEnglish(data) {
+  if (!shouldUseContactSurfaceReplacement(data)) return "";
+
+  return [
+    "Contact surface height adjustment:",
+    "Draw desks, tables, counters, platforms, floors, ground, walls, steps, railings, tools, handheld objects, and touched objects as contact surfaces adjusted to the fixed character body and pose.",
+    "Set work surfaces and contact surfaces to a height the character can use naturally without stretching the torso or arms.",
+    "For standing actions, avoid surfaces that are too low or too high, and place the work surface at a natural height for the hand action.",
+    "Do not use standard adult-sized high fixtures as the scale reference.",
+    "If the contact surface does not fit, adjust the height, position, or size of the contact surface, tools, props, or surrounding objects instead of deforming the character."
+  ].join("\n");
+}
+
+function shouldUseShallowDepthForDeformedCharacter(data) {
+  return hasReference(data, "subjectReference") && deformedScalePresets.has(data.get("scalePreset"));
+}
+
+function getEffectiveDepth(data) {
+  const depth = data.get("depth");
+  if (shouldUseShallowDepthForDeformedCharacter(data) && depth === "自然な奥行き") {
+    return "デフォルメ向け浅い奥行き";
+  }
+  return depth;
+}
+
+function getDepthInstructionJapanese(data) {
+  const depth = getEffectiveDepth(data);
+  if (depth !== "デフォルメ向け浅い奥行き") return "";
+
+  return [
+    "【デフォルメ向け浅い奥行き】",
+    "デフォルメキャラに合わせた浅い奥行きで描く。",
+    "背景は深いリアル空間にせず、手前・人物・背面の関係が分かる程度に簡略化する。",
+    "床、壁、机、台、カウンター、棚、背景要素に強い遠近感をつけない。",
+    "強い遠近感、奥へ大きく伸びる床板、長い作業台、深い室内パースは強調しない。",
+    "接地感と場所の分かりやすさは保つ。",
+    "人物の体型を背景パースに合わせて縦に伸ばさない。"
+  ].join("\n");
+}
+
+function getDepthInstructionEnglish(data) {
+  const depth = getEffectiveDepth(data);
+  if (depth !== "デフォルメ向け浅い奥行き") return "";
+
+  return [
+    "Shallow depth for deformed characters:",
+    "Use shallow depth adjusted to the deformed character.",
+    "Do not create a deep realistic space.",
+    "Simplify the depth enough to keep the foreground, character, and rear background readable.",
+    "Do not apply strong perspective to the floor, walls, desks, tables, counters, shelves, or background elements.",
+    "Do not emphasize strong perspective, long floorboards, long work surfaces, or deep indoor perspective.",
+    "Preserve grounding and location readability.",
+    "Do not vertically stretch the character's body to fit the background perspective."
+  ].join("\n");
+}
+
+function getBackgroundDetailBalanceJapanese(data) {
+  if (!shouldUseShallowDepthForDeformedCharacter(data)) return "";
+
+  return [
+    "【背景情報量】",
+    "背景は白地を残しつつ、場所が分かる程度の家具・設備・壁・棚・小物を描く。",
+    "背景を完全に省略しすぎない。",
+    "背景の描き込みは控えめにするが、場所の構造が分かる情報量は残す。",
+    "背景は人物より目立たせない。",
+    "木目、床板、壁、棚、小物の質感は簡略化し、細密に描き込みすぎない。"
+  ].join("\n");
+}
+
+function getBackgroundDetailBalanceEnglish(data) {
+  if (!shouldUseShallowDepthForDeformedCharacter(data)) return "";
+
+  return [
+    "Background detail balance:",
+    "Keep some white space, but include enough furniture, fixtures, walls, shelves, and props to make the location readable.",
+    "Do not over-simplify the background into an almost empty space.",
+    "Keep the background detail restrained, but preserve enough structure to understand the setting.",
+    "Do not let the background overpower the character.",
+    "Simplify textures such as wood grain, floorboards, walls, shelves, and props instead of rendering them densely."
+  ].join("\n");
 }
 
 function getBackgroundCameraViewEnglish(value) {
@@ -485,36 +889,52 @@ function getPersonBackgroundPrompt(data) {
   const timeOfDay = data.get("timeOfDay");
   const weatherLight = data.get("weatherLight");
   const atmosphere = data.get("atmosphere");
+  const scalePreset = data.get("scalePreset");
+  const workSurfaceHeight = data.get("workSurfaceHeight");
+  const propScale = data.get("propScale");
+  const unwantedFurniture = data.get("unwantedFurniture");
+  const backgroundStructureScale = data.get("backgroundStructureScale");
+  const scaleData = {
+    scalePreset,
+    workSurfaceHeight,
+    propScale,
+    unwantedFurniture,
+    backgroundStructureScale
+  };
 
   const jpSubject = subjectPhrase || "魅力的な被写体";
   const jpAction = subjectPhrase
     ? `最重要の表情・動作指定: ${subjectPhrase}。この表情と動作を必ず画面の主役として描く。`
     : "";
   const jpPriority = "最優先: 口の形、目、眉、姿勢、視線、両手の位置、手元の動作を大きく明確に描く。叫び、セリフ、感情語がある場合は、口を大きく開けた表情や短い吹き出しで分かるように表現する。";
-  const jpSceneIntegration = "背景を単なる模様にせず、場所の構造が分かるように描く。背景の向き、床や壁のライン、光源を被写体の動きに合わせて自然に調整する。背景と被写体を同じカメラ位置、同じアイレベル、同じパース、同じ光源で統一する。足裏や体を床・机・壁など背景の空間に自然に接地させ、接地影と奥行きで浮いて見えないようにする。";
+  const jpSceneIntegration = shouldUseShallowDepthForDeformedCharacter(data)
+    ? "背景は場所の構造が分かる程度に簡略化して描く。接地感は保つが、リアルな深い奥行きや強いパースは避ける。背景の床・壁・棚・接触面は、デフォルメキャラの体型に合う浅い空間として描く。"
+    : "背景を単なる模様にせず、場所の構造が分かるように描く。背景と被写体を同じカメラ位置、同じアイレベル、同じ光源で統一し、接地影で浮いて見えないようにする。";
+  const jpStylizedIntegration = "人物と背景は同じ空間にあるように接地させる。ただし、人物の体型や画風を背景に合わせて変形しない。";
   const jpScaleLock = compactJoin([
-    "【人物と部屋のスケール固定】",
-    "主人公の頭身、体型、手足の長さ、デフォルメ度は添付の被写体参照画像を基準にする。",
-    "背景・家具・机・椅子・PCの大きさは、参照画像の主人公が自然に座れるサイズに調整する。",
-    "人物の体型に対して机や椅子が大きすぎたり小さすぎたりしないようにする。",
-    "机、椅子、PC、ベッド、本棚、クローゼットは、主人公との大きさの関係が自然に見えるようにする。",
-    "座った主人公の机天板の高さは、体型に対して自然な作業姿勢になる高さにする。",
-    "椅子の背もたれは、主人公の背中に対して自然な高さにする。",
-    "13インチPCは主人公の手元に対して自然な大きさにし、両手を置いて作業できるサイズにする。",
-    "ベッドは人物より奥にある大きな家具として描き、人物と同じ平面に貼り付けたようにしない。",
-    "人物、机、椅子、床、背景家具の接地感と奥行きを一致させる。",
-    "人物をミニチュア化しない。",
-    "人物を部屋に対して大きくしすぎない。",
-    "家具を巨大化しない。",
-    "PCを巨大化しない。"
+    "【人物固定・環境側調整】",
+    "人物の体型を正解として固定する。",
+    "人物を背景や接触面に合わせて伸ばさない。",
+    "背景要素、接触面、作業面、小物、周辺物の側を、人物の体型と現在のポーズに合わせる。"
   ], "\n");
+  const jpDetailedScale = getDetailedScaleJapanese(scaleData);
+  const jpContactSurfaceReplacement = getContactSurfaceReplacementJapanese(data);
+  const jpDepthInstruction = getDepthInstructionJapanese(data);
+  const jpBackgroundDetailBalance = getBackgroundDetailBalanceJapanese(data);
   const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
   const [jpMotionBackground, enMotionBackground] = getMotionBackgroundNote(motionBackground);
   const jpEnvironment = getBackgroundEnvironmentJapanese(timeOfDay, weatherLight, atmosphere);
+  const effectiveDepth = getEffectiveDepth(data);
   const jpEffectSentence = effect === "なし"
-    ? `${depth}で、漫画演出は控えめにする。`
-    : `${depth}で、${effect}を使った漫画演出を加える。`;
+    ? `${effectiveDepth}で、漫画演出は控えめにする。`
+    : `${effectiveDepth}で、${effect}を使った漫画演出を加える。`;
   const referenceNotes = getReferenceNotes(data);
+  const jpStyleLock = getStyleLockJapanese(data);
+  const enStyleLock = getStyleLockEnglish(data);
+  const jpBodyProportionLock = getBodyProportionLockJapanese(data);
+  const enBodyProportionLock = getBodyProportionLockEnglish(data);
+  const jpDeformedComposition = getDeformedCompositionJapanese(data, true, true);
+  const enDeformedComposition = getDeformedCompositionEnglish(data, true, true);
   const jpSceneSubject = subjectPhrase ? `${subjectPhrase}シーン` : jpSubject;
   const jpSceneSentence = background
     ? `${background}を舞台に、${jpSceneSubject}を描いた漫画調のワンシーン画像。`
@@ -522,17 +942,26 @@ function getPersonBackgroundPrompt(data) {
 
   jpPrompt.value = compactJoin([
     referenceNotes.jp,
+    jpStyleLock,
+    jpBodyProportionLock,
+    jpDeformedComposition,
     jpAction,
     jpPriority,
+    jpSceneSentence,
     jpSceneIntegration,
+    jpStylizedIntegration,
+    jpContactSurfaceReplacement,
     jpScaleLock,
+    jpDetailedScale,
+    jpDepthInstruction,
+    jpBackgroundDetailBalance,
     jpCameraView,
     jpMotionBackground,
     jpEnvironment,
-    jpSceneSentence,
     `アスペクト比は${aspect.value}。`,
     `${shot}、${direction}、${angle}、被写体は${subjectPlacement}、画面全体は${screenComposition}。`,
     jpEffectSentence,
+    "ショットの種類にかかわらず、胴体を縦に伸ばして画面に収めない。",
     "自然な日本の漫画らしい線、読みやすいシルエット、表情と空気感が伝わる仕上がり。"
   ], "\n");
 
@@ -543,22 +972,45 @@ function getPersonBackgroundPrompt(data) {
     ? "Most important action and expression: depict the specified subject/action as the main focus of the image."
     : "";
   const enPriority = "Top priority: clearly show the mouth shape, eyes, eyebrows, pose, gaze, both hand positions, and hand/action details. If the input includes shouting, dialogue, or an emotion word, express it with a wide-open mouth and, if useful, a short speech bubble.";
-  const enSceneIntegration = "Do not render the background as a flat pattern; make the structure of the location readable. Adjust the direction of the background, floor and wall lines, and lighting naturally to match the subject's action. Integrate the subject and background with the same camera position, eye level, perspective, and light direction. Ground the feet and body naturally in the space with contact shadows and depth so the subject does not look pasted on or floating.";
+  const enSceneIntegration = shouldUseShallowDepthForDeformedCharacter(data)
+    ? "Keep the location structure readable but simplified. Preserve grounding, but avoid deep realistic perspective and strong spatial depth. Draw floors, walls, shelves, and contact surfaces as a shallow space scaled to the deformed character."
+    : "Make the location structure readable. Integrate the subject and background with the same camera position, eye level, and light direction, and use contact shadows so the subject does not look floating.";
+  const enStylizedIntegration = "Ground the character and background in the same space, but do not deform the character's proportions or style to match the background.";
+  const enScaleAdaptation = compactJoin([
+    "Character-fixed, environment-adjusted scale:",
+    "Treat the character's proportions as the fixed correct reference.",
+    "Do not stretch the character to fit the background or contact surfaces.",
+    "Adjust the background elements, contact surfaces, work surfaces, props, and surrounding objects to the character's body and pose."
+  ], "\n");
+  const enDetailedScale = getDetailedScaleEnglish(scaleData);
+  const enContactSurfaceReplacement = getContactSurfaceReplacementEnglish(data);
+  const enDepthInstruction = getDepthInstructionEnglish(data);
+  const enBackgroundDetailBalance = getBackgroundDetailBalanceEnglish(data);
   const enCameraView = getOptionEnglish("cameraView", cameraView) ? `Camera view: ${getOptionEnglish("cameraView", cameraView)}.` : "";
   const enEnvironment = getBackgroundEnvironmentEnglish(timeOfDay, weatherLight, atmosphere);
 
   enPrompt.value = compactJoin([
     referenceNotes.en,
+    enStyleLock,
+    enBodyProportionLock,
+    enDeformedComposition,
     enAction,
     enPriority,
+    `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     enSceneIntegration,
+    enStylizedIntegration,
+    enContactSurfaceReplacement,
+    enScaleAdaptation,
+    enDetailedScale,
+    enDepthInstruction,
+    enBackgroundDetailBalance,
     enCameraView,
     enMotionBackground,
     enEnvironment,
-    `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     `Use a ${aspect.en}.`,
     `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, subject placement: ${getOptionEnglish("subjectPlacement", subjectPlacement)}, overall composition: ${getOptionEnglish("screenComposition", screenComposition)}.`,
-    `${getOptionEnglish("depth", depth)}, ${enEffect}.`,
+    `${getOptionEnglish("depth", effectiveDepth)}, ${enEffect}.`,
+    "Regardless of shot type, do not stretch the torso vertically to fill the frame.",
     "Clean Japanese manga linework, readable silhouette, expressive mood, polished image-generation prompt style."
   ], "\n");
 }
@@ -586,8 +1038,11 @@ function getPersonOnlyPrompt(data) {
     ? `最重要の表情・動作指定: ${subjectPhrase}。この表情と動作を必ず画面の主役として描く。`
     : "";
   const jpReference = hasSubjectReference
-    ? "被写体は添付画像を参照し、キャラクターの特徴、画風、線のタッチ、色味を反映する。"
+    ? "被写体は添付画像を参照する。"
     : "";
+  const jpStyleLock = getStyleLockJapanese(data);
+  const jpBodyProportionLock = getBodyProportionLockJapanese(data, false);
+  const jpDeformedComposition = getDeformedCompositionJapanese(data, false, false);
   const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
   const [jpMotionBackground, enMotionBackground] = getPersonMotionNote(motionBackground);
   const jpEnvironment = getBackgroundEnvironmentJapanese(timeOfDay, weatherLight, atmosphere);
@@ -597,6 +1052,9 @@ function getPersonOnlyPrompt(data) {
 
   jpPrompt.value = compactJoin([
     jpReference,
+    jpStyleLock,
+    jpBodyProportionLock,
+    jpDeformedComposition,
     "人物のみを生成する。",
     "背景、場所、部屋、家具、風景を描かない。",
     "背景は白地または単色のシンプルな背景にする。",
@@ -615,8 +1073,11 @@ function getPersonOnlyPrompt(data) {
 
   const enSubject = translateFreeText(subjectPhrase, preserveOriginalText(subjectPhrase, "the subject and action described in Japanese")) || "an appealing character";
   const enReference = hasSubjectReference
-    ? "Use the attached subject reference image to reflect the character design, art style, linework, and color palette."
+    ? "Use the attached subject reference image."
     : "";
+  const enStyleLock = getStyleLockEnglish(data);
+  const enBodyProportionLock = getBodyProportionLockEnglish(data, false);
+  const enDeformedComposition = getDeformedCompositionEnglish(data, false, false);
   const enAction = subjectPhrase
     ? "Most important action and expression: depict the specified subject/action as the main focus of the image."
     : "";
@@ -626,6 +1087,9 @@ function getPersonOnlyPrompt(data) {
 
   enPrompt.value = compactJoin([
     enReference,
+    enStyleLock,
+    enBodyProportionLock,
+    enDeformedComposition,
     "Generate a character-only image.",
     "No background scenery, no room, no furniture, no environment.",
     "Use a plain white or simple solid-color background.",
@@ -675,6 +1139,10 @@ function updateModeUi() {
     setFieldDisabled(field, !isBackgroundMode);
   });
 
+  document.querySelectorAll("[data-person-background-field]").forEach((field) => {
+    setFieldDisabled(field, !isPersonBackgroundMode);
+  });
+
   const effectField = document.querySelector("#effect")?.closest(".field-card");
   if (effectField) {
     setFieldDisabled(effectField, isBackgroundMode);
@@ -711,7 +1179,7 @@ fillSelect("direction", optionGroups.direction, "斜め前");
 fillSelect("angle", optionGroups.angle, "アイレベル");
 fillSelect("cameraView", optionGroups.cameraView, "指定なし");
 fillSelect("subjectPlacement", optionGroups.subjectPlacement, "中央配置");
-fillSelect("screenComposition", optionGroups.screenComposition, "自然な構図");
+fillSelect("screenComposition", optionGroups.screenComposition, "デフォルメキャラ優先");
 fillSelect("depth", optionGroups.depth, "自然な奥行き");
 fillSelect("motionBackground", optionGroups.motionBackground, "指定なし");
 fillSelect("effect", optionGroups.effect, "なし");
@@ -719,6 +1187,11 @@ fillSelect("alternateViewpoint", optionGroups.alternateViewpoint, "斜め前");
 fillSelect("timeOfDay", optionGroups.timeOfDay, "なし");
 fillSelect("weatherLight", optionGroups.weatherLight, "なし");
 fillSelect("atmosphere", optionGroups.atmosphere, "なし");
+fillSelect("scalePreset", optionGroups.scalePreset, personBackgroundScaleDefaults.scalePreset);
+fillSelect("workSurfaceHeight", optionGroups.workSurfaceHeight, personBackgroundScaleDefaults.workSurfaceHeight);
+fillSelect("propScale", optionGroups.propScale, personBackgroundScaleDefaults.propScale);
+fillSelect("unwantedFurniture", optionGroups.unwantedFurniture, personBackgroundScaleDefaults.unwantedFurniture);
+fillSelect("backgroundStructureScale", optionGroups.backgroundStructureScale, personBackgroundScaleDefaults.backgroundStructureScale);
 updateAspectDescription();
 updateModeUi();
 generatePrompt();
@@ -747,6 +1220,7 @@ document.querySelector("#resetButton").addEventListener("click", () => {
   const backgroundDetailInput = document.querySelector("#backgroundDetail");
   if (backgroundDetailInput) backgroundDetailInput.value = "";
   aspectSelect.value = "4:3 標準横構図";
+  resetPersonBackgroundScaleDefaults();
   updateAspectDescription();
   updateModeUi();
   generatePrompt();
