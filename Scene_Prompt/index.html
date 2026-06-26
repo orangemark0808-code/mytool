@@ -8,7 +8,75 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Nunito:wght@300;400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2026.06.26-scale10">
+  <link rel="stylesheet" href="style.css?v=2026.06.26-reference15">
+
+  <style>
+
+    .reference-usage {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.85rem;
+    }
+    .reference-usage[hidden] {
+      display: none;
+    }
+    .reference-usage .sub-label {
+      margin: 0;
+    }
+    .reference-usage select {
+      width: 100%;
+    }
+    .shot-card .hint {
+      grid-column: 1 / -1;
+      width: 100%;
+      max-width: none;
+      margin-top: 0.65rem;
+      white-space: normal;
+    }
+    .consistency-card {
+      display: block;
+      border: 1px solid rgba(255, 127, 0, 0.35);
+      background: rgba(255, 247, 236, 0.85);
+    }
+    .consistency-card[hidden] {
+      display: none;
+    }
+    .consistency-card label,
+    .consistency-card .hint,
+    .consistency-card ul {
+      width: 100%;
+      max-width: none;
+    }
+    .consistency-card label {
+      display: block;
+      margin-bottom: 0.55rem;
+    }
+    .consistency-card .hint {
+      margin: 0 0 0.8rem;
+      line-height: 1.65;
+    }
+    .consistency-card ul {
+      display: grid;
+      gap: 0.55rem;
+      margin: 0;
+      padding-left: 1.15rem;
+    }
+    .consistency-card li {
+      margin: 0;
+      line-height: 1.75;
+      overflow-wrap: anywhere;
+    }
+    .compatibility-status-ok {
+      color: #2f7a34;
+    }
+    .compatibility-status-warn {
+      color: #9a5a00;
+    }
+    .compatibility-status-bad {
+      color: #9b2c2c;
+      font-weight: 700;
+    }
+  </style>
 </head>
 <body>
   <main class="app-shell">
@@ -16,10 +84,10 @@
       <div>
         <p class="eyebrow">ORANGEMANIA TOOL</p>
         <h1>Scene Prompt</h1>
-        <p class="version-label">2026.06.26-scale10</p>
+        <p class="version-label">2026.06.26-reference15</p>
       </div>
       <p class="lead">
-        人物＋背景、人物のみ、背景のみを切り替えながら、カメラワーク、構図、空間演出を選んで画像生成プロンプトを作れます。
+        人物＋背景、人物のみ、背景のみを切り替えながら、カメラワーク、構図、空間の前後関係を選び、ショット・向き・アスペクト比の矛盾を確認しながら画像生成プロンプトを作れます。
       </p>
     </header>
 
@@ -69,9 +137,9 @@
           </div>
 
           <div class="field-card background-card" data-background-section>
-            <label for="background">場所・背景</label>
+            <label for="background">場所・背景・空間</label>
             <div class="reference-upload">
-              <p class="sub-label">場所・背景の参照画像</p>
+              <p class="sub-label">場所・背景・空間構成の参照画像</p>
               <div class="segmented-control" role="radiogroup" aria-label="場所・背景の参照画像">
                 <label>
                   <input type="radio" name="backgroundReference" value="none" checked>
@@ -82,9 +150,14 @@
                   <span>有</span>
                 </label>
               </div>
-              <p class="hint" id="backgroundReferenceHint">有の場合、添付画像の場所・背景をプロンプトに反映します。</p>
+              <p class="hint" id="backgroundReferenceHint">有の場合、添付画像の場所・背景・空間構成をプロンプトに反映します。部屋以外の場所にも使えます。</p>
             </div>
-            <textarea id="background" name="background" class="prompt-input" rows="2" placeholder="例：明るいカフェ店内、木製の机、大きな窓、観葉植物、本棚、生活感がある"></textarea>
+            <div class="reference-usage" id="backgroundReferenceUsageWrap">
+              <label class="sub-label" for="backgroundReferenceUsage">参照画像の使い方</label>
+              <select id="backgroundReferenceUsage" name="backgroundReferenceUsage"></select>
+              <p class="hint" id="backgroundReferenceUsageHint">背景参照を有にしたとき、添付画像をどの範囲で使うかを選びます。</p>
+            </div>
+            <textarea id="background" name="background" class="prompt-input" rows="2" placeholder="例：明るいカフェ店内、木製の机、大きな窓、観葉植物、本棚、生活感がある／屋外、店内、街、自然、乗り物など"></textarea>
           </div>
 
           <div class="field-card field-card-wide">
@@ -94,9 +167,10 @@
           </div>
 
           <div class="field-grid">
-            <div class="field-card" data-person-field>
+            <div class="field-card shot-card" data-person-field>
               <label for="shot">映す範囲（ショット）</label>
               <select id="shot" name="shot"></select>
+              <p class="hint">上半身・バストアップでは、人物の画角を優先します。</p>
             </div>
 
             <div class="field-card" data-person-field>
@@ -128,6 +202,12 @@
               <label for="screenComposition">配置（構図）</label>
               <select id="screenComposition" name="screenComposition"></select>
             </div>
+          </div>
+
+          <div class="field-card field-card-wide consistency-card" id="consistencyCard" aria-live="polite" hidden>
+            <label>整合性チェック</label>
+            <p class="hint" id="consistencySummary"></p>
+            <ul id="consistencyList"></ul>
           </div>
 
           <details class="advanced-settings">
@@ -191,6 +271,12 @@
                 <label for="backgroundStructureScale">背景構造のスケール</label>
                 <select id="backgroundStructureScale" name="backgroundStructureScale"></select>
               </div>
+
+              <div class="field-card field-card-wide" data-person-background-field>
+                <label for="spatialRelation">画面内の前後関係</label>
+                <textarea id="spatialRelation" name="spatialRelation" class="prompt-input" rows="2" placeholder="例：手前から机の天板→主人公の上半身→椅子の背もたれ→右側の収納家具の順に見せる。窓とベッドは背景端だけにする"></textarea>
+                <p class="hint">背景参照画像の配置を、生成画像の前景・中景・背景の奥行き順として固定したいときに使います。部屋以外の場所にも使えます。</p>
+              </div>
             </div>
           </details>
 
@@ -234,6 +320,6 @@
     </div>
   </main>
 
-  <script src="script.js?v=2026.06.26-scale10"></script>
+  <script src="script.js?v=2026.06.26-reference15"></script>
 </body>
 </html>

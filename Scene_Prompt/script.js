@@ -105,6 +105,14 @@ const optionGroups = {
     ["窓側から見る", "view from the window side"],
     ["机側から見る", "view from the desk side"]
   ],
+  backgroundReferenceUsage: [
+    ["背景全体を参照", "use the whole background reference"],
+    ["画面内に入る範囲だけ参照", "use only the visible area that fits in the frame"],
+    ["接触家具・作業面だけ参照", "use only contact furniture and work surfaces"],
+    ["小物・道具だけ参照", "use only props and tools"],
+    ["配置図として参照", "use as a layout diagram"],
+    ["空間の前後関係だけ参照", "use only spatial depth order"]
+  ],
   timeOfDay: [
     ["なし", ""],
     ["朝", "morning"],
@@ -195,6 +203,20 @@ const deformedScalePresets = new Set([
   "マスコット体型"
 ]);
 
+
+const closeShotSet = new Set(["顔アップ", "目元アップ", "手元アップ", "バストアップ"]);
+const upperShotSet = new Set(["上半身"]);
+const partialBodyShotSet = new Set(["膝上"]);
+const fullBodyShotSet = new Set(["全身"]);
+const longShotSet = new Set(["遠景"]);
+const wideAspectSet = new Set(["3:2 自然な横構図", "16:9 映画風ワイド", "21:9 超ワイド映画風"]);
+const ultraWideAspectSet = new Set(["21:9 超ワイド映画風"]);
+const verticalAspectSet = new Set(["4:5 縦寄り・SNS向き", "3:4 縦構図・キャラ向き", "2:3 縦長・全身向き", "9:16 スマホ縦長"]);
+const squareAspectSet = new Set(["1:1 正方形・SNS向き"]);
+const characterCloseRecommendedAspects = new Set(["1:1 正方形・SNS向き", "4:5 縦寄り・SNS向き", "3:4 縦構図・キャラ向き", "4:3 標準横構図"]);
+const fullBodyRecommendedAspects = new Set(["3:4 縦構図・キャラ向き", "2:3 縦長・全身向き", "9:16 スマホ縦長"]);
+const backgroundRecommendedAspects = new Set(["16:9 映画風ワイド", "4:3 標準横構図", "3:2 自然な横構図", "21:9 超ワイド映画風"]);
+
 const form = document.querySelector("#promptForm");
 const aspectSelect = document.querySelector("#aspect");
 const aspectDescription = document.querySelector("#aspectDescription");
@@ -202,6 +224,12 @@ const jpPrompt = document.querySelector("#jpPrompt");
 const enPrompt = document.querySelector("#enPrompt");
 const copyStatus = document.querySelector("#copyStatus");
 const backgroundReferenceHint = document.querySelector("#backgroundReferenceHint");
+const backgroundReferenceUsageWrap = document.querySelector("#backgroundReferenceUsageWrap");
+const backgroundReferenceUsageSelect = document.querySelector("#backgroundReferenceUsage");
+const backgroundReferenceUsageHint = document.querySelector("#backgroundReferenceUsageHint");
+const consistencyCard = document.querySelector("#consistencyCard");
+const consistencySummary = document.querySelector("#consistencySummary");
+const consistencyList = document.querySelector("#consistencyList");
 
 function fillSelect(selectId, options, defaultValue) {
   const select = document.querySelector(`#${selectId}`);
@@ -333,6 +361,52 @@ function getDetailedScaleEnglish(scaleData) {
   ], "\n");
 }
 
+function getSpatialRelationLockJapanese(data) {
+  const relation = String(data.get("spatialRelation") || "").trim();
+  if (!shouldUseSpatialRelationLock(data)) return "";
+
+  const relationLines = relation
+    ? [
+      `指定された画面内の前後関係: ${stripTrailingPunctuation(relation)}。`,
+      "この前後関係を優先し、他の背景要素は画面端、横、またはさらに奥に控えめに配置する。"
+    ]
+    : [];
+
+  return compactJoin([
+    "【空間関係・前後関係固定】",
+    "参照画像は部屋に限らず、屋外、店内、街、自然、乗り物、建物、机上などの場所・背景・空間構成として扱う。",
+    "参照画像の要素をただ横に並べず、選択したカメラ位置から見た前景・中景・背景の奥行きに変換する。",
+    "画面内で、被写体の手前、横、背後、さらに奥に何があるかを整理して描く。",
+    "被写体の背後側には、カメラから見て実際に重なる背景要素を配置する。",
+    "参照画像のすべての要素を正面から説明するように横並びで見せない。",
+    "奥行き順、重なり、接地影、床・地面・壁・水平線・垂直線の向きを統一する。",
+    ...relationLines
+  ], "\n");
+}
+
+function getSpatialRelationLockEnglish(data) {
+  const relation = String(data.get("spatialRelation") || "").trim();
+  if (!shouldUseSpatialRelationLock(data)) return "";
+
+  const relationLines = relation
+    ? [
+      `Specified on-screen depth order: ${stripTrailingPunctuation(relation)}.`,
+      "Prioritize this depth order, and place other background elements at the edges, to the side, or farther back in a restrained way."
+    ]
+    : [];
+
+  return compactJoin([
+    "Spatial relationship and depth-order lock:",
+    "The reference image does not have to be a room. Treat it as a spatial-layout reference for indoor spaces, outdoor places, shops, streets, nature, vehicles, buildings, tabletops, or any other environment.",
+    "Do not simply line up the reference elements side by side. Convert them into foreground, midground, and background depth from the selected camera position.",
+    "Organize what appears in front of the subject, beside the subject, behind the subject, and farther in the background.",
+    "Behind the subject, place the background elements that would actually overlap from the camera's viewpoint.",
+    "Do not show every reference element as a front-facing explanatory lineup.",
+    "Keep the depth order, overlaps, contact shadows, floor or ground direction, walls, horizon lines, and vertical lines consistent.",
+    ...relationLines
+  ], "\n");
+}
+
 function getBackgroundEnvironmentJapanese(timeOfDay, weatherLight, atmosphere) {
   const details = compactJoin([
     isOptionalChoice(timeOfDay) ? `時間帯は${timeOfDay}` : "",
@@ -445,6 +519,431 @@ function stripTrailingPunctuation(text) {
   return text.replace(/[。．.、,\s]+$/g, "");
 }
 
+
+
+function getGenerationMode(data) {
+  return data.get("generationMode") || "personBackground";
+}
+
+function hasBackgroundContext(data) {
+  return getGenerationMode(data) === "personBackground" && (hasReference(data, "backgroundReference") || Boolean(String(data.get("background") || "").trim()));
+}
+
+function isCloseOrUpperShot(shot) {
+  return closeShotSet.has(shot) || upperShotSet.has(shot);
+}
+
+function isFullOrLongShot(shot) {
+  return fullBodyShotSet.has(shot) || longShotSet.has(shot);
+}
+
+function getAspectCompatibilityStatus(data, aspectValue) {
+  const generationMode = getGenerationMode(data);
+  const shot = data.get("shot");
+
+  if (generationMode === "background") {
+    return backgroundRecommendedAspects.has(aspectValue) ? "recommended" : "caution";
+  }
+
+  if (isCloseOrUpperShot(shot)) {
+    if (ultraWideAspectSet.has(aspectValue)) return "bad";
+    return characterCloseRecommendedAspects.has(aspectValue) ? "recommended" : "caution";
+  }
+
+  if (partialBodyShotSet.has(shot) || fullBodyShotSet.has(shot)) {
+    if (ultraWideAspectSet.has(aspectValue)) return "bad";
+    return fullBodyRecommendedAspects.has(aspectValue) ? "recommended" : "caution";
+  }
+
+  if (longShotSet.has(shot)) {
+    return wideAspectSet.has(aspectValue) || aspectValue === "4:3 標準横構図" ? "recommended" : "caution";
+  }
+
+  return "recommended";
+}
+
+function decorateAspectOptions(data) {
+  if (!aspectSelect) return;
+  Array.from(aspectSelect.options).forEach((option) => {
+    const status = getAspectCompatibilityStatus(data, option.value);
+    const suffix = status === "bad" ? " ✕非推奨" : status === "caution" ? " ⚠注意" : "";
+    option.textContent = `${option.value}${suffix}`;
+    option.disabled = false;
+  });
+}
+
+function getEffectiveDirectionJapanese(data) {
+  const cameraView = data.get("cameraView");
+  const direction = data.get("direction");
+
+  if (cameraView === "サイドビュー") {
+    if (direction === "正面") return "体は横向き、顔だけ少しこちら向き";
+    if (direction === "後ろ姿") return "体は横向き、背中側が少し見える向き";
+    if (direction === "斜め後ろ") return "横向き寄りの斜め後ろ";
+  }
+
+  if (cameraView === "斜めサイドビュー" && direction === "正面") {
+    return "体は斜め横向き、顔だけ少しこちら向き";
+  }
+
+  if ((cameraView === "背後から追う" || cameraView === "肩越し") && direction === "正面") {
+    return "背中または肩越しを主に見せ、顔は横顔か一部だけ見える向き";
+  }
+
+  return direction;
+}
+
+function getEffectiveDirectionEnglish(data) {
+  const cameraView = data.get("cameraView");
+  const direction = data.get("direction");
+
+  if (cameraView === "サイドビュー") {
+    if (direction === "正面") return "side-facing body, with only the face turned slightly toward the viewer";
+    if (direction === "後ろ姿") return "side-facing body with a slight view of the back";
+    if (direction === "斜め後ろ") return "mostly side-facing with a slight three-quarter back angle";
+  }
+
+  if (cameraView === "斜めサイドビュー" && direction === "正面") {
+    return "three-quarter side-facing body, with only the face turned slightly toward the viewer";
+  }
+
+  if ((cameraView === "背後から追う" || cameraView === "肩越し") && direction === "正面") {
+    return "mainly a back or over-the-shoulder view, with only a profile or partial face visible";
+  }
+
+  return getOptionEnglish("direction", direction);
+}
+
+function getEffectiveCompositionJapanese(data) {
+  const shot = data.get("shot");
+  const screenComposition = data.get("screenComposition");
+  if (isCloseOrUpperShot(shot) && screenComposition === "背景広め") {
+    return "ショット優先、背景は見える範囲だけ";
+  }
+  if (isCloseOrUpperShot(shot) && screenComposition === "奥行き構図") {
+    return "ショット優先、奥行きは控えめ";
+  }
+  return screenComposition;
+}
+
+function getEffectiveCompositionEnglish(data) {
+  const shot = data.get("shot");
+  const screenComposition = data.get("screenComposition");
+  if (isCloseOrUpperShot(shot) && screenComposition === "背景広め") {
+    return "shot-priority composition, with only the visible background area";
+  }
+  if (isCloseOrUpperShot(shot) && screenComposition === "奥行き構図") {
+    return "shot-priority composition, with restrained depth";
+  }
+  return getOptionEnglish("screenComposition", screenComposition);
+}
+
+function getFramingSummaryJapanese(data) {
+  return `${data.get("shot")}、被写体の向きは${getEffectiveDirectionJapanese(data)}、${data.get("angle")}、被写体は${data.get("subjectPlacement")}、画面全体は${getEffectiveCompositionJapanese(data)}。`;
+}
+
+function getFramingSummaryEnglish(data) {
+  return `${getOptionEnglish("shot", data.get("shot"))}, subject direction: ${getEffectiveDirectionEnglish(data)}, ${getOptionEnglish("angle", data.get("angle"))}, subject placement: ${getOptionEnglish("subjectPlacement", data.get("subjectPlacement"))}, overall composition: ${getEffectiveCompositionEnglish(data)}.`;
+}
+
+function getShotLockJapanese(data) {
+  const shot = data.get("shot");
+  const aspect = getAspect();
+  const hasBg = hasBackgroundContext(data);
+
+  if (closeShotSet.has(shot)) {
+    return compactJoin([
+      `映す範囲は${shot}を最優先する。`,
+      `アスペクト比は${aspect.value}だが、画面比率のためにカメラを引かない。`,
+      "肩より下、胴体全体、腰、膝、足、足元、全身を描かない。",
+      hasBg ? "背景参照があっても、背景は顔や手元の背後に見える一部だけにする。" : ""
+    ], "\n");
+  }
+
+  if (upperShotSet.has(shot)) {
+    return compactJoin([
+      "映す範囲は上半身を最優先する。",
+      `アスペクト比は${aspect.value}だが、横幅や背景を見せるために全身構図へ引かない。`,
+      "膝、足、足元、全身を描かない。",
+      "画面外に下半身が自然に続くように見せる。",
+      hasBg ? "背景参照画像の全体を無理に入れず、上半身ショットの背後に見える範囲だけ描く。" : ""
+    ], "\n");
+  }
+
+  if (partialBodyShotSet.has(shot)) {
+    return compactJoin([
+      "映す範囲は膝上を優先する。",
+      `アスペクト比は${aspect.value}だが、足元まで入れるために勝手に全身へ広げない。`,
+      "足、足元、靴底まで描かない。"
+    ], "\n");
+  }
+
+  if (fullBodyShotSet.has(shot)) {
+    return compactJoin([
+      "映す範囲は全身を優先する。",
+      "頭から足先まで入れるが、人物を縦に伸ばさず、余白を使って自然に収める。",
+      squareAspectSet.has(aspect.value) || wideAspectSet.has(aspect.value) ? "横長または正方形でも、足先を切らず、背景を広く見せるために人物を小さくしすぎない。" : ""
+    ], "\n");
+  }
+
+  return "";
+}
+
+function getShotLockEnglish(data) {
+  const shot = data.get("shot");
+  const aspect = getAspect();
+  const hasBg = hasBackgroundContext(data);
+
+  if (closeShotSet.has(shot)) {
+    return compactJoin([
+      `Prioritize the selected shot: ${getOptionEnglish("shot", shot)}.`,
+      `Use the ${aspect.en}, but do not pull the camera back because of the aspect ratio.`,
+      "Do not show the lower body, full torso, waist, knees, legs, feet, floor around the feet, or full body.",
+      hasBg ? "Even with a background reference, show only the partial background visible behind the face or hands." : ""
+    ], "\n");
+  }
+
+  if (upperShotSet.has(shot)) {
+    return compactJoin([
+      "Prioritize the upper-body shot.",
+      `Use the ${aspect.en}, but do not widen the camera into a full-body composition to show more background.`,
+      "Do not show knees, legs, feet, floor around the feet, or the full body.",
+      "Let the lower body continue naturally outside the frame.",
+      hasBg ? "Do not force the entire background reference into the frame; include only what naturally appears behind the upper-body shot." : ""
+    ], "\n");
+  }
+
+  if (partialBodyShotSet.has(shot)) {
+    return compactJoin([
+      "Prioritize the knee-up shot.",
+      `Use the ${aspect.en}, but do not expand it into a full-body shot just to include the feet.`,
+      "Do not show the feet, floor around the feet, or shoe soles."
+    ], "\n");
+  }
+
+  if (fullBodyShotSet.has(shot)) {
+    return compactJoin([
+      "Prioritize the full-body shot.",
+      "Show the character from head to toe, but do not stretch the character vertically; use natural empty space if needed.",
+      squareAspectSet.has(aspect.value) || wideAspectSet.has(aspect.value) ? "Even in a square or horizontal aspect ratio, do not cut off the feet or make the character too small just to show more background." : ""
+    ], "\n");
+  }
+
+  return "";
+}
+
+function getOrientationLockJapanese(data) {
+  const cameraView = data.get("cameraView");
+  const direction = data.get("direction");
+  const lines = [];
+
+  if (cameraView === "サイドビュー" && direction === "正面") {
+    lines.push("サイドビューと正面向きが矛盾するため、カメラビューを優先し、体は横向き、顔だけ少しこちら向きにする。");
+  }
+  if (cameraView === "斜めサイドビュー" && direction === "正面") {
+    lines.push("斜めサイドビューでは、体は斜め横向き、顔だけ少しこちら向きにする。");
+  }
+  if ((cameraView === "背後から追う" || cameraView === "肩越し") && direction === "正面") {
+    lines.push("背後・肩越しのカメラでは正面顔を大きく見せず、背中、肩越し、横顔、または顔の一部だけにする。");
+  }
+
+  return lines.length ? compactJoin(["【向き補正】", ...lines], "\n") : "";
+}
+
+function getOrientationLockEnglish(data) {
+  const cameraView = data.get("cameraView");
+  const direction = data.get("direction");
+  const lines = [];
+
+  if (cameraView === "サイドビュー" && direction === "正面") {
+    lines.push("Because side view and front-facing direction conflict, prioritize the camera view: make the body side-facing and turn only the face slightly toward the viewer.");
+  }
+  if (cameraView === "斜めサイドビュー" && direction === "正面") {
+    lines.push("For a three-quarter side view, use a three-quarter side-facing body and turn only the face slightly toward the viewer.");
+  }
+  if ((cameraView === "背後から追う" || cameraView === "肩越し") && direction === "正面") {
+    lines.push("For a rear or over-the-shoulder camera, do not show a large front-facing face; show the back, shoulder view, profile, or only part of the face.");
+  }
+
+  return lines.length ? compactJoin(["Direction correction:", ...lines], "\n") : "";
+}
+
+function getAspectPriorityLockJapanese(data) {
+  const aspect = getAspect();
+  const shot = data.get("shot");
+  const lines = [
+    "【アスペクト比・ショット整合性】",
+    "アスペクト比は画面の形を決める指定であり、映す範囲より優先しない。",
+    `アスペクト比が${aspect.value}でも、映す範囲は${shot}を維持する。`,
+    "背景や空間を多く見せるために、指定ショットを勝手に広げない。"
+  ];
+
+  if (hasFullBackgroundReference(data) && isCloseOrUpperShot(shot) && wideAspectSet.has(aspect.value)) {
+    lines.push("横構図で背景全体参照がある場合でも、背景は画面内に自然に入る範囲だけにする。");
+  }
+  if (isCloseOrUpperShot(shot) && ultraWideAspectSet.has(aspect.value)) {
+    lines.push("超ワイド比率でも、人物を小さくして全身化せず、横の余白や背景の一部で画面を構成する。");
+  }
+  if (isFullOrLongShot(shot) && (squareAspectSet.has(aspect.value) || wideAspectSet.has(aspect.value))) {
+    lines.push("全身・遠景では、足先を切らず、人物を縮小しすぎず、余白を使って自然に収める。");
+  }
+
+  return compactJoin(lines, "\n");
+}
+
+function getAspectPriorityLockEnglish(data) {
+  const aspect = getAspect();
+  const shot = data.get("shot");
+  const lines = [
+    "Aspect-ratio and shot consistency:",
+    "The aspect ratio defines the canvas shape; it must not override the selected shot size.",
+    `Even with the ${aspect.en}, preserve the selected shot: ${getOptionEnglish("shot", shot)}.`,
+    "Do not pull the camera back or widen the shot just to show more background or space."
+  ];
+
+  if (hasFullBackgroundReference(data) && isCloseOrUpperShot(shot) && wideAspectSet.has(aspect.value)) {
+    lines.push("Even in a horizontal composition with a full-background reference, show only the background area that naturally fits within the selected shot.");
+  }
+  if (isCloseOrUpperShot(shot) && ultraWideAspectSet.has(aspect.value)) {
+    lines.push("Even in an ultra-wide aspect ratio, do not make the character small or turn the image into a full-body shot; use side space or partial background instead.");
+  }
+  if (isFullOrLongShot(shot) && (squareAspectSet.has(aspect.value) || wideAspectSet.has(aspect.value))) {
+    lines.push("For full-body or long shots, do not cut off the feet or shrink the character too much; use natural empty space if needed.");
+  }
+
+  return compactJoin(lines, "\n");
+}
+
+function getPoseAngleWarning(data) {
+  const subject = String(data.get("subject") || "");
+  const angle = data.get("angle");
+  const hasDeskContact = /(机|デスク|テーブル|カウンター|作業台|つっぷ|突っ伏|うつ伏せ|寝|倒れ|座|座っ)/.test(subject);
+  if (hasDeskContact && (angle === "見上げ" || angle === "あおり" || angle === "真上")) {
+    return true;
+  }
+  return false;
+}
+
+function getConsistencyLockJapanese(data) {
+  const generationMode = getGenerationMode(data);
+  if (generationMode === "background") return "";
+
+  return compactJoin([
+    "【矛盾回避・優先順位】",
+    "指定が矛盾する場合は、映す範囲（ショット）→表情・動作→カメラビュー→上下の角度→体の向き→顔・視線の向き→背景の見せ方、の順で優先する。",
+    "下位の指定は、上位の指定を壊さない範囲で自然に補正する。",
+    getAspectPriorityLockJapanese(data),
+    getShotLockJapanese(data),
+    getOrientationLockJapanese(data),
+    getPoseAngleWarning(data) ? "【角度注意】机・接触面・寝姿勢に関わる動作では、見上げ・あおり・真上視点で手元や顔の接触関係が崩れやすい。指定角度を使う場合も、動作と接触面の自然さを優先する。" : ""
+  ], "\n");
+}
+
+function getConsistencyLockEnglish(data) {
+  const generationMode = getGenerationMode(data);
+  if (generationMode === "background") return "";
+
+  return compactJoin([
+    "Conflict-avoidance priority:",
+    "If any instructions conflict, prioritize them in this order: shot size, expression/action, camera view, vertical camera angle, body direction, face/gaze direction, then background visibility.",
+    "Lower-priority instructions should be adjusted naturally without breaking higher-priority instructions.",
+    getAspectPriorityLockEnglish(data),
+    getShotLockEnglish(data),
+    getOrientationLockEnglish(data),
+    getPoseAngleWarning(data) ? "Angle caution: for actions involving desks, contact surfaces, lying down, or leaning onto a surface, low-angle, dramatic low-angle, or top-down views can break the face, hands, and contact relationship. Even if the selected angle is used, prioritize a natural action and contact-surface relationship." : ""
+  ], "\n");
+}
+
+function collectConsistencyItems(data) {
+  const items = [];
+  const generationMode = getGenerationMode(data);
+  const shot = data.get("shot");
+  const aspect = getAspect();
+  const direction = data.get("direction");
+  const cameraView = data.get("cameraView");
+  const screenComposition = data.get("screenComposition");
+  const aspectStatus = getAspectCompatibilityStatus(data, aspect.value);
+
+  if (generationMode !== "background") {
+    if (aspectStatus === "bad") {
+      items.push({ level: "bad", text: `${shot} × ${aspect.value}：非推奨。出力ではショットを優先します。` });
+    } else if (aspectStatus === "caution") {
+      items.push({ level: "warn", text: `${shot} × ${aspect.value}：注意。画角が広がりやすいため、ショット優先で補正します。` });
+    }
+
+    if (hasFullBackgroundReference(data) && isCloseOrUpperShot(shot)) {
+      items.push({ level: "warn", text: `${shot}＋背景全体参照：全体を入れず、画面に入る範囲だけ使います。` });
+    }
+
+    if (hasReference(data, "backgroundReference") && getBackgroundReferenceUsage(data) === "配置図として参照" && isCloseOrUpperShot(shot)) {
+      items.push({ level: "warn", text: `${shot}＋配置図参照：図面の俯瞰ではなく、選択したカメラビューに変換します。` });
+    }
+
+    if ((cameraView === "サイドビュー" || cameraView === "斜めサイドビュー") && direction === "正面") {
+      items.push({ level: "warn", text: `${cameraView}＋正面向き：体は横向き寄り、顔だけ少しこちら向きにします。` });
+    }
+
+    if ((cameraView === "背後から追う" || cameraView === "肩越し") && direction === "正面") {
+      items.push({ level: "warn", text: `${cameraView}＋正面向き：背中・肩越し・横顔寄りにします。` });
+    }
+
+    if (isCloseOrUpperShot(shot) && (screenComposition === "背景広め" || screenComposition === "奥行き構図")) {
+      items.push({ level: "warn", text: `${shot}＋${screenComposition}：カメラが引きやすいため、人物の画角を優先します。` });
+    }
+
+    if (getPoseAngleWarning(data)) {
+      items.push({ level: "warn", text: "机・接触面＋見上げ/あおり/真上：接触が崩れやすいため、動作の自然さを優先します。" });
+    }
+  } else if (aspectStatus === "caution") {
+    items.push({ level: "warn", text: `${aspect.value}：背景専用としては縦寄りです。横背景なら 16:9、4:3、3:2 が安定します。` });
+  }
+
+  return items;
+}
+
+function updateAspectDescriptionAndRestrictions() {
+  const data = new FormData(form);
+  decorateAspectOptions(data);
+  const aspect = getAspect();
+  const status = getAspectCompatibilityStatus(data, aspect.value);
+  const statusText = status === "bad" ? "非推奨：" : status === "caution" ? "注意：" : "";
+  const compatibilityText = status === "bad"
+    ? "この組み合わせは画角が崩れやすいため、出力プロンプトでショット優先に補正します。"
+    : status === "caution"
+      ? "この組み合わせは少し崩れやすいため、必要な補正文を自動で追加します。"
+      : "現在のショットと相性が良い比率です。";
+  aspectDescription.textContent = `${statusText}${aspect.description} ${compatibilityText}`;
+}
+
+function updateConsistencyUi() {
+  if (!consistencyCard || !consistencySummary || !consistencyList) return;
+  const data = new FormData(form);
+  const items = collectConsistencyItems(data);
+  const hasItems = items.length > 0;
+
+  consistencyCard.hidden = false;
+  consistencyList.innerHTML = "";
+
+  if (!hasItems) {
+    consistencySummary.textContent = "現在の組み合わせに大きな矛盾はありません。";
+    consistencySummary.className = "hint compatibility-status-ok";
+    return;
+  }
+
+  const hasBad = items.some((item) => item.level === "bad");
+  consistencySummary.textContent = hasBad
+    ? "非推奨があります。出力時はショット・向きを優先します。"
+    : "注意があります。出力時に自動補正します。";
+  consistencySummary.className = `hint ${hasBad ? "compatibility-status-bad" : "compatibility-status-warn"}`;
+
+  items.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item.text;
+    li.className = item.level === "bad" ? "compatibility-status-bad" : "compatibility-status-warn";
+    consistencyList.appendChild(li);
+  });
+}
+
 function translateFreeText(text, fallbackText) {
   const dictionary = {
     "オレンジ色のマスコットキャラクター": "an orange mascot character",
@@ -483,6 +982,114 @@ function hasReference(data, name) {
   return data.get(name) === "yes";
 }
 
+function getBackgroundReferenceUsage(data) {
+  if (!hasReference(data, "backgroundReference")) return "";
+  return data.get("backgroundReferenceUsage") || "画面内に入る範囲だけ参照";
+}
+
+function hasFullBackgroundReference(data) {
+  return hasReference(data, "backgroundReference") && getBackgroundReferenceUsage(data) === "背景全体を参照";
+}
+
+function hasLimitedBackgroundReference(data) {
+  const usage = getBackgroundReferenceUsage(data);
+  return Boolean(usage) && usage !== "背景全体を参照";
+}
+
+function shouldUseSpatialRelationLock(data) {
+  const relation = String(data.get("spatialRelation") || "").trim();
+  const usage = getBackgroundReferenceUsage(data);
+  return Boolean(relation) || ["背景全体を参照", "画面内に入る範囲だけ参照", "配置図として参照", "空間の前後関係だけ参照"].includes(usage);
+}
+
+function getBackgroundReferenceUsageNoteJapanese(data) {
+  if (!hasReference(data, "backgroundReference")) return "";
+  const usage = getBackgroundReferenceUsage(data);
+  const notes = {
+    "背景全体を参照": [
+      "【参照画像の使い方】",
+      "添付画像は、場所・背景・空間構成の参照として使う。",
+      "背景全体の構造、家具・設備・自然物・建物・小物・光・雰囲気を参考にする。",
+      "ただし、指定されたショット、カメラビュー、アスペクト比を優先する。"
+    ],
+    "画面内に入る範囲だけ参照": [
+      "【参照画像の使い方】",
+      "添付画像は、最終画面に自然に入る範囲だけ参照する。",
+      "指定ショットを優先し、背景全体を入れるためにカメラを引かない。",
+      "画面外にある参照要素は、無理に描かない。"
+    ],
+    "接触家具・作業面だけ参照": [
+      "【参照画像の使い方】",
+      "添付画像は背景全体ではなく、机・椅子・テーブル・カウンター・作業台・PC・マグカップ・本・ライトなど、被写体が接する家具・作業面・小物の配置、サイズ感、接触面の高さだけを参照する。",
+      "部屋全体や空間全体を画面に入れない。",
+      "指定ショットで見える範囲だけ使い、背景を見せるためにカメラを引かない。"
+    ],
+    "小物・道具だけ参照": [
+      "【参照画像の使い方】",
+      "添付画像は、小物・道具・持ち物の形、サイズ感、配置だけを参照する。",
+      "背景全体、部屋構造、空間構成は再現しない。",
+      "小物や道具は、被写体の手元と指定ショットに自然に入る範囲だけ描く。"
+    ],
+    "配置図として参照": [
+      "【参照画像の使い方】",
+      "添付画像は配置図として使い、家具・物・場所要素の位置関係、距離感、スケール感だけを参照する。",
+      "最終画像では、添付画像の俯瞰、アイソメ、真上視点、図面風のカメラ角度を再現しない。",
+      "配置情報を、選択したカメラビューとショットに合う自然な構図へ変換する。"
+    ],
+    "空間の前後関係だけ参照": [
+      "【参照画像の使い方】",
+      "添付画像は、空間の前後関係だけを参照する。",
+      "前景・中景・背景、被写体の手前・横・背後・奥にある要素を整理して使う。",
+      "構図、画角、カメラビューは、Scene Promptで選択した設定を優先する。"
+    ]
+  };
+  return compactJoin(notes[usage] || notes["画面内に入る範囲だけ参照"], "\n");
+}
+
+function getBackgroundReferenceUsageNoteEnglish(data) {
+  if (!hasReference(data, "backgroundReference")) return "";
+  const usage = getBackgroundReferenceUsage(data);
+  const notes = {
+    "背景全体を参照": [
+      "Reference-image usage:",
+      "Use the attached image as a reference for the location, background, and spatial structure.",
+      "Refer to the overall structure, furniture, fixtures, natural objects, buildings, props, lighting, and atmosphere.",
+      "However, prioritize the selected shot size, camera view, and aspect ratio."
+    ],
+    "画面内に入る範囲だけ参照": [
+      "Reference-image usage:",
+      "Use only the part of the reference image that naturally fits within the final frame.",
+      "Prioritize the selected shot; do not pull the camera back just to include the entire background.",
+      "Do not force reference elements that would be outside the frame into the image."
+    ],
+    "接触家具・作業面だけ参照": [
+      "Reference-image usage:",
+      "Do not use the attached image as a full-background reference. Use only contact furniture, work surfaces, and nearby props such as the desk, chair, table, counter, worktop, laptop, mug, book, and lamp for placement, scale, and contact-surface height.",
+      "Do not include the whole room or the whole environment in the frame.",
+      "Use only what fits naturally within the selected shot, and do not pull the camera back to show more background."
+    ],
+    "小物・道具だけ参照": [
+      "Reference-image usage:",
+      "Use the attached image only for props, tools, handheld objects, their shapes, sizes, and placement.",
+      "Do not recreate the full background, room structure, or spatial layout.",
+      "Draw props and tools only where they naturally fit near the subject's hands and within the selected shot."
+    ],
+    "配置図として参照": [
+      "Reference-image usage:",
+      "Use the attached image as a layout diagram: refer only to the positional relationships, distances, and scale relationships of furniture, objects, and place elements.",
+      "Do not recreate the reference image's bird's-eye, isometric, top-down, or diagram-like camera angle in the final image.",
+      "Convert the layout information into a natural composition that matches the selected camera view and shot."
+    ],
+    "空間の前後関係だけ参照": [
+      "Reference-image usage:",
+      "Use the attached image only for spatial depth order.",
+      "Organize which elements belong to the foreground, midground, background, in front of the subject, beside the subject, behind the subject, and farther back.",
+      "Prioritize the Scene Prompt settings for composition, framing, and camera view."
+    ]
+  };
+  return compactJoin(notes[usage] || notes["画面内に入る範囲だけ参照"], "\n");
+}
+
 function getReferenceNotes(data) {
   const hasSubjectReference = hasReference(data, "subjectReference");
   const hasBackgroundReference = hasReference(data, "backgroundReference");
@@ -490,11 +1097,11 @@ function getReferenceNotes(data) {
   return {
     jp: compactJoin([
       hasSubjectReference ? "被写体は添付画像を参照する。" : "",
-      hasBackgroundReference ? "場所・背景は添付画像を参照する。" : ""
+      hasBackgroundReference ? "添付画像を参照する。参照画像の具体的な使い方は、参照画像の使い方指定に従う。" : ""
     ], "\n"),
     en: compactJoin([
       hasSubjectReference ? "Use the attached subject reference image." : "",
-      hasBackgroundReference ? "Use the attached location/background reference image for the setting." : ""
+      hasBackgroundReference ? "Use the attached reference image. Follow the selected reference-image usage instructions for how to use it." : ""
     ], "\n")
   };
 }
@@ -509,11 +1116,11 @@ function getStyleLockJapanese(data) {
     "添付の被写体参照画像は、人物の体型だけでなく、画面全体の画風の最優先基準として使う。",
     "人物の顔立ち、目の描き方、髪の描き方、線の太さ、線の柔らかさ、黒の置き方、グレーのトーン量、陰影、白地の残し方を参照画像に合わせる。",
     "背景だけ写実的・細密・高密度にしない。",
-    "背景要素・環境要素・家具・床・壁・道具・周辺物も、被写体参照画像と同じ簡略化レベル、線画密度、トーン量にする。"
+    "背景要素・環境要素・家具・床・壁・道具・自然物・建物・設備・周辺物も、被写体参照画像と同じ簡略化レベル、線画密度、トーン量にする。"
   ].join("\n");
   const backgroundPriority = hasBackgroundReference
     ? [
-      "背景の場所・構造は背景参照画像を参照する。",
+      "背景参照画像の使い方は、参照画像の使い方指定に従う。",
       "ただし、画風、線のタッチ、トーン量、簡略化レベルは被写体参照画像を最優先で合わせる。"
     ].join("\n")
     : "";
@@ -531,11 +1138,11 @@ function getStyleLockEnglish(data) {
     "Use the attached subject reference not only for the character design and body proportions, but also as the top-priority style reference for the entire image.",
     "Match the face design, eye style, hair rendering, line thickness, line softness, black placement, gray tone amount, shading style, and white-space balance to the subject reference.",
     "Do not make the background realistic, highly detailed, or visually denser than the character.",
-    "Keep background elements, environmental elements, furniture, floors, walls, tools, and surrounding objects at the same simplification level, line density, and tone density as the subject reference."
+    "Keep background elements, environmental elements, furniture, floors, walls, tools, natural objects, buildings, fixtures, and surrounding objects at the same simplification level, line density, and tone density as the subject reference."
   ].join("\n");
   const backgroundPriority = hasBackgroundReference
     ? [
-      "Use the background reference for the location and spatial structure.",
+      "Use the background reference according to the selected reference-image usage instructions.",
       "However, match the overall art style, linework, tone density, and simplification level to the subject reference as the top priority."
     ].join("\n")
     : "";
@@ -789,14 +1396,18 @@ function getBackgroundOnlyPrompt(data) {
   const weatherLight = data.get("weatherLight");
   const atmosphere = data.get("atmosphere");
   const hasBackgroundReference = hasReference(data, "backgroundReference");
+  const jpReferenceUsageNote = getBackgroundReferenceUsageNoteJapanese(data);
+  const enReferenceUsageNote = getBackgroundReferenceUsageNoteEnglish(data);
   const [jpMotionComposition, enMotionComposition] = getBackgroundMotionComposition(motionBackground);
 
   const jpReference = hasBackgroundReference
     ? compactJoin([
       "添付画像は場所・背景・空間構成だけの参照として使う。",
+      "参照画像は部屋に限らず、屋外、店内、街、自然、乗り物、建物、机上などの空間構成として扱う。",
       "添付画像内に人物やキャラクターが写っていても参照せず、生成にも含めない。",
       "添付画像と同じカメラアングルや同じ構図は避ける。",
-      "同じ場所を別視点から見た背景として、家具、部屋構造、光、色味、雰囲気を参考にする。",
+      "同じ場所を別視点から見た背景として、家具、設備、自然物、建物、地面、部屋構造、空間構造、光、色味、雰囲気を参考にする。",
+      "参照要素をただ横に並べず、選択したカメラ位置から見た前景・中景・背景の奥行きに変換する。",
       "新しい視点から環境を生成し、添付画像と同じ視点は使わない。"
     ], "\n")
     : "人物なしの背景専用シーンを生成する。";
@@ -807,6 +1418,7 @@ function getBackgroundOnlyPrompt(data) {
 
   jpPrompt.value = compactJoin([
     jpReference,
+    jpReferenceUsageNote,
     "人物を含めない。キャラクターを含めない。",
     "背景、場所、空間、レイアウト、家具、構造、光、雰囲気だけを中心に描写する。",
     `${jpLocation}の背景画像。`,
@@ -822,15 +1434,17 @@ function getBackgroundOnlyPrompt(data) {
 
   const enReference = hasBackgroundReference
     ? compactJoin([
-      "Use the attached image as a reference for the location and background only.",
-      "Refer to the environment, room structure, furniture placement, lighting, colors, and atmosphere.",
+      "Use the attached image as a reference for the location, background, and spatial layout only.",
+      "The reference does not have to be a room. Treat it as a spatial-layout reference for indoor spaces, outdoor places, shops, streets, nature, vehicles, buildings, tabletops, or any other environment.",
+      "Refer to the environment, spatial structure, object placement, fixtures, furniture, natural elements, buildings, lighting, colors, and atmosphere.",
       "Do not reference or include any people or characters from the attached image.",
       "Do not include any people or characters.",
       "Generate the same environment from a different angle than the attached image.",
       "Avoid recreating the exact same camera angle or composition as the reference image.",
+      "Convert reference elements into foreground, midground, and background depth from the selected camera position instead of lining them up side by side.",
       "Generate the environment from a new viewpoint.",
       "Do not use the same viewpoint as the attached image.",
-      "Focus only on the background, environment, space, layout, furniture, lighting, and atmosphere."
+      "Focus only on the background, environment, space, layout, spatial relationships, lighting, and atmosphere."
     ], "\n")
     : compactJoin([
       "Generate a background-only scene with no people.",
@@ -843,6 +1457,7 @@ function getBackgroundOnlyPrompt(data) {
 
   enPrompt.value = compactJoin([
     enReference,
+    enReferenceUsageNote,
     `A background-only scene of ${enLocation}.`,
     enDetail,
     `New viewpoint: ${getOptionEnglish("alternateViewpoint", alternateViewpoint)}.`,
@@ -929,12 +1544,18 @@ function getPersonBackgroundPrompt(data) {
     ? `${effectiveDepth}で、漫画演出は控えめにする。`
     : `${effectiveDepth}で、${effect}を使った漫画演出を加える。`;
   const referenceNotes = getReferenceNotes(data);
+  const jpReferenceUsageNote = getBackgroundReferenceUsageNoteJapanese(data);
+  const enReferenceUsageNote = getBackgroundReferenceUsageNoteEnglish(data);
   const jpStyleLock = getStyleLockJapanese(data);
   const enStyleLock = getStyleLockEnglish(data);
   const jpBodyProportionLock = getBodyProportionLockJapanese(data);
   const enBodyProportionLock = getBodyProportionLockEnglish(data);
+  const jpSpatialRelationLock = getSpatialRelationLockJapanese(data);
+  const enSpatialRelationLock = getSpatialRelationLockEnglish(data);
   const jpDeformedComposition = getDeformedCompositionJapanese(data, true, true);
   const enDeformedComposition = getDeformedCompositionEnglish(data, true, true);
+  const jpConsistencyLock = getConsistencyLockJapanese(data);
+  const enConsistencyLock = getConsistencyLockEnglish(data);
   const jpSceneSubject = subjectPhrase ? `${subjectPhrase}シーン` : jpSubject;
   const jpSceneSentence = background
     ? `${background}を舞台に、${jpSceneSubject}を描いた漫画調のワンシーン画像。`
@@ -942,6 +1563,7 @@ function getPersonBackgroundPrompt(data) {
 
   jpPrompt.value = compactJoin([
     referenceNotes.jp,
+    jpReferenceUsageNote,
     jpStyleLock,
     jpBodyProportionLock,
     jpDeformedComposition,
@@ -950,6 +1572,8 @@ function getPersonBackgroundPrompt(data) {
     jpSceneSentence,
     jpSceneIntegration,
     jpStylizedIntegration,
+    jpSpatialRelationLock,
+    jpConsistencyLock,
     jpContactSurfaceReplacement,
     jpScaleLock,
     jpDetailedScale,
@@ -959,7 +1583,7 @@ function getPersonBackgroundPrompt(data) {
     jpMotionBackground,
     jpEnvironment,
     `アスペクト比は${aspect.value}。`,
-    `${shot}、${direction}、${angle}、被写体は${subjectPlacement}、画面全体は${screenComposition}。`,
+    getFramingSummaryJapanese(data),
     jpEffectSentence,
     "ショットの種類にかかわらず、胴体を縦に伸ばして画面に収めない。",
     "自然な日本の漫画らしい線、読みやすいシルエット、表情と空気感が伝わる仕上がり。"
@@ -991,6 +1615,7 @@ function getPersonBackgroundPrompt(data) {
 
   enPrompt.value = compactJoin([
     referenceNotes.en,
+    enReferenceUsageNote,
     enStyleLock,
     enBodyProportionLock,
     enDeformedComposition,
@@ -999,6 +1624,8 @@ function getPersonBackgroundPrompt(data) {
     `A manga-style single-scene image of ${enSubject}${enLocation ? `, ${enLocation}` : ""}.`,
     enSceneIntegration,
     enStylizedIntegration,
+    enSpatialRelationLock,
+    enConsistencyLock,
     enContactSurfaceReplacement,
     enScaleAdaptation,
     enDetailedScale,
@@ -1008,7 +1635,7 @@ function getPersonBackgroundPrompt(data) {
     enMotionBackground,
     enEnvironment,
     `Use a ${aspect.en}.`,
-    `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, subject placement: ${getOptionEnglish("subjectPlacement", subjectPlacement)}, overall composition: ${getOptionEnglish("screenComposition", screenComposition)}.`,
+    getFramingSummaryEnglish(data),
     `${getOptionEnglish("depth", effectiveDepth)}, ${enEffect}.`,
     "Regardless of shot type, do not stretch the torso vertically to fill the frame.",
     "Clean Japanese manga linework, readable silhouette, expressive mood, polished image-generation prompt style."
@@ -1043,6 +1670,7 @@ function getPersonOnlyPrompt(data) {
   const jpStyleLock = getStyleLockJapanese(data);
   const jpBodyProportionLock = getBodyProportionLockJapanese(data, false);
   const jpDeformedComposition = getDeformedCompositionJapanese(data, false, false);
+  const jpConsistencyLock = getConsistencyLockJapanese(data);
   const jpCameraView = getOptionalJapanese(cameraView) ? `カメラビューは${cameraView}。` : "";
   const [jpMotionBackground, enMotionBackground] = getPersonMotionNote(motionBackground);
   const jpEnvironment = getBackgroundEnvironmentJapanese(timeOfDay, weatherLight, atmosphere);
@@ -1055,6 +1683,7 @@ function getPersonOnlyPrompt(data) {
     jpStyleLock,
     jpBodyProportionLock,
     jpDeformedComposition,
+    jpConsistencyLock,
     "人物のみを生成する。",
     "背景、場所、部屋、家具、風景を描かない。",
     "背景は白地または単色のシンプルな背景にする。",
@@ -1066,7 +1695,7 @@ function getPersonOnlyPrompt(data) {
     jpEnvironment,
     `${jpSubject}を描いた人物のみの漫画調画像。`,
     `アスペクト比は${aspect.value}。`,
-    `${shot}、${direction}、${angle}、被写体は${subjectPlacement}、画面全体は${screenComposition}。`,
+    getFramingSummaryJapanese(data),
     jpEffectSentence,
     "自然な日本の漫画らしい線、読みやすいシルエット、表情と動作が伝わる仕上がり。"
   ], "\n");
@@ -1078,6 +1707,7 @@ function getPersonOnlyPrompt(data) {
   const enStyleLock = getStyleLockEnglish(data);
   const enBodyProportionLock = getBodyProportionLockEnglish(data, false);
   const enDeformedComposition = getDeformedCompositionEnglish(data, false, false);
+  const enConsistencyLock = getConsistencyLockEnglish(data);
   const enAction = subjectPhrase
     ? "Most important action and expression: depict the specified subject/action as the main focus of the image."
     : "";
@@ -1090,6 +1720,7 @@ function getPersonOnlyPrompt(data) {
     enStyleLock,
     enBodyProportionLock,
     enDeformedComposition,
+    enConsistencyLock,
     "Generate a character-only image.",
     "No background scenery, no room, no furniture, no environment.",
     "Use a plain white or simple solid-color background.",
@@ -1101,14 +1732,15 @@ function getPersonOnlyPrompt(data) {
     enEnvironment,
     `A manga-style character-only image of ${enSubject}.`,
     `Use a ${aspect.en}.`,
-    `${getOptionEnglish("shot", shot)}, ${getOptionEnglish("direction", direction)}, ${getOptionEnglish("angle", angle)}, subject placement: ${getOptionEnglish("subjectPlacement", subjectPlacement)}, overall composition: ${getOptionEnglish("screenComposition", screenComposition)}.`,
+    getFramingSummaryEnglish(data),
     `${getPersonDepthEnglish(depth)}, ${enEffect}.`,
     "Clean Japanese manga linework, readable silhouette, expressive pose and emotion, polished image-generation prompt style."
   ], "\n");
 }
 
 function updateAspectDescription() {
-  aspectDescription.textContent = getAspect().description;
+  updateAspectDescriptionAndRestrictions();
+  updateConsistencyUi();
 }
 
 function updateModeUi() {
@@ -1148,11 +1780,34 @@ function updateModeUi() {
     setFieldDisabled(effectField, isBackgroundMode);
   }
 
+  const hasBackgroundReference = data.get("backgroundReference") === "yes";
+  if (backgroundReferenceUsageWrap) {
+    backgroundReferenceUsageWrap.hidden = !hasBackgroundReference || isPersonMode;
+    backgroundReferenceUsageWrap.classList.toggle("is-mode-disabled", !hasBackgroundReference || isPersonMode);
+    backgroundReferenceUsageWrap.setAttribute("aria-disabled", String(!hasBackgroundReference || isPersonMode));
+    backgroundReferenceUsageWrap.querySelectorAll("input, select, textarea").forEach((control) => {
+      control.disabled = !hasBackgroundReference || isPersonMode;
+    });
+  }
+
+  if (backgroundReferenceUsageHint && backgroundReferenceUsageSelect) {
+    const usage = backgroundReferenceUsageSelect.value;
+    const usageHints = {
+      "背景全体を参照": "背景全体の構造や雰囲気を使います。上半身などでは注意が出ます。",
+      "画面内に入る範囲だけ参照": "指定ショットに入る範囲だけ使います。背景を入れるためにカメラを引きません。",
+      "接触家具・作業面だけ参照": "机・椅子・PC・小物など、人物が接するものの位置とサイズだけ使います。",
+      "小物・道具だけ参照": "道具や持ち物だけを使い、部屋や空間全体は再現しません。",
+      "配置図として参照": "アイソメ図や平面図の配置だけを使い、最終画像は選択したカメラビューに変換します。",
+      "空間の前後関係だけ参照": "前景・中景・背景の順番だけを使います。"
+    };
+    backgroundReferenceUsageHint.textContent = usageHints[usage] || "背景参照を有にしたとき、添付画像をどの範囲で使うかを選びます。";
+  }
+
   backgroundReferenceHint.textContent = isBackgroundMode
-    ? "有の場合、添付画像の人物は参照せず、場所・背景・空間構成だけを参考にして別アングルの背景を作ります。"
+    ? "有の場合、添付画像の人物は参照せず、参照画像の使い方に従って背景を作ります。部屋以外の場所にも使えます。"
     : isPersonBackgroundMode
-      ? "有の場合、添付画像の場所・背景をプロンプトに反映します。"
-    : "有の場合、添付画像の場所・背景をプロンプトに反映します。";
+      ? "有の場合、下の『参照画像の使い方』で、背景全体・接触家具・配置図などの用途を選べます。"
+    : "有の場合、添付画像の場所・背景・空間構成をプロンプトに反映します。部屋以外の場所にも使えます。";
 }
 
 async function copyText(targetId) {
@@ -1184,6 +1839,7 @@ fillSelect("depth", optionGroups.depth, "自然な奥行き");
 fillSelect("motionBackground", optionGroups.motionBackground, "指定なし");
 fillSelect("effect", optionGroups.effect, "なし");
 fillSelect("alternateViewpoint", optionGroups.alternateViewpoint, "斜め前");
+fillSelect("backgroundReferenceUsage", optionGroups.backgroundReferenceUsage, "画面内に入る範囲だけ参照");
 fillSelect("timeOfDay", optionGroups.timeOfDay, "なし");
 fillSelect("weatherLight", optionGroups.weatherLight, "なし");
 fillSelect("atmosphere", optionGroups.atmosphere, "なし");
@@ -1219,7 +1875,11 @@ document.querySelector("#resetButton").addEventListener("click", () => {
   document.querySelector("#subject").value = "";
   const backgroundDetailInput = document.querySelector("#backgroundDetail");
   if (backgroundDetailInput) backgroundDetailInput.value = "";
+  const spatialRelationInput = document.querySelector("#spatialRelation");
+  if (spatialRelationInput) spatialRelationInput.value = "";
   aspectSelect.value = "4:3 標準横構図";
+  const backgroundReferenceUsageInput = document.querySelector("#backgroundReferenceUsage");
+  if (backgroundReferenceUsageInput) backgroundReferenceUsageInput.value = "画面内に入る範囲だけ参照";
   resetPersonBackgroundScaleDefaults();
   updateAspectDescription();
   updateModeUi();
