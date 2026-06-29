@@ -8,9 +8,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Nunito:wght@300;400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2026.06.26-reference15">
+  <link rel="stylesheet" href="style.css?v=2026-06-29-07">
 
   <style>
+
+    .mode-control {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
 
     .reference-usage {
       display: grid;
@@ -26,6 +30,56 @@
     .reference-usage select {
       width: 100%;
     }
+
+    .work-seat-lock {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.85rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid rgba(58, 42, 26, 0.12);
+    }
+    .work-seat-lock[hidden] {
+      display: none;
+    }
+    .work-seat-lock .sub-label {
+      margin: 0;
+    }
+    .work-seat-lock select {
+      width: 100%;
+    }
+
+    .backdrop-anchor {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.85rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid rgba(58, 42, 26, 0.12);
+    }
+    .backdrop-anchor[hidden] {
+      display: none;
+    }
+    .backdrop-anchor .sub-label {
+      margin: 0;
+    }
+    .backdrop-anchor select {
+      width: 100%;
+    }
+    .side-view-direction {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.85rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid rgba(58, 42, 26, 0.12);
+    }
+    .side-view-direction[hidden] {
+      display: none;
+    }
+    .side-view-direction .sub-label {
+      margin: 0;
+    }
+    .side-view-direction select {
+      width: 100%;
+    }
     .shot-card .hint {
       grid-column: 1 / -1;
       width: 100%;
@@ -34,6 +88,7 @@
       white-space: normal;
     }
     .consistency-card {
+      grid-column: 1 / -1;
       display: block;
       border: 1px solid rgba(255, 127, 0, 0.35);
       background: rgba(255, 247, 236, 0.85);
@@ -84,10 +139,10 @@
       <div>
         <p class="eyebrow">ORANGEMANIA TOOL</p>
         <h1>Scene Prompt</h1>
-        <p class="version-label">2026.06.26-reference15</p>
+        <p class="version-label">2026-06-29-07</p>
       </div>
       <p class="lead">
-        人物＋背景、人物のみ、背景のみを切り替えながら、カメラワーク、構図、空間の前後関係を選び、ショット・向き・アスペクト比の矛盾を確認しながら画像生成プロンプトを作れます。
+        人物＋背景、自分の部屋、人物のみ、背景のみを切り替えながら、カメラワーク、構図、空間の前後関係を選び、ショット・向き・アスペクト比の矛盾を確認しながら画像生成プロンプトを作れます。
       </p>
     </header>
 
@@ -107,6 +162,10 @@
                 <span>人物＋背景</span>
               </label>
               <label>
+                <input type="radio" name="generationMode" value="myRoom">
+                <span>自分の部屋</span>
+              </label>
+              <label>
                 <input type="radio" name="generationMode" value="person">
                 <span>人物</span>
               </label>
@@ -115,6 +174,7 @@
                 <span>背景</span>
               </label>
             </div>
+            <p class="hint" id="myRoomHint" style="display:none;margin-top:8px;color:var(--accent-deep);font-size:13px;">主人公の向きを選ぶと、向きに応じた背景指定が自動で追加されます。平面図・アイソメ図を添付して使う場合は「背景参照：有」にして使い方を選んでください。</p>
           </div>
 
           <div class="field-card subject-card" data-person-field>
@@ -156,6 +216,21 @@
               <label class="sub-label" for="backgroundReferenceUsage">参照画像の使い方</label>
               <select id="backgroundReferenceUsage" name="backgroundReferenceUsage"></select>
               <p class="hint" id="backgroundReferenceUsageHint">背景参照を有にしたとき、添付画像をどの範囲で使うかを選びます。</p>
+            </div>
+            <div class="work-seat-lock" id="workSeatLockWrap" hidden>
+              <label class="sub-label" for="workSeatLock">配置補助ルール</label>
+              <select id="workSeatLock" name="workSeatLock"></select>
+              <p class="hint" id="workSeatLockHint">平面図・配置図を使うときだけ、固定したい作業席ルールを選びます。</p>
+            </div>
+            <div class="side-view-direction" id="sideViewDirectionWrap" hidden>
+              <label class="sub-label" for="sideViewDirection">サイドビュー方向</label>
+              <select id="sideViewDirection" name="sideViewDirection"></select>
+              <p class="hint" id="sideViewDirectionHint">サイドビュー時に、横顔の左右や背後に見える壁・家具を固定したいときに選びます。</p>
+            </div>
+            <div class="backdrop-anchor" id="backdropAnchorWrap" hidden>
+              <label class="sub-label" for="backdropAnchor">背景に何を見せるか</label>
+              <select id="backdropAnchor" name="backdropAnchor"></select>
+              <p class="hint" id="backdropAnchorHint">最終的な絵に何を見せるかを選びます。</p>
             </div>
             <textarea id="background" name="background" class="prompt-input" rows="2" placeholder="例：明るいカフェ店内、木製の机、大きな窓、観葉植物、本棚、生活感がある／屋外、店内、街、自然、乗り物など"></textarea>
           </div>
@@ -320,6 +395,6 @@
     </div>
   </main>
 
-  <script src="script.js?v=2026.06.26-reference15"></script>
+  <script src="script.js?v=2026-06-29-07"></script>
 </body>
 </html>

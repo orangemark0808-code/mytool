@@ -652,3 +652,84 @@ textarea:focus {
     width: 100%;
   }
 }
+
+
+/* backdrop19: consistency card full width, side-view direction, and backdrop anchor controls */
+.consistency-card {
+  grid-column: 1 / -1;
+}
+
+.side-view-direction {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(58, 42, 26, 0.12);
+}
+
+.side-view-direction[hidden] {
+  display: none;
+}
+
+.side-view-direction .sub-label {
+  margin: 0;
+}
+
+.side-view-direction select {
+  width: 100%;
+}
+
+.backdrop-anchor {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(58, 42, 26, 0.12);
+}
+
+.backdrop-anchor[hidden] {
+  display: none;
+}
+
+.backdrop-anchor .sub-label {
+  margin: 0;
+}
+
+.backdrop-anchor select {
+  width: 100%;
+}
+
+
+/* rightwall22: gray out backdrop anchor while side-view direction controls the background */
+.backdrop-anchor.is-mode-disabled,
+.side-view-direction.is-mode-disabled {
+  border-color: #b8b0a4;
+  border-style: dashed;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(58, 42, 26, 0.035) 0,
+      rgba(58, 42, 26, 0.035) 8px,
+      transparent 8px,
+      transparent 16px
+    ),
+    #ebe7df;
+  color: #6f665d;
+}
+
+.backdrop-anchor.is-mode-disabled label,
+.backdrop-anchor.is-mode-disabled .hint,
+.backdrop-anchor.is-mode-disabled .sub-label,
+.side-view-direction.is-mode-disabled label,
+.side-view-direction.is-mode-disabled .hint,
+.side-view-direction.is-mode-disabled .sub-label {
+  color: #6f665d;
+}
+
+.backdrop-anchor.is-mode-disabled select,
+.side-view-direction.is-mode-disabled select {
+  border-color: #b8b0a4;
+  background: #ded9cf;
+  color: #6f665d;
+  cursor: not-allowed;
+}
