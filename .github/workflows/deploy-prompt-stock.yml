@@ -59,6 +59,7 @@ jobs:
           mkdir -p dist/PROMPT_STOCK
           mkdir -p dist/Scene_Prompt
           mkdir -p dist/horoscope
+          mkdir -p dist/netakiroku
           cp "index.html" "dist/index.html"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
           cp "PROMPT_STOCK/README.md" "dist/PROMPT_STOCK/README.md"
@@ -68,6 +69,10 @@ jobs:
           cp "Scene_Prompt/favicon.svg" "dist/Scene_Prompt/favicon.svg"
           cp "horoscope/index.html" "dist/horoscope/index.html"
           cp "horoscope/favicon.svg" "dist/horoscope/favicon.svg"
+          cp "netakiroku/index.html" "dist/netakiroku/index.html"
+          cp "netakiroku/app.js" "dist/netakiroku/app.js"
+          cp "netakiroku/styles.css" "dist/netakiroku/styles.css"
+          cp "netakiroku/README.md" "dist/netakiroku/README.md"
           cat > "dist/firebase-config.js" <<'EOF'
           window.PROMPT_STOCK_FIREBASE_CONFIG = {
             apiKey: "__FIREBASE_API_KEY__",
@@ -89,6 +94,7 @@ jobs:
             -e "s|__FIREBASE_MEASUREMENT_ID__|$FIREBASE_MEASUREMENT_ID|g" \
             "dist/firebase-config.js"
           cp "dist/firebase-config.js" "dist/PROMPT_STOCK/firebase-config.js"
+          sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.NETAKIROKU_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/netakiroku/firebase-config.js"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
