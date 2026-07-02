@@ -65,10 +65,21 @@ button:disabled { cursor: not-allowed; opacity: 0.58; }
 }
 
 .brand h1 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   margin: 0;
   font-size: clamp(22px, 3vw, 30px);
   font-weight: 650;
   letter-spacing: 0;
+}
+
+.app-version {
+  color: var(--muted);
+  font-size: 0.5em;
+  font-weight: 650;
+  white-space: nowrap;
 }
 
 .brand p {
@@ -489,26 +500,59 @@ input:focus, textarea:focus, select:focus {
 }
 
 @media (max-width: 640px) {
+  body {
+    overflow-x: hidden;
+  }
+
   .app-shell {
-    width: min(100% - 18px, 1180px);
-    padding-top: 10px;
+    width: min(100% - 20px, 1180px);
+    padding-top: 8px;
   }
   .editor-head, .rows-head {
     align-items: stretch;
     flex-direction: column;
   }
   .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px 0 14px;
+  }
+  .brand {
+    width: 100%;
     align-items: center;
   }
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+  .brand h1 {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+  .brand p {
+    display: none;
+  }
   .account {
-    justify-content: flex-end;
-    flex-wrap: nowrap;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .account .btn {
     padding-inline: 10px;
+    min-height: 38px;
+    flex: 0 1 auto;
   }
   .account .btn span {
     white-space: nowrap;
+  }
+  .account .icon-btn {
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+    flex: 0 0 38px;
   }
   .toolbar, .basic-grid, .row-editor, .add-option, .option-row {
     grid-template-columns: 1fr;
@@ -521,5 +565,13 @@ input:focus, textarea:focus, select:focus {
   }
   .editor-actions .btn, .card-actions .btn, .toolbar .btn, .file-btn {
     flex: 1 1 auto;
+  }
+  .card-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  .status-select {
+    max-width: 132px;
+    min-width: 0;
   }
 }
