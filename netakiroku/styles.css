@@ -352,8 +352,25 @@ input:focus, textarea:focus, select:focus {
   display: grid;
   gap: 5px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 650;
+}
+
+.basic-grid input,
+.basic-grid select,
+.row-field input,
+.row-field select,
+.row-field textarea {
+  font-size: 16px;
+  line-height: 1.45;
+  min-height: 42px;
+  padding-block: 10px;
+}
+
+.basic-grid input::placeholder,
+.row-field input::placeholder,
+.row-field textarea::placeholder {
+  font-size: 16px;
 }
 
 .basic-grid .wide {
