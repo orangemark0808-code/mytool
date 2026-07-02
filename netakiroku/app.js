@@ -33,7 +33,7 @@ const FIREBASE_CONFIG = window.NETAKIROKU_FIREBASE_CONFIG || window.PROMPT_STOCK
 
 const DEFAULT_SETTINGS = {
   categories: ["AI制作", "日常", "仕事", "制作裏話", "メモ"],
-  statuses: ["未作成", "作成中", "漫画作成済み", "ボツ"],
+  statuses: ["ネタ作成中", "漫画未作成", "漫画作成済み", "ボツ"],
   tagSuggestions: [],
   actorSuggestions: ["主人公", "ナレーション", "PC通知"],
 };
@@ -160,11 +160,12 @@ function normalizeRow(row = {}) {
 
 function normalizeNeta(id, data = {}) {
   const rows = Array.isArray(data.rows) ? data.rows.map(normalizeRow) : [normalizeRow({ panel: "1" })];
+  const status = normalizeStatusValue(data.status);
   return {
     id,
     title: String(data.title || "無題のネタ").trim(),
     pageCount: Math.max(1, Number(data.pageCount || 1)),
-    status: settings.statuses.includes(data.status) ? data.status : settings.statuses[0],
+    status: settings.statuses.includes(status) ? status : settings.statuses[0],
     category: String(data.category || settings.categories[0] || "").trim(),
     tags: Array.isArray(data.tags) ? data.tags.map(String).filter(Boolean) : splitTags(data.tags),
     memo: String(data.memo || ""),
@@ -182,10 +183,25 @@ function splitTags(value) {
 function mergeSettings(remote = {}) {
   settings = {
     categories: normalizeOptionList(remote.categories, DEFAULT_SETTINGS.categories),
-    statuses: normalizeOptionList(remote.statuses, DEFAULT_SETTINGS.statuses),
+    statuses: normalizeStatusList(remote.statuses),
     tagSuggestions: normalizeOptionList(remote.tagSuggestions, DEFAULT_SETTINGS.tagSuggestions),
     actorSuggestions: normalizeOptionList(remote.actorSuggestions, DEFAULT_SETTINGS.actorSuggestions),
   };
+}
+
+function normalizeStatusValue(value) {
+  const status = String(value || "").trim();
+  if (status === "未作成") return "漫画未作成";
+  if (status === "作成中") return "ネタ作成中";
+  if (status === "完成" || status === "作成済み") return "漫画作成済み";
+  return DEFAULT_SETTINGS.statuses.includes(status) ? status : DEFAULT_SETTINGS.statuses[0];
+}
+
+function normalizeStatusList(value) {
+  const normalized = normalizeOptionList(value, DEFAULT_SETTINGS.statuses).map(normalizeStatusValue);
+  const allowed = new Set(normalized);
+  const statuses = DEFAULT_SETTINGS.statuses.filter((status) => allowed.has(status) || !Array.isArray(value));
+  return statuses.length ? statuses : [...DEFAULT_SETTINGS.statuses];
 }
 
 function normalizeOptionList(value, fallback) {
@@ -214,6 +230,7 @@ async function loadRemote() {
 }
 
 async function saveSettings() {
+  settings.statuses = [...DEFAULT_SETTINGS.statuses];
   render();
   await setDoc(getCollections().settings, settings, { merge: true });
 }
@@ -233,9 +250,11 @@ function render() {
 }
 
 function renderFilters() {
-  fillSelect(elements.statusFilter, ["すべてのステータス", ...settings.statuses], elements.statusFilter.value);
+  settings.statuses = [...DEFAULT_SETTINGS.statuses];
+  const currentStatusFilter = elements.statusFilter.value ? normalizeStatusValue(elements.statusFilter.value) : "";
+  fillSelect(elements.statusFilter, ["すべてのステータス", ...settings.statuses], currentStatusFilter);
   fillSelect(elements.categoryFilter, ["すべてのカテゴリ", ...settings.categories], elements.categoryFilter.value);
-  fillSelect(elements.statusInput, settings.statuses, elements.statusInput.value || settings.statuses[0]);
+  fillSelect(elements.statusInput, settings.statuses, normalizeStatusValue(elements.statusInput.value || settings.statuses[0]));
   fillSelect(elements.categoryInput, settings.categories, elements.categoryInput.value || settings.categories[0]);
 }
 
@@ -254,9 +273,11 @@ function getFirstPanel(neta) {
 }
 
 function statusClass(status) {
+  if (status === "ネタ作成中") return "status-drafting";
+  if (status === "漫画未作成") return "status-todo";
   if (status === "漫画作成済み") return "status-done";
   if (status === "ボツ") return "status-dead";
-  return "";
+  return "status-drafting";
 }
 
 function renderList() {
@@ -355,7 +376,7 @@ function collectDraft() {
   return {
     title: elements.titleInput.value.trim(),
     pageCount: Math.max(1, Number(elements.pageCountInput.value || 1)),
-    status: elements.statusInput.value || settings.statuses[0],
+    status: normalizeStatusValue(elements.statusInput.value || settings.statuses[0]),
     category: elements.categoryInput.value || "",
     tags: splitTags(elements.tagsInput.value),
     memo: elements.memoInput.value.trim(),
@@ -456,6 +477,7 @@ async function removeNeta(id) {
 }
 
 async function updateNetaStatus(id, status) {
+  status = normalizeStatusValue(status);
   const target = netas.find((item) => item.id === id);
   if (!target || target.status === status) return;
   const previousStatus = target.status;
@@ -659,7 +681,7 @@ function wireEvents() {
     if (button.dataset.optionAction === "delete") settings[kind].splice(index, 1);
     if (button.dataset.optionAction === "up" && index > 0) [settings[kind][index - 1], settings[kind][index]] = [settings[kind][index], settings[kind][index - 1]];
     if (button.dataset.optionAction === "down" && index < settings[kind].length - 1) [settings[kind][index + 1], settings[kind][index]] = [settings[kind][index], settings[kind][index + 1]];
-    if (!settings.statuses.length) settings.statuses = [...DEFAULT_SETTINGS.statuses];
+    settings.statuses = [...DEFAULT_SETTINGS.statuses];
     saveSettings();
   });
 }

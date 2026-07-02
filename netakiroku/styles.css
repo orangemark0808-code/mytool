@@ -243,9 +243,9 @@ input:focus, textarea:focus, select:focus {
 }
 
 .status-badge {
-  border-color: #ffd9ad;
-  color: #8a4400;
-  background: var(--orange-soft);
+  border-color: #bbddc2;
+  color: #2f6b3a;
+  background: #eaf7ec;
 }
 
 .status-select {
@@ -257,27 +257,31 @@ input:focus, textarea:focus, select:focus {
 }
 
 .status-select:hover {
-  background: #fff7ec;
+  filter: brightness(0.98);
+}
+
+.status-drafting {
+  border-color: #bbddc2;
+  color: #2f6b3a;
+  background: #eaf7ec;
+}
+
+.status-todo {
+  border-color: #f3b9b9;
+  color: #9b2c2c;
+  background: #fdecec;
 }
 
 .status-done {
-  border-color: #bfdcc9;
-  color: var(--ok);
-  background: #f0faf3;
-}
-
-.status-done:hover {
-  background: #e8f7ed;
+  border-color: #d8d8d8;
+  color: #555555;
+  background: #f1f1f1;
 }
 
 .status-dead {
-  border-color: #e0c7c1;
-  color: var(--danger);
-  background: #fff4f1;
-}
-
-.status-dead:hover {
-  background: #ffebe6;
+  border-color: #c8c8c8;
+  color: #444444;
+  background: #e4e4e4;
 }
 
 .first-panel {
