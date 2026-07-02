@@ -332,7 +332,7 @@ function renderList() {
       <div class="card-actions">
         <button class="btn ghost" type="button" data-action="edit" data-id="${neta.id}"><i data-lucide="pencil"></i><span>編集</span></button>
         <button class="btn ghost" type="button" data-action="download" data-id="${neta.id}"><i data-lucide="download"></i><span>CSV</span></button>
-        <button class="btn ghost" type="button" data-action="copy" data-id="${neta.id}"><i data-lucide="copy"></i><span>コピー</span></button>
+        <button class="btn ghost" type="button" data-action="copy" data-id="${neta.id}"><i data-lucide="copy"></i><span>CSV</span></button>
         <button class="btn ghost" type="button" data-action="duplicate" data-id="${neta.id}"><i data-lucide="copy-plus"></i><span>複製</span></button>
         <button class="btn ghost danger" type="button" data-action="delete" data-id="${neta.id}"><i data-lucide="trash-2"></i><span>削除</span></button>
       </div>
