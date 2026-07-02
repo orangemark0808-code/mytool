@@ -256,6 +256,7 @@ function renderFilters() {
   fillSelect(elements.categoryFilter, ["すべてのカテゴリ", ...settings.categories], elements.categoryFilter.value);
   fillSelect(elements.statusInput, settings.statuses, normalizeStatusValue(elements.statusInput.value || settings.statuses[0]));
   fillSelect(elements.categoryInput, settings.categories, elements.categoryInput.value || settings.categories[0]);
+  applyStatusSelectClass(elements.statusInput);
 }
 
 function fillSelect(select, options, current) {
@@ -278,6 +279,12 @@ function statusClass(status) {
   if (status === "漫画作成済み") return "status-done";
   if (status === "ボツ") return "status-dead";
   return "status-drafting";
+}
+
+function applyStatusSelectClass(select) {
+  if (!select) return;
+  select.classList.remove("status-drafting", "status-todo", "status-done", "status-dead");
+  select.classList.add("status-control", statusClass(normalizeStatusValue(select.value)));
 }
 
 function renderList() {
@@ -345,6 +352,7 @@ function openEditor(id = null) {
   elements.titleInput.value = neta?.title === "無題のネタ" ? "" : neta?.title || "";
   elements.pageCountInput.value = neta?.pageCount || 1;
   elements.statusInput.value = neta?.status || settings.statuses[0];
+  applyStatusSelectClass(elements.statusInput);
   elements.categoryInput.value = neta?.category || settings.categories[0] || "";
   elements.tagsInput.value = (neta?.tags || []).join(", ");
   elements.memoInput.value = neta?.memo || "";
@@ -618,6 +626,7 @@ function wireEvents() {
     renderRows();
   });
   [elements.searchInput, elements.statusFilter, elements.categoryFilter, elements.sortSelect].forEach((item) => item.addEventListener("input", render));
+  elements.statusInput.addEventListener("change", () => applyStatusSelectClass(elements.statusInput));
   elements.csvImportInput.addEventListener("change", (event) => {
     importCsv(event.target.files[0]).finally(() => { event.target.value = ""; });
   });
