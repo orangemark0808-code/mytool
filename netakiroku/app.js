@@ -594,8 +594,7 @@ function buildCsv(neta) {
   const rows = flattenPages(normalizePages(neta));
   return rows.map((row, index) => [
     index === 0 ? neta.title : "",
-    index === 0 ? neta.pageCount : "",
-    row.pageNumber,
+    index === 0 || row.pageNumber !== rows[index - 1]?.pageNumber ? row.pageNumber : "",
     row.panel,
     row.actor,
     row.type,
@@ -723,21 +722,24 @@ async function importCsv(file) {
   const csvRows = parseCsv(text.replace(/^\ufeff/, ""));
   let title = "";
   let pageCount = 1;
+  let currentPageNumber = 1;
   const bodyRows = [];
   csvRows.forEach((cells, index) => {
     if (rowLooksLikeMemo(cells, index)) return;
     const [a = "", b = "", c = "", d = "", e = "", f = "", g = "", h = ""] = cells;
     const hasPageColumn = cells.length >= 8;
-    const pageNumber = hasPageColumn ? c : "1";
+    const pageCell = hasPageColumn ? c : b;
+    if (pageCell.trim()) currentPageNumber = Math.max(1, Number(pageCell.trim()) || currentPageNumber);
+    const pageNumber = currentPageNumber;
     const panel = hasPageColumn ? d : c;
     const actor = hasPageColumn ? e : d;
     const type = hasPageColumn ? f : e;
     const detail = hasPageColumn ? g : f;
     const reference = hasPageColumn ? h : g;
     if (a.trim()) title = a.trim();
-    if (b.trim()) pageCount = Math.max(1, Number(b.trim()) || pageCount);
+    pageCount = Math.max(pageCount, pageNumber);
     if (!panel.trim() && !actor.trim() && !type.trim() && !detail.trim() && !reference.trim()) return;
-    bodyRows.push({ ...normalizeRow({ panel, actor, type, detail, reference }), pageNumber: Math.max(1, Number(pageNumber) || 1) });
+    bodyRows.push({ ...normalizeRow({ panel, actor, type, detail, reference }), pageNumber });
   });
   const pages = normalizePages({ rows: bodyRows.length ? bodyRows : [normalizeRow({ panel: "1" })] });
   const data = {
