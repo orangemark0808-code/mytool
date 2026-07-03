@@ -40,12 +40,12 @@ const DEFAULT_SETTINGS = {
 
 const TYPE_OPTIONS = [
   { label: "空白", value: "" },
+  { label: "(状)", value: "(状)" },
+  { label: "(PC)", value: "(PC)" },
   { label: "(心)", value: "(心)" },
+  { label: "(M)", value: "(M)" },
   { label: "(叫)", value: "(叫)" },
   { label: "(回)", value: "(回)" },
-  { label: "(状)", value: "(状)" },
-  { label: "(M)", value: "(M)" },
-  { label: "(PC)", value: "(PC)" },
 ];
 
 const elements = {
