@@ -76,6 +76,10 @@ const elements = {
   memoInput: document.getElementById("memoInput"),
   rowsEditor: document.getElementById("rowsEditor"),
   addRowButton: document.getElementById("addRowButton"),
+  addPageButton: document.getElementById("addPageButton"),
+  mobileAddRowButton: document.getElementById("mobileAddRowButton"),
+  mobileAddPageButton: document.getElementById("mobileAddPageButton"),
+  draftStatus: document.getElementById("draftStatus"),
   saveButton: document.getElementById("saveButton"),
   editorCopyButton: document.getElementById("editorCopyButton"),
   editorDownloadButton: document.getElementById("editorDownloadButton"),
@@ -90,6 +94,11 @@ let netas = [];
 let settings = structuredClone(DEFAULT_SETTINGS);
 let editingId = null;
 let draftRows = [];
+let draftPages = [];
+let activePageIndex = 0;
+let draftSaveTimer = null;
+let draftDirty = false;
+let restoringDraft = false;
 
 function isConfigured() {
   return Boolean(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId && FIREBASE_CONFIG.appId);
@@ -158,18 +167,51 @@ function normalizeRow(row = {}) {
   };
 }
 
+function normalizePage(page = {}, index = 0) {
+  const rows = Array.isArray(page.rows) ? page.rows.map(normalizeRow) : [];
+  return {
+    pageNumber: Math.max(1, Number(page.pageNumber || page.number || index + 1)),
+    rows: rows.length ? rows : [normalizeRow({ panel: "1" })],
+  };
+}
+
+function normalizePages(data = {}) {
+  if (Array.isArray(data.pages) && data.pages.length) {
+    return data.pages.map(normalizePage).map((page, index) => ({ ...page, pageNumber: index + 1 }));
+  }
+  const rows = Array.isArray(data.rows) && data.rows.length ? data.rows : [normalizeRow({ panel: "1" })];
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const pageNumber = Math.max(1, Number(row.pageNumber || row.page || 1));
+    if (!grouped.has(pageNumber)) grouped.set(pageNumber, []);
+    grouped.get(pageNumber).push(normalizeRow(row));
+  });
+  return [...grouped.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([, pageRows], index) => ({ pageNumber: index + 1, rows: pageRows.length ? pageRows : [normalizeRow({ panel: "1" })] }));
+}
+
+function flattenPages(pages) {
+  return pages.flatMap((page, pageIndex) => page.rows.map((row) => ({
+    ...normalizeRow(row),
+    pageNumber: pageIndex + 1,
+  })));
+}
+
 function normalizeNeta(id, data = {}) {
-  const rows = Array.isArray(data.rows) ? data.rows.map(normalizeRow) : [normalizeRow({ panel: "1" })];
+  const pages = normalizePages(data);
+  const rows = flattenPages(pages);
   const status = normalizeStatusValue(data.status);
   return {
     id,
     title: String(data.title || "無題のネタ").trim(),
-    pageCount: Math.max(1, Number(data.pageCount || 1)),
+    pageCount: Math.max(1, Number(data.pageCount || pages.length || 1), pages.length),
     status: settings.statuses.includes(status) ? status : settings.statuses[0],
     category: String(data.category || settings.categories[0] || "").trim(),
     tags: Array.isArray(data.tags) ? data.tags.map(String).filter(Boolean) : splitTags(data.tags),
     memo: String(data.memo || ""),
-    rows: rows.length ? rows : [normalizeRow({ panel: "1" })],
+    pages,
+    rows: rows.length ? rows : [normalizeRow({ panel: "1", pageNumber: 1 })],
     createdAt: data.createdAt || Date.now(),
     updatedAt: data.updatedAt || Date.now(),
   };
@@ -240,6 +282,82 @@ function setView(view) {
   elements.editorView.hidden = view !== "editor";
   elements.settingsView.hidden = view !== "settings";
   refreshIcons();
+}
+
+function syncDraftRows() {
+  draftPages = (draftPages.length ? draftPages : [{ pageNumber: 1, rows: [normalizeRow({ panel: "1" })] }])
+    .map((page, index) => normalizePage({ ...page, pageNumber: index + 1 }, index));
+  draftRows = flattenPages(draftPages);
+  elements.pageCountInput.value = draftPages.length;
+}
+
+function getDraftKey(id = editingId) {
+  if (!currentUser) return "";
+  return `netakiroku:draft:${currentUser.uid}:${id || "new"}`;
+}
+
+function updateDraftStatus(message = "") {
+  if (!elements.draftStatus) return;
+  elements.draftStatus.textContent = message;
+}
+
+function getStoredDraft(id = editingId) {
+  const key = getDraftKey(id);
+  if (!key) return null;
+  try {
+    return JSON.parse(localStorage.getItem(key) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft(id = editingId) {
+  const key = getDraftKey(id);
+  if (key) localStorage.removeItem(key);
+  draftDirty = false;
+  updateDraftStatus("");
+}
+
+function restoreDraftPayload(payload) {
+  restoringDraft = true;
+  elements.titleInput.value = payload.title || "";
+  elements.pageCountInput.value = payload.pageCount || 1;
+  elements.statusInput.value = normalizeStatusValue(payload.status || settings.statuses[0]);
+  applyStatusSelectClass(elements.statusInput);
+  elements.categoryInput.value = payload.category || settings.categories[0] || "";
+  elements.tagsInput.value = (payload.tags || []).join(", ");
+  elements.memoInput.value = payload.memo || "";
+  draftPages = normalizePages(payload);
+  syncDraftRows();
+  renderRows();
+  restoringDraft = false;
+}
+
+function scheduleDraftSave() {
+  if (restoringDraft || !currentUser || elements.editorView.hidden) return;
+  draftDirty = true;
+  updateDraftStatus("下書き保存中...");
+  window.clearTimeout(draftSaveTimer);
+  draftSaveTimer = window.setTimeout(() => {
+    const key = getDraftKey();
+    if (!key) return;
+    const savedAt = Date.now();
+    localStorage.setItem(key, JSON.stringify({ ...collectDraft(), savedAt }));
+    const time = new Date(savedAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    updateDraftStatus(`下書き保存済み ${time}`);
+  }, 700);
+}
+
+function maybeRestoreDraft(id, baseUpdatedAt) {
+  const stored = getStoredDraft(id);
+  if (!stored?.savedAt || stored.savedAt <= baseUpdatedAt) return;
+  const shouldRestore = window.confirm("前回の入力途中データがあります。復元しますか？");
+  if (shouldRestore) {
+    restoreDraftPayload(stored);
+    draftDirty = true;
+    const time = new Date(stored.savedAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    updateDraftStatus(`下書きを復元しました ${time}`);
+  }
 }
 
 function render() {
@@ -349,6 +467,8 @@ function openEditor(id = null) {
     category: settings.categories[0],
     rows: [{ panel: "1" }],
   });
+  window.clearTimeout(draftSaveTimer);
+  draftDirty = false;
   elements.titleInput.value = neta?.title === "無題のネタ" ? "" : neta?.title || "";
   elements.pageCountInput.value = neta?.pageCount || 1;
   elements.statusInput.value = neta?.status || settings.statuses[0];
@@ -356,46 +476,94 @@ function openEditor(id = null) {
   elements.categoryInput.value = neta?.category || settings.categories[0] || "";
   elements.tagsInput.value = (neta?.tags || []).join(", ");
   elements.memoInput.value = neta?.memo || "";
-  draftRows = (neta?.rows || [normalizeRow({ panel: "1" })]).map(normalizeRow);
+  activePageIndex = 0;
+  draftPages = normalizePages(neta || {});
+  syncDraftRows();
   renderRows();
   setView("editor");
+  updateDraftStatus("");
+  maybeRestoreDraft(id, id ? timestampToMillis(neta?.updatedAt) : 0);
 }
 
 function renderRows() {
-  elements.rowsEditor.innerHTML = draftRows.map((row, index) => `
-    <div class="row-editor" data-index="${index}">
-      <div class="row-field"><label>コマ<input data-field="panel" value="${escapeHtml(row.panel)}" inputmode="numeric"></label></div>
-      <div class="row-field"><label>人物名や状況<input data-field="actor" value="${escapeHtml(row.actor)}" autocomplete="off"></label></div>
-      <div class="row-field"><label>区分<select data-field="type">${TYPE_OPTIONS.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === row.type ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></label></div>
-      <div class="row-field detail"><label>詳細<textarea data-field="detail" rows="2">${escapeHtml(row.detail)}</textarea></label></div>
-      <div class="row-field reference"><label>参照・補足<textarea data-field="reference" rows="2">${escapeHtml(row.reference)}</textarea></label></div>
-      <div class="row-actions">
-        <button class="btn ghost" type="button" data-row-action="up" title="上へ"><i data-lucide="arrow-up"></i></button>
-        <button class="btn ghost" type="button" data-row-action="down" title="下へ"><i data-lucide="arrow-down"></i></button>
-        <button class="btn ghost" type="button" data-row-action="copy" title="複製"><i data-lucide="copy-plus"></i></button>
-        <button class="btn ghost danger" type="button" data-row-action="delete" title="削除"><i data-lucide="trash-2"></i></button>
+  syncDraftRows();
+  elements.rowsEditor.innerHTML = draftPages.map((page, pageIndex) => `
+    <section class="page-editor ${pageIndex === activePageIndex ? "active" : ""}" data-page-index="${pageIndex}">
+      <div class="page-editor-head">
+        <button class="page-toggle" type="button" data-page-action="toggle" aria-expanded="true">
+          <i data-lucide="chevron-down"></i><span>ページ${pageIndex + 1}</span><small>${page.rows.length}コマ</small>
+        </button>
+        <button class="btn ghost" type="button" data-page-action="add-row"><i data-lucide="list-plus"></i><span>コマ追加</span></button>
       </div>
-    </div>
+      <div class="page-rows">
+        ${page.rows.map((row, rowIndex) => `
+          <div class="row-editor" data-page-index="${pageIndex}" data-row-index="${rowIndex}">
+            <div class="row-field"><label>コマ<input data-field="panel" value="${escapeHtml(row.panel)}" inputmode="numeric"></label></div>
+            <div class="row-field"><label>人物名や状況<input data-field="actor" value="${escapeHtml(row.actor)}" autocomplete="off"></label></div>
+            <div class="row-field"><label>区分<select data-field="type">${TYPE_OPTIONS.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === row.type ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}</select></label></div>
+            <div class="row-field detail"><label>詳細<textarea data-field="detail" rows="2">${escapeHtml(row.detail)}</textarea></label></div>
+            <div class="row-field reference"><label>参照・補足<textarea data-field="reference" rows="2">${escapeHtml(row.reference)}</textarea></label></div>
+            <div class="row-actions">
+              <button class="btn ghost" type="button" data-row-action="up" title="上へ"><i data-lucide="arrow-up"></i></button>
+              <button class="btn ghost" type="button" data-row-action="down" title="下へ"><i data-lucide="arrow-down"></i></button>
+              <button class="btn ghost" type="button" data-row-action="copy" title="複製"><i data-lucide="copy-plus"></i></button>
+              <button class="btn ghost danger" type="button" data-row-action="delete" title="削除"><i data-lucide="trash-2"></i></button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
   `).join("");
   refreshIcons();
 }
 
 function collectDraft() {
+  syncDraftRows();
   return {
     title: elements.titleInput.value.trim(),
-    pageCount: Math.max(1, Number(elements.pageCountInput.value || 1)),
+    pageCount: draftPages.length,
     status: normalizeStatusValue(elements.statusInput.value || settings.statuses[0]),
     category: elements.categoryInput.value || "",
     tags: splitTags(elements.tagsInput.value),
     memo: elements.memoInput.value.trim(),
-    rows: draftRows.map(normalizeRow),
+    pages: draftPages.map((page, index) => ({ pageNumber: index + 1, rows: page.rows.map(normalizeRow) })),
+    rows: draftRows.map((row) => ({ ...normalizeRow(row), pageNumber: Math.max(1, Number(row.pageNumber || 1)) })),
   };
+}
+
+function scrollToRow(pageIndex, rowIndex) {
+  requestAnimationFrame(() => {
+    const row = elements.rowsEditor.querySelector(`.row-editor[data-page-index="${pageIndex}"][data-row-index="${rowIndex}"]`);
+    row?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const input = row?.querySelector('[data-field="detail"]') || row?.querySelector("input, textarea, select");
+    input?.focus({ preventScroll: true });
+  });
+}
+
+function addRowToPage(pageIndex = activePageIndex, shouldScroll = true) {
+  activePageIndex = Math.max(0, Math.min(pageIndex, draftPages.length - 1));
+  const page = draftPages[activePageIndex] || { pageNumber: activePageIndex + 1, rows: [] };
+  const row = normalizeRow({ panel: String(page.rows.length + 1) });
+  page.rows.push(row);
+  draftPages[activePageIndex] = page;
+  renderRows();
+  scheduleDraftSave();
+  if (shouldScroll) scrollToRow(activePageIndex, page.rows.length - 1);
+}
+
+function addPage() {
+  draftPages.push({ pageNumber: draftPages.length + 1, rows: [normalizeRow({ panel: "1" })] });
+  activePageIndex = draftPages.length - 1;
+  renderRows();
+  scheduleDraftSave();
+  scrollToRow(activePageIndex, 0);
 }
 
 async function saveCurrent(event) {
   event?.preventDefault();
   if (!currentUser) return;
   const data = collectDraft();
+  const draftKeyId = editingId;
   if (!data.title) {
     showToast("タイトルを入力してください");
     return;
@@ -411,6 +579,7 @@ async function saveCurrent(event) {
       editingId = ref.id;
       netas.unshift(normalizeNeta(ref.id, { ...data, createdAt: Date.now(), updatedAt: Date.now() }));
     }
+    clearDraft(draftKeyId);
     showToast("保存しました");
     setView("list");
     render();
@@ -422,10 +591,11 @@ async function saveCurrent(event) {
 }
 
 function buildCsv(neta) {
-  const rows = neta.rows.length ? neta.rows : [normalizeRow()];
+  const rows = flattenPages(normalizePages(neta));
   return rows.map((row, index) => [
     index === 0 ? neta.title : "",
     index === 0 ? neta.pageCount : "",
+    row.pageNumber,
     row.panel,
     row.actor,
     row.type,
@@ -556,20 +726,29 @@ async function importCsv(file) {
   const bodyRows = [];
   csvRows.forEach((cells, index) => {
     if (rowLooksLikeMemo(cells, index)) return;
-    const [a = "", b = "", c = "", d = "", e = "", f = "", g = ""] = cells;
+    const [a = "", b = "", c = "", d = "", e = "", f = "", g = "", h = ""] = cells;
+    const hasPageColumn = cells.length >= 8;
+    const pageNumber = hasPageColumn ? c : "1";
+    const panel = hasPageColumn ? d : c;
+    const actor = hasPageColumn ? e : d;
+    const type = hasPageColumn ? f : e;
+    const detail = hasPageColumn ? g : f;
+    const reference = hasPageColumn ? h : g;
     if (a.trim()) title = a.trim();
     if (b.trim()) pageCount = Math.max(1, Number(b.trim()) || pageCount);
-    if (!c.trim() && !d.trim() && !e.trim() && !f.trim() && !g.trim()) return;
-    bodyRows.push(normalizeRow({ panel: c, actor: d, type: e, detail: f, reference: g }));
+    if (!panel.trim() && !actor.trim() && !type.trim() && !detail.trim() && !reference.trim()) return;
+    bodyRows.push({ ...normalizeRow({ panel, actor, type, detail, reference }), pageNumber: Math.max(1, Number(pageNumber) || 1) });
   });
+  const pages = normalizePages({ rows: bodyRows.length ? bodyRows : [normalizeRow({ panel: "1" })] });
   const data = {
     title: title || file.name.replace(/\.csv$/i, ""),
-    pageCount,
+    pageCount: Math.max(pageCount, pages.length),
     status: settings.statuses[0],
     category: settings.categories[0] || "",
     tags: [],
     memo: "",
-    rows: bodyRows.length ? bodyRows : [normalizeRow({ panel: "1" })],
+    pages,
+    rows: flattenPages(pages),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -617,15 +796,23 @@ function wireEvents() {
   elements.loginButton.addEventListener("click", () => signInWithPopup(auth, new GoogleAuthProvider()).catch((error) => showToast(error.message)));
   elements.logoutButton.addEventListener("click", () => signOut(auth));
   elements.newButton.addEventListener("click", () => openEditor());
-  elements.backButton.addEventListener("click", () => { setView("list"); render(); });
+  elements.backButton.addEventListener("click", () => {
+    if (draftDirty && !window.confirm("未保存の変更があります。一覧へ戻りますか？")) return;
+    setView("list");
+    render();
+  });
   elements.settingsButton.addEventListener("click", () => { setView("settings"); render(); });
   elements.settingsBackButton.addEventListener("click", () => { setView("list"); render(); });
   elements.editorForm.addEventListener("submit", saveCurrent);
-  elements.addRowButton.addEventListener("click", () => {
-    draftRows.push(normalizeRow({ panel: String(draftRows.length + 1) }));
-    renderRows();
-  });
+  elements.addRowButton.addEventListener("click", () => addRowToPage(activePageIndex));
+  elements.addPageButton.addEventListener("click", addPage);
+  elements.mobileAddRowButton.addEventListener("click", () => addRowToPage(activePageIndex));
+  elements.mobileAddPageButton.addEventListener("click", addPage);
   [elements.searchInput, elements.statusFilter, elements.categoryFilter, elements.sortSelect].forEach((item) => item.addEventListener("input", render));
+  [elements.titleInput, elements.pageCountInput, elements.statusInput, elements.categoryInput, elements.tagsInput, elements.memoInput].forEach((item) => {
+    item.addEventListener("input", scheduleDraftSave);
+    item.addEventListener("change", scheduleDraftSave);
+  });
   elements.statusInput.addEventListener("change", () => applyStatusSelectClass(elements.statusInput));
   elements.csvImportInput.addEventListener("change", (event) => {
     importCsv(event.target.files[0]).finally(() => { event.target.value = ""; });
@@ -653,21 +840,48 @@ function wireEvents() {
     const field = event.target.dataset.field;
     const rowEl = event.target.closest(".row-editor");
     if (!field || !rowEl) return;
-    const index = Number(rowEl.dataset.index);
-    draftRows[index][field] = event.target.value;
-    if (field === "type") draftRows[index] = normalizeRow(draftRows[index]);
+    const pageIndex = Number(rowEl.dataset.pageIndex);
+    const rowIndex = Number(rowEl.dataset.rowIndex);
+    activePageIndex = pageIndex;
+    draftPages[pageIndex].rows[rowIndex][field] = event.target.value;
+    if (field === "type") draftPages[pageIndex].rows[rowIndex] = normalizeRow(draftPages[pageIndex].rows[rowIndex]);
+    syncDraftRows();
+    scheduleDraftSave();
+  });
+  elements.rowsEditor.addEventListener("focusin", (event) => {
+    const pageEl = event.target.closest(".page-editor");
+    if (pageEl) activePageIndex = Number(pageEl.dataset.pageIndex);
   });
   elements.rowsEditor.addEventListener("click", (event) => {
+    const pageButton = event.target.closest("button[data-page-action]");
+    if (pageButton) {
+      const pageEl = pageButton.closest(".page-editor");
+      const pageIndex = Number(pageEl.dataset.pageIndex);
+      activePageIndex = pageIndex;
+      if (pageButton.dataset.pageAction === "add-row") addRowToPage(pageIndex);
+      if (pageButton.dataset.pageAction === "toggle") {
+        const rows = pageEl.querySelector(".page-rows");
+        const collapsed = pageEl.classList.toggle("collapsed");
+        rows.hidden = collapsed;
+        pageButton.setAttribute("aria-expanded", String(!collapsed));
+      }
+      return;
+    }
     const button = event.target.closest("button[data-row-action]");
     if (!button) return;
-    const index = Number(button.closest(".row-editor").dataset.index);
+    const rowEl = button.closest(".row-editor");
+    const pageIndex = Number(rowEl.dataset.pageIndex);
+    const index = Number(rowEl.dataset.rowIndex);
     const action = button.dataset.rowAction;
-    if (action === "up" && index > 0) [draftRows[index - 1], draftRows[index]] = [draftRows[index], draftRows[index - 1]];
-    if (action === "down" && index < draftRows.length - 1) [draftRows[index + 1], draftRows[index]] = [draftRows[index], draftRows[index + 1]];
-    if (action === "copy") draftRows.splice(index + 1, 0, { ...draftRows[index] });
-    if (action === "delete") draftRows.splice(index, 1);
-    if (!draftRows.length) draftRows.push(normalizeRow({ panel: "1" }));
+    const rows = draftPages[pageIndex].rows;
+    activePageIndex = pageIndex;
+    if (action === "up" && index > 0) [rows[index - 1], rows[index]] = [rows[index], rows[index - 1]];
+    if (action === "down" && index < rows.length - 1) [rows[index + 1], rows[index]] = [rows[index], rows[index + 1]];
+    if (action === "copy") rows.splice(index + 1, 0, { ...rows[index] });
+    if (action === "delete") rows.splice(index, 1);
+    if (!rows.length) rows.push(normalizeRow({ panel: "1" }));
     renderRows();
+    scheduleDraftSave();
   });
   elements.editorCopyButton.addEventListener("click", () => copyCsv(normalizeNeta(editingId || "", collectDraft())));
   elements.editorDownloadButton.addEventListener("click", () => downloadCsv(normalizeNeta(editingId || "", collectDraft())));
@@ -692,6 +906,11 @@ function wireEvents() {
     if (button.dataset.optionAction === "down" && index < settings[kind].length - 1) [settings[kind][index + 1], settings[kind][index]] = [settings[kind][index], settings[kind][index + 1]];
     settings.statuses = [...DEFAULT_SETTINGS.statuses];
     saveSettings();
+  });
+  window.addEventListener("beforeunload", (event) => {
+    if (!draftDirty || elements.editorView.hidden) return;
+    event.preventDefault();
+    event.returnValue = "";
   });
 }
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ネタキロク</title>
   <link rel="preconnect" href="https://unpkg.com">
-  <link rel="stylesheet" href="./styles.css?v=2026.07.02-05">
+  <link rel="stylesheet" href="./styles.css?v=2026.07.03-01">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23FF7F00'/%3E%3Cpath d='M18 18h28v28H18z' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M24 30h16M24 39h10' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -14,7 +14,7 @@
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"><i data-lucide="notebook-pen"></i></span>
         <div>
-          <h1><span>ネタキロク</span> <span class="app-version">v2026.07.02-05</span></h1>
+          <h1><span>ネタキロク</span> <span class="app-version">v2026.07.03-01</span></h1>
           <p id="syncStatus">未ログイン</p>
         </div>
       </div>
@@ -69,14 +69,24 @@
             <label class="memo-field">自分用メモ<input id="memoInput" type="text" autocomplete="off" placeholder="制作時の注意や補足"></label>
           </div>
 
+          <div class="draft-status" id="draftStatus" aria-live="polite"></div>
+
           <div class="rows-head">
             <div>
               <h2>本文行</h2>
-              <p>A列タイトル・B列ページ数は基本情報からCSVへ出力します。</p>
+              <p>A列タイトル・B列ページ数・C列ページ番号をCSVへ出力します。</p>
             </div>
-            <button class="btn ghost" id="addRowButton" type="button"><i data-lucide="list-plus"></i><span>行追加</span></button>
+            <div class="rows-head-actions">
+              <button class="btn ghost" id="addPageButton" type="button"><i data-lucide="file-plus-2"></i><span>ページ追加</span></button>
+              <button class="btn ghost" id="addRowButton" type="button"><i data-lucide="list-plus"></i><span>コマ追加</span></button>
+            </div>
           </div>
           <div class="rows-table" id="rowsEditor"></div>
+
+          <div class="mobile-editor-bar" id="mobileEditorBar">
+            <button class="btn ghost" id="mobileAddPageButton" type="button"><i data-lucide="file-plus-2"></i><span>ページ追加</span></button>
+            <button class="btn primary" id="mobileAddRowButton" type="button"><i data-lucide="list-plus"></i><span>コマ追加</span></button>
+          </div>
         </form>
       </section>
 
@@ -117,6 +127,6 @@
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="./firebase-config.js"></script>
   <script src="./firebase-config.local.js"></script>
-  <script type="module" src="./app.js?v=2026.07.02-05"></script>
+  <script type="module" src="./app.js?v=2026.07.03-01"></script>
 </body>
 </html>

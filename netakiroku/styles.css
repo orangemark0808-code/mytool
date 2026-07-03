@@ -393,6 +393,13 @@ input:focus, textarea:focus, select:focus {
   margin: 24px 0 10px;
 }
 
+.rows-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .rows-head h2, .settings-panel h2 {
   margin: 0;
   font-size: 20px;
@@ -407,7 +414,70 @@ input:focus, textarea:focus, select:focus {
 
 .rows-table {
   display: grid;
+  gap: 14px;
+}
+
+.draft-status {
+  min-height: 22px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+}
+
+.page-editor {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffdf9;
+  overflow: hidden;
+}
+
+.page-editor.active {
+  border-color: var(--orange);
+}
+
+.page-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  padding: 10px;
+  background: #fff6ea;
+  border-bottom: 1px solid var(--line);
+}
+
+.page-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.page-toggle svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.16s ease;
+}
+
+.page-toggle small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.page-editor.collapsed .page-toggle svg {
+  transform: rotate(-90deg);
+}
+
+.page-rows {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
 }
 
 .row-editor {
@@ -419,6 +489,10 @@ input:focus, textarea:focus, select:focus {
   grid-template-columns: 82px 1fr 138px 2fr 1.5fr auto;
   gap: 8px;
   align-items: end;
+}
+
+.mobile-editor-bar {
+  display: none;
 }
 
 .row-actions {
@@ -536,6 +610,39 @@ input:focus, textarea:focus, select:focus {
   .editor-head, .rows-head {
     align-items: stretch;
     flex-direction: column;
+  }
+  .rows-head-actions {
+    display: none;
+  }
+  .draft-status {
+    text-align: left;
+  }
+  #editorView {
+    padding-bottom: 78px;
+  }
+  .mobile-editor-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 8;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 10px max(10px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right));
+    border-top: 1px solid var(--line-strong);
+    background: rgba(255, 253, 249, 0.96);
+    box-shadow: 0 -8px 22px rgba(58, 42, 26, 0.10);
+  }
+  .mobile-editor-bar .btn {
+    min-height: 46px;
+  }
+  .page-editor-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .page-editor-head .btn {
+    width: 100%;
   }
   .topbar {
     flex-direction: column;
