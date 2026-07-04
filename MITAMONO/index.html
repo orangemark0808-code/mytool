@@ -1,0 +1,2555 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ミタモノキロク</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23FF7F00'/%3E%3Ctext x='32' y='44' font-family='monospace' font-size='32' font-weight='700' fill='%23ffffff' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Nunito:wght@400;600;700;800&family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #faf8f4;
+      --panel: #ffffff;
+      --text: #3a2a1a;
+      --muted: #9c8c78;
+      --line: rgba(58, 42, 26, 0.12);
+      --line-strong: rgba(58, 42, 26, 0.28);
+      --accent: #ff7f00;
+      --accent-soft: rgba(255, 127, 0, 0.10);
+      --accent-soft-strong: rgba(255, 127, 0, 0.18);
+      --danger: #c0392b;
+      --danger-soft: rgba(192, 57, 43, 0.10);
+      --radius: 14px;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: "Nunito", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    button, select, input, textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    h1, h2, h3 {
+      font-family: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      line-height: 1.35;
+    }
+
+    .label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- Topbar ---------- */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(250, 248, 244, 0.92);
+      backdrop-filter: blur(10px);
+    }
+
+    .brand .eyebrow {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--accent);
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .brand h1 {
+      font-family: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      font-size: clamp(20px, 2.6vw, 28px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .topbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ---------- Buttons ---------- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+
+    .btn-secondary {
+      border-color: var(--line);
+      background: transparent;
+      color: var(--text);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-danger {
+      border-color: var(--danger-soft);
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      border-color: var(--danger);
+    }
+
+    .icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .icon-button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ---------- App layout ---------- */
+    .app {
+      width: min(1180px, calc(100% - 48px));
+      margin: 0 auto;
+      padding: 20px 0 100px;
+    }
+
+    .sync-status {
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      overflow-wrap: anywhere;
+    }
+
+    /* ---------- Filter bar ---------- */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .filter-bar input[type="search"],
+    .filter-bar select {
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      font-size: 12px;
+    }
+
+    .filter-bar input[type="search"] {
+      flex: 1 1 220px;
+      min-width: 160px;
+    }
+
+    .filter-bar input[type="search"]:focus,
+    .filter-bar select:focus {
+      outline: 2px solid var(--accent-soft-strong);
+      outline-offset: 1px;
+      border-color: var(--accent);
+    }
+
+    .count-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .count-pill {
+      padding: 7px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      font-family: "DM Mono", monospace;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .count-pill strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .count-pill-watching {
+      border-color: #5B7FBD;
+      background: #5B7FBD;
+      color: #ffffff;
+    }
+
+    .count-pill-watching strong {
+      color: #ffffff;
+    }
+
+    /* ---------- Gallery ---------- */
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      cursor: pointer;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .card.is-watching {
+      border-color: var(--accent);
+    }
+
+    .card-poster {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 2 / 3;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .card-poster img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .card-poster .no-poster {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      color: var(--muted);
+      font-family: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      font-size: 13px;
+      text-align: center;
+      padding: 12px;
+    }
+
+    .card-kind-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(58, 42, 26, 0.66);
+      color: #ffffff;
+      font-family: "DM Mono", monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .card-reaction-badges {
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-width: calc(100% - 16px);
+    }
+
+    .card-reaction-badge {
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #ffffff;
+      font-family: "DM Mono", monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px;
+    }
+
+    .card-title {
+      font-family: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.4;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-family: "DM Mono", monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .card-date {
+      color: var(--muted);
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .chip {
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      background: transparent;
+      transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+    }
+
+    .chip.is-active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .chip-toggle {
+      cursor: pointer;
+    }
+
+    /* ---------- Empty state ---------- */
+    .empty {
+      grid-column: 1 / -1;
+      padding: 80px 24px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .empty strong {
+      display: block;
+      margin-bottom: 8px;
+      font-family: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    /* ---------- FAB ---------- */
+    .fab {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .fab:hover {
+      opacity: 0.9;
+    }
+
+    /* ---------- Modal ---------- */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(58, 42, 26, 0.32);
+      overflow-y: auto;
+    }
+
+    .modal-overlay[hidden] {
+      display: none;
+    }
+
+    .modal {
+      width: min(680px, 100%);
+      margin: auto;
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .modal-settings {
+      width: min(453px, 100%);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .modal-body {
+      padding: 22px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .modal-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 22px;
+      border-top: 1px solid var(--line);
+    }
+
+    .footer-spacer {
+      flex: 1 1 auto;
+    }
+
+    /* ---------- Form ---------- */
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field input[type="text"],
+    .field input[type="url"],
+    .field input[type="date"],
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      font-size: 13px;
+    }
+
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      outline: 2px solid var(--accent-soft-strong);
+      outline-offset: 1px;
+      border-color: var(--accent);
+    }
+
+    .field textarea {
+      resize: vertical;
+      min-height: 110px;
+      line-height: 1.7;
+    }
+
+    .watch-end-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .watch-end-row input[type="date"] {
+      flex: 1 1 130px;
+      min-width: 120px;
+      width: auto;
+    }
+
+    .watch-end-row button {
+      flex: 0 0 auto;
+      padding: 8px 10px;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .tmdb-search-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tmdb-search-row input {
+      flex: 1 1 auto;
+    }
+
+    .tmdb-candidates {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .tmdb-candidate {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      text-align: left;
+      background: var(--panel);
+    }
+
+    .tmdb-candidate:hover {
+      border-color: var(--accent);
+    }
+
+    .tmdb-candidate img {
+      width: 40px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 4px;
+      background: var(--bg);
+      flex: 0 0 auto;
+    }
+
+    .tmdb-candidate-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .tmdb-candidate-info .title {
+      font-weight: 700;
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tmdb-candidate-info .sub {
+      color: var(--muted);
+      font-family: "DM Mono", monospace;
+      font-size: 11px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tmdb-status {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .poster-preview-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .poster-preview {
+      width: 90px;
+      height: 135px;
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .poster-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .poster-preview span {
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+      padding: 4px;
+    }
+
+    .poster-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* ---------- Import modal ---------- */
+    .import-textarea {
+      width: 100%;
+      min-height: 160px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      font-family: "DM Mono", monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+
+    .import-result {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* ---------- Settings modal ---------- */
+    .option-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .option-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      font-size: 13px;
+    }
+
+    .option-item-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .option-color-swatch {
+      flex: 0 0 auto;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .option-item-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .option-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .option-item-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      width: 26px;
+      height: 26px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .option-item-button:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .option-item-button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .option-item-remove:hover:not(:disabled) {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .option-empty {
+      padding: 8px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .option-add-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .option-add-row input {
+      flex: 1 1 auto;
+    }
+
+    .modal-settings .field input[type="text"] {
+      border-color: var(--line-strong);
+    }
+
+    /* ---------- Toast ---------- */
+    .toast {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      z-index: 50;
+      max-width: min(360px, calc(100% - 40px));
+      padding: 13px 18px;
+      border-radius: var(--radius);
+      background: var(--text);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.96);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 720px) {
+      .topbar {
+        padding: 14px 16px;
+      }
+
+      .app {
+        width: calc(100% - 32px);
+      }
+
+      .field-row {
+        grid-template-columns: 1fr;
+      }
+
+      .gallery {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+      }
+
+      .modal-overlay {
+        padding: 0;
+        align-items: stretch;
+      }
+
+      .modal {
+        width: 100%;
+        margin: 0;
+        min-height: 100%;
+        border-radius: 0;
+      }
+
+      .modal-body {
+        max-height: none;
+        flex: 1 1 auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="eyebrow">MITAMONO LOG</span>
+      <h1>ミタモノキロク</h1>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-secondary" id="loginButton" type="button">ログイン</button>
+      <button class="btn btn-secondary" id="logoutButton" type="button" hidden>ログアウト</button>
+      <button class="btn btn-secondary" id="importButton" type="button">インポート</button>
+      <button class="icon-button" id="settingsButton" type="button" aria-label="設定">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+      <button class="btn btn-primary" id="openAddButton" type="button">＋ 新規</button>
+    </div>
+  </header>
+
+  <main class="app">
+    <div class="sync-status" id="syncStatus" aria-live="polite">ローカル確認中...</div>
+
+    <section class="filter-bar">
+      <input id="searchInput" type="search" autocomplete="off" placeholder="タイトル・原題で検索">
+      <select id="platformFilter" aria-label="媒体で絞り込み">
+        <option value="">媒体: すべて</option>
+      </select>
+      <select id="kindFilter" aria-label="種類で絞り込み">
+        <option value="">種類: すべて</option>
+        <option value="Drama">Drama</option>
+        <option value="Movie">Movie</option>
+      </select>
+      <div class="count-group">
+        <span class="count-pill count-pill-watching">視聴途中 <strong id="watchingCount">0</strong>件</span>
+        <span class="count-pill"><strong id="totalCount">0</strong>件</span>
+      </div>
+    </section>
+
+    <section class="gallery" id="gallery" aria-label="視聴記録一覧"></section>
+  </main>
+
+  <button class="fab" id="fabAddButton" type="button" aria-label="新規追加">+</button>
+
+  <!-- 記録 追加/編集 モーダル -->
+  <div class="modal-overlay" id="formModalOverlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="formModalTitle">
+      <div class="modal-header">
+        <h2 id="formModalTitle">新規記録</h2>
+        <button class="icon-button" id="closeFormButton" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="recordForm">
+          <div class="field">
+            <span class="label">TMDB検索（タイトル / 原題 / IMDB URL）</span>
+            <div class="tmdb-search-row">
+              <input id="tmdbQueryInput" type="text" autocomplete="off" placeholder="例: シャーシャンクの空に / The Shawshank Redemption / tt0111161">
+              <button class="btn btn-secondary" id="tmdbSearchButton" type="button">検索</button>
+            </div>
+            <div class="tmdb-status" id="tmdbStatus"></div>
+            <div class="tmdb-candidates" id="tmdbCandidates" hidden></div>
+          </div>
+
+          <div class="field">
+            <span class="label">Title</span>
+            <input id="fieldTitle" type="text" autocomplete="off" required>
+          </div>
+
+          <div class="field">
+            <span class="label">Original Title</span>
+            <input id="fieldOriginalTitle" type="text" autocomplete="off">
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <span class="label">Platform</span>
+              <select id="fieldPlatform"></select>
+            </div>
+            <div class="field">
+              <span class="label">Kind</span>
+              <select id="fieldKind">
+                <option value="Drama">Drama</option>
+                <option value="Movie">Movie</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <span class="label">Watch Start</span>
+              <input id="fieldWatchStart" type="date" required>
+            </div>
+            <div class="field">
+              <span class="label">Watch End</span>
+              <div class="watch-end-row">
+                <input id="fieldWatchEnd" type="date">
+                <button class="btn btn-secondary" id="watchEndTodayButton" type="button">今日</button>
+                <button class="btn btn-secondary" id="watchEndClearButton" type="button" hidden>× クリア</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="label">視聴先URL</span>
+            <input id="fieldUrl" type="url" autocomplete="off" placeholder="https://...">
+          </div>
+
+          <div class="field">
+            <span class="label">IMDB</span>
+            <input id="fieldImdbUrl" type="url" autocomplete="off" placeholder="https://www.imdb.com/title/tt.../">
+          </div>
+
+          <div class="field">
+            <span class="label">視聴</span>
+            <div class="chip-row" id="reactionChips"></div>
+          </div>
+
+          <div class="field">
+            <span class="label">感想</span>
+            <textarea id="fieldReview" rows="6" placeholder="感想を入力（複数行OK）"></textarea>
+          </div>
+
+          <div class="field">
+            <span class="label">ポスター画像</span>
+            <div class="poster-preview-row">
+              <div class="poster-preview" id="posterPreview"><span>画像なし</span></div>
+              <div class="poster-actions">
+                <button class="btn btn-secondary" id="posterUploadButton" type="button">画像を選択</button>
+                <button class="btn btn-secondary" id="posterRemoveButton" type="button">削除</button>
+                <input id="posterFileInput" type="file" accept="image/*" hidden>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="deleteRecordButton" type="button" hidden>削除</button>
+        <div class="footer-spacer"></div>
+        <button class="btn btn-secondary" id="cancelFormButton" type="button">キャンセル</button>
+        <button class="btn btn-primary" id="saveRecordButton" type="submit" form="recordForm">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JSONインポート モーダル -->
+  <div class="modal-overlay" id="importModalOverlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
+      <div class="modal-header">
+        <h2 id="importModalTitle">JSONインポート</h2>
+        <button class="icon-button" id="closeImportButton" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <span class="label">.jsonファイル</span>
+          <input id="importFileInput" type="file" accept="application/json,.json">
+        </div>
+        <div class="field">
+          <span class="label">またはJSONを貼り付け</span>
+          <textarea class="import-textarea" id="importTextarea" placeholder="[ { &quot;title&quot;: &quot;...&quot;, ... }, ... ]"></textarea>
+        </div>
+        <div class="import-result" id="importResult"></div>
+      </div>
+      <div class="modal-footer">
+        <div class="footer-spacer"></div>
+        <button class="btn btn-secondary" id="cancelImportButton" type="button">キャンセル</button>
+        <button class="btn btn-primary" id="runImportButton" type="button">インポート実行</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定 モーダル -->
+  <div class="modal-overlay" id="settingsModalOverlay" hidden>
+    <div class="modal modal-settings" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+      <div class="modal-header">
+        <h2 id="settingsModalTitle">設定</h2>
+        <button class="icon-button" id="closeSettingsButton" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <span class="label">Platforms（媒体）</span>
+          <div class="option-list" id="platformOptionList"></div>
+          <div class="option-add-row">
+            <input id="platformAddInput" type="text" autocomplete="off" placeholder="媒体名を追加">
+            <button class="btn btn-secondary" id="platformAddButton" type="button">追加</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="label">Reactions（視聴タグ）</span>
+          <div class="option-list" id="reactionOptionList"></div>
+          <div class="option-add-row">
+            <input id="reactionAddInput" type="text" autocomplete="off" placeholder="タグを追加">
+            <button class="btn btn-secondary" id="reactionAddButton" type="button">追加</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="footer-spacer"></div>
+        <button class="btn btn-secondary" id="closeSettingsFooterButton" type="button">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="./firebase-config.js"></script>
+  <script src="./firebase-config.local.js"></script>
+  <script src="./tmdb-config.js"></script>
+  <script src="./tmdb-config.local.js"></script>
+  <script>
+    // ---------- 設定 ----------
+    const FIREBASE_CONFIG = window.MITAMONO_FIREBASE_CONFIG || window.PROMPT_STOCK_FIREBASE_CONFIG || {
+      apiKey: "",
+      authDomain: "",
+      projectId: "",
+      storageBucket: "",
+      messagingSenderId: "",
+      appId: "",
+      measurementId: "",
+    };
+    const TMDB_API_KEY = window.MITAMONO_TMDB_KEY || "";
+    const TMDB_DEBOUNCE_MS = 400;
+    const TMDB_MIN_QUERY_LENGTH = 2;
+    const TMDB_FALLBACK_LENGTHS = [5, 3];
+    const FIRESTORE_COLLECTION = "mitamono";
+    const LOCAL_STORAGE_KEY = "mitamono-records-cache";
+    const POSTER_MAX_WIDTH = 400;
+
+    let PLATFORM_OPTIONS = [
+      "Amazon",
+      "Netflix",
+      "Mysteryチャンネル",
+      "ACTIONチャンネル",
+      "スーパードラマTV",
+      "Hulu",
+      "Disney＋",
+    ];
+
+    let REACTION_OPTIONS = [
+      "視聴途中",
+      "ブラボー",
+      "感動",
+      "そこで終わるんかい！？",
+      "普通",
+      "微妙",
+      "時間を返せ",
+      "断念",
+    ];
+
+    const REACTION_COLORS = {
+      "視聴途中": { bg: "#A9C3E8", fg: "#3a2a1a" },
+      "そこで終わるんかい！？": { bg: "#C7B8DE", fg: "#3a2a1a" },
+      "ブラボー": { bg: "#F2C97D", fg: "#3a2a1a" },
+      "感動": { bg: "#EFAEBD", fg: "#3a2a1a" },
+      "普通": { bg: "#ABC9A0", fg: "#3a2a1a" },
+      "微妙": { bg: "#DECB80", fg: "#3a2a1a" },
+      "時間を返せ": { bg: "#D99D9A", fg: "#3a2a1a" },
+      "断念": { bg: "#B7AFA9", fg: "#3a2a1a" },
+    };
+
+    function getReactionColor(reaction) {
+      return REACTION_COLORS[reaction] || { bg: "#ff7f00", fg: "#ffffff" };
+    }
+
+    // ---------- DOM ----------
+    const elements = {
+      loginButton: document.getElementById("loginButton"),
+      logoutButton: document.getElementById("logoutButton"),
+      importButton: document.getElementById("importButton"),
+      openAddButton: document.getElementById("openAddButton"),
+      fabAddButton: document.getElementById("fabAddButton"),
+      syncStatus: document.getElementById("syncStatus"),
+      searchInput: document.getElementById("searchInput"),
+      platformFilter: document.getElementById("platformFilter"),
+      kindFilter: document.getElementById("kindFilter"),
+      totalCount: document.getElementById("totalCount"),
+      watchingCount: document.getElementById("watchingCount"),
+      gallery: document.getElementById("gallery"),
+
+      formModalOverlay: document.getElementById("formModalOverlay"),
+      formModalTitle: document.getElementById("formModalTitle"),
+      closeFormButton: document.getElementById("closeFormButton"),
+      recordForm: document.getElementById("recordForm"),
+      tmdbQueryInput: document.getElementById("tmdbQueryInput"),
+      tmdbSearchButton: document.getElementById("tmdbSearchButton"),
+      tmdbStatus: document.getElementById("tmdbStatus"),
+      tmdbCandidates: document.getElementById("tmdbCandidates"),
+      fieldTitle: document.getElementById("fieldTitle"),
+      fieldOriginalTitle: document.getElementById("fieldOriginalTitle"),
+      fieldPlatform: document.getElementById("fieldPlatform"),
+      fieldKind: document.getElementById("fieldKind"),
+      fieldWatchStart: document.getElementById("fieldWatchStart"),
+      fieldWatchEnd: document.getElementById("fieldWatchEnd"),
+      watchEndTodayButton: document.getElementById("watchEndTodayButton"),
+      watchEndClearButton: document.getElementById("watchEndClearButton"),
+      fieldUrl: document.getElementById("fieldUrl"),
+      fieldImdbUrl: document.getElementById("fieldImdbUrl"),
+      reactionChips: document.getElementById("reactionChips"),
+      fieldReview: document.getElementById("fieldReview"),
+      posterPreview: document.getElementById("posterPreview"),
+      posterUploadButton: document.getElementById("posterUploadButton"),
+      posterRemoveButton: document.getElementById("posterRemoveButton"),
+      posterFileInput: document.getElementById("posterFileInput"),
+      deleteRecordButton: document.getElementById("deleteRecordButton"),
+      cancelFormButton: document.getElementById("cancelFormButton"),
+      saveRecordButton: document.getElementById("saveRecordButton"),
+
+      importModalOverlay: document.getElementById("importModalOverlay"),
+      closeImportButton: document.getElementById("closeImportButton"),
+      importFileInput: document.getElementById("importFileInput"),
+      importTextarea: document.getElementById("importTextarea"),
+      importResult: document.getElementById("importResult"),
+      cancelImportButton: document.getElementById("cancelImportButton"),
+      runImportButton: document.getElementById("runImportButton"),
+
+      settingsButton: document.getElementById("settingsButton"),
+      settingsModalOverlay: document.getElementById("settingsModalOverlay"),
+      closeSettingsButton: document.getElementById("closeSettingsButton"),
+      closeSettingsFooterButton: document.getElementById("closeSettingsFooterButton"),
+      platformOptionList: document.getElementById("platformOptionList"),
+      platformAddInput: document.getElementById("platformAddInput"),
+      platformAddButton: document.getElementById("platformAddButton"),
+      reactionOptionList: document.getElementById("reactionOptionList"),
+      reactionAddInput: document.getElementById("reactionAddInput"),
+      reactionAddButton: document.getElementById("reactionAddButton"),
+
+      toast: document.getElementById("toast"),
+    };
+
+    // ---------- 状態 ----------
+    let records = loadLocalRecords();
+    let currentUser = null;
+    let editingId = null;
+    let selectedReactions = new Set();
+    let posterDataUrl = "";
+    let toastTimer = null;
+    let authReadyTimer = null;
+    let isSaving = false;
+
+    // ---------- 共通ユーティリティ ----------
+    function showToast(message) {
+      elements.toast.textContent = message;
+      elements.toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        elements.toast.classList.remove("show");
+      }, 2400);
+    }
+
+    function setSyncStatus(message) {
+      elements.syncStatus.textContent = message;
+    }
+
+    function todayString() {
+      const now = new Date();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      return `${now.getFullYear()}-${month}-${day}`;
+    }
+
+    function normalize(value) {
+      return String(value || "").trim().toLowerCase();
+    }
+
+    function loadLocalRecords() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY));
+        if (!Array.isArray(saved)) return [];
+        return saved.map(normalizeRecord);
+      } catch {
+        return [];
+      }
+    }
+
+    function saveLocalRecords() {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(records));
+    }
+
+    function normalizeRecord(raw = {}) {
+      const reactions = Array.isArray(raw.reactions)
+        ? raw.reactions.filter((reaction) => REACTION_OPTIONS.includes(reaction))
+        : [];
+      return {
+        id: raw.id || "",
+        title: String(raw.title || "").trim(),
+        originalTitle: String(raw.originalTitle || "").trim(),
+        platform: String(raw.platform || "").trim(),
+        kind: raw.kind === "Movie" ? "Movie" : "Drama",
+        watchStart: String(raw.watchStart || "").trim(),
+        watchEnd: String(raw.watchEnd || "").trim(),
+        url: String(raw.url || "").trim(),
+        imdbUrl: String(raw.imdbUrl || "").trim(),
+        reactions,
+        review: String(raw.review || ""),
+        posterUrl: String(raw.posterUrl || ""),
+        tmdbId: raw.tmdbId === undefined || raw.tmdbId === null ? "" : raw.tmdbId,
+        tmdbType: String(raw.tmdbType || "").trim(),
+        createdAt: Number(raw.createdAt) || Date.now(),
+        updatedAt: Number(raw.updatedAt) || Number(raw.createdAt) || Date.now(),
+      };
+    }
+
+    // ---------- Firestore REST 変換 ----------
+    function toFirestoreValue(value) {
+      if (value === null || value === undefined) return { nullValue: null };
+      if (Array.isArray(value)) {
+        return { arrayValue: { values: value.map(toFirestoreValue) } };
+      }
+      if (typeof value === "object") {
+        return {
+          mapValue: {
+            fields: Object.fromEntries(
+              Object.entries(value).map(([key, item]) => [key, toFirestoreValue(item)])
+            ),
+          },
+        };
+      }
+      if (typeof value === "number") {
+        return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+      }
+      if (typeof value === "boolean") return { booleanValue: value };
+      return { stringValue: String(value) };
+    }
+
+    function fromFirestoreValue(value) {
+      if (!value || typeof value !== "object") return null;
+      if ("stringValue" in value) return value.stringValue;
+      if ("integerValue" in value) return Number(value.integerValue);
+      if ("doubleValue" in value) return Number(value.doubleValue);
+      if ("booleanValue" in value) return Boolean(value.booleanValue);
+      if ("nullValue" in value) return null;
+      if ("arrayValue" in value) {
+        return (value.arrayValue.values || []).map(fromFirestoreValue);
+      }
+      if ("mapValue" in value) {
+        return Object.fromEntries(
+          Object.entries(value.mapValue.fields || {}).map(([key, item]) => [key, fromFirestoreValue(item)])
+        );
+      }
+      return null;
+    }
+
+    function toFirestoreFields(data) {
+      return Object.fromEntries(
+        Object.entries(data).map(([key, value]) => [key, toFirestoreValue(value)])
+      );
+    }
+
+    function fromFirestoreFields(fields) {
+      return Object.fromEntries(
+        Object.entries(fields || {}).map(([key, value]) => [key, fromFirestoreValue(value)])
+      );
+    }
+
+    function documentToRecord(doc) {
+      const id = doc.name.split("/").pop();
+      return normalizeRecord({ id, ...fromFirestoreFields(doc.fields) });
+    }
+
+    // ---------- Firebase Auth / Firestore REST ----------
+    function isFirebaseConfigured() {
+      return Boolean(
+        FIREBASE_CONFIG.apiKey &&
+        FIREBASE_CONFIG.authDomain &&
+        FIREBASE_CONFIG.projectId &&
+        FIREBASE_CONFIG.appId
+      );
+    }
+
+    function isAuthLocked() {
+      return isFirebaseConfigured() && !currentUser;
+    }
+
+    function getFirebaseConfigStatus() {
+      if (!window.MITAMONO_FIREBASE_CONFIG && !window.PROMPT_STOCK_FIREBASE_CONFIG) {
+        return "firebase-config.js未読込";
+      }
+      if (!isFirebaseConfigured()) {
+        return "firebase-config.js読込済み / 設定不足";
+      }
+      return `firebase-config.js読込済み / ${FIREBASE_CONFIG.projectId}`;
+    }
+
+    function getAuthErrorMessage(error, action) {
+      const code = error?.code || "";
+      const message = error?.message || "";
+      if (code === "auth/unauthorized-domain") {
+        return `${action}失敗: Firebase Authenticationの承認済みドメインに、現在開いているドメインを追加してください（${code}）`;
+      }
+      if (code === "auth/popup-blocked") {
+        return `${action}失敗: ポップアップがブロックされました。ブラウザ設定を確認してください（${code}）`;
+      }
+      if (code === "auth/operation-not-allowed") {
+        return `${action}失敗: Firebase AuthenticationでGoogleログインを有効にしてください（${code}）`;
+      }
+      const detail = [code, message].filter(Boolean).join(": ");
+      return detail ? `${action}失敗: ${detail}` : `${action}に失敗しました`;
+    }
+
+    async function getRestErrorMessage(response, action) {
+      let detail = "";
+      try {
+        const body = await response.json();
+        detail = body?.error?.message ? `: ${body.error.message}` : "";
+      } catch {
+        try {
+          const text = await response.text();
+          detail = text ? `: ${text.slice(0, 160)}` : "";
+        } catch {
+          detail = "";
+        }
+      }
+      if (detail.includes("Cloud Firestore API has not been used") || detail.includes("is disabled")) {
+        return `REST${action}失敗 ${response.status}: Cloud Firestore APIが無効です。Google Cloud ConsoleでFirestore APIを有効化してください`;
+      }
+      return `REST${action}失敗 ${response.status}${detail}`;
+    }
+
+    function decodeJwtPayload(token) {
+      try {
+        const payload = token.split(".")[1] || "";
+        const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+        return JSON.parse(atob(normalized));
+      } catch {
+        return {};
+      }
+    }
+
+    async function getAuthContext(user, forceRefresh = false) {
+      const token = await user.getIdToken(forceRefresh);
+      const payload = decodeJwtPayload(token);
+      return {
+        token,
+        uid: payload.user_id || payload.sub || user.uid,
+      };
+    }
+
+    function getCollectionUrl(uid) {
+      const projectId = encodeURIComponent(FIREBASE_CONFIG.projectId);
+      const databaseId = encodeURIComponent("(default)");
+      return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${encodeURIComponent(uid)}/${FIRESTORE_COLLECTION}`;
+    }
+
+    function getDocumentUrl(uid, docId) {
+      return `${getCollectionUrl(uid)}/${encodeURIComponent(docId)}`;
+    }
+
+    function getMetaOptionsUrl(uid) {
+      const projectId = encodeURIComponent(FIREBASE_CONFIG.projectId);
+      const databaseId = encodeURIComponent("(default)");
+      return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${encodeURIComponent(uid)}/meta/options`;
+    }
+
+    async function loadRemoteOptions(user) {
+      const { token, uid } = await getAuthContext(user);
+      const response = await fetch(getMetaOptionsUrl(uid), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) {
+        throw new Error(await getRestErrorMessage(response, "設定読み込み"));
+      }
+      const doc = await response.json();
+      return fromFirestoreFields(doc.fields);
+    }
+
+    async function saveRemoteOptions(user, platforms, reactions) {
+      const { token, uid } = await getAuthContext(user, true);
+      const response = await fetch(getMetaOptionsUrl(uid), {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fields: toFirestoreFields({ platforms, reactions }) }),
+      });
+      if (!response.ok) {
+        throw new Error(await getRestErrorMessage(response, "設定保存"));
+      }
+    }
+
+    async function listRemoteRecords(user) {
+      const { token, uid } = await getAuthContext(user);
+      const result = [];
+      let pageToken = "";
+      do {
+        const url = new URL(getCollectionUrl(uid));
+        url.searchParams.set("pageSize", "300");
+        if (pageToken) url.searchParams.set("pageToken", pageToken);
+        const response = await fetch(url.toString(), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.status === 404) break;
+        if (!response.ok) {
+          throw new Error(await getRestErrorMessage(response, "読み込み"));
+        }
+        const data = await response.json();
+        (data.documents || []).forEach((doc) => {
+          result.push(documentToRecord(doc));
+        });
+        pageToken = data.nextPageToken || "";
+      } while (pageToken);
+      return result;
+    }
+
+    async function createRemoteRecord(user, fields) {
+      const { token, uid } = await getAuthContext(user, true);
+      const response = await fetch(getCollectionUrl(uid), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fields: toFirestoreFields(fields) }),
+      });
+      if (!response.ok) {
+        throw new Error(await getRestErrorMessage(response, "保存"));
+      }
+      const doc = await response.json();
+      return doc.name.split("/").pop();
+    }
+
+    async function updateRemoteRecord(user, docId, fields) {
+      const { token, uid } = await getAuthContext(user, true);
+      const response = await fetch(getDocumentUrl(uid, docId), {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fields: toFirestoreFields(fields) }),
+      });
+      if (!response.ok) {
+        throw new Error(await getRestErrorMessage(response, "保存"));
+      }
+    }
+
+    async function deleteRemoteRecord(user, docId) {
+      const { token, uid } = await getAuthContext(user, true);
+      const response = await fetch(getDocumentUrl(uid, docId), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new Error(await getRestErrorMessage(response, "削除"));
+      }
+    }
+
+    // ---------- 認証UI ----------
+    function setSignedOutUi(message = "ログインするとクラウド同期します") {
+      elements.loginButton.hidden = false;
+      elements.loginButton.disabled = false;
+      elements.logoutButton.hidden = true;
+      setSyncStatus(`${message}（${getFirebaseConfigStatus()}）`);
+    }
+
+    function setSignedInUi(user) {
+      elements.loginButton.hidden = true;
+      elements.logoutButton.hidden = false;
+    }
+
+    function setAuthErrorUi(message) {
+      elements.loginButton.hidden = false;
+      elements.loginButton.disabled = true;
+      elements.logoutButton.hidden = true;
+      setSyncStatus(message);
+    }
+
+    function startAuthReadyTimer() {
+      clearTimeout(authReadyTimer);
+      authReadyTimer = setTimeout(() => {
+        setSignedOutUi("認証の確認に時間がかかっています。ログインボタンから再ログインしてください");
+      }, 8000);
+    }
+
+    function stopAuthReadyTimer() {
+      clearTimeout(authReadyTimer);
+      authReadyTimer = null;
+    }
+
+    async function syncOptions() {
+      try {
+        const remote = await loadRemoteOptions(currentUser);
+        if (remote) {
+          if (Array.isArray(remote.platforms) && remote.platforms.length) {
+            PLATFORM_OPTIONS = remote.platforms;
+          }
+          if (Array.isArray(remote.reactions) && remote.reactions.length) {
+            REACTION_OPTIONS = remote.reactions;
+          }
+          if (!REACTION_OPTIONS.includes("断念")) {
+            REACTION_OPTIONS = [...REACTION_OPTIONS, "断念"];
+            await saveRemoteOptions(currentUser, PLATFORM_OPTIONS, REACTION_OPTIONS);
+          }
+        } else {
+          await saveRemoteOptions(currentUser, PLATFORM_OPTIONS, REACTION_OPTIONS);
+        }
+      } catch {
+        // 設定の同期に失敗しても、既定値のままギャラリー表示は継続する
+      }
+      populatePlatformSelect();
+    }
+
+    async function refreshRemoteData(options = {}) {
+      if (!currentUser) return;
+      const silent = Boolean(options.silent);
+      try {
+        if (!silent) setSyncStatus("クラウドから読み込み中...");
+        await syncOptions();
+        records = await listRemoteRecords(currentUser);
+        saveLocalRecords();
+        if (editingId && !records.some((record) => record.id === editingId)) {
+          closeFormModal();
+        }
+        render();
+        setSyncStatus(`同期済み（users/${currentUser.uid}/${FIRESTORE_COLLECTION}）`);
+      } catch (error) {
+        const detail = error && error.message ? `: ${error.message}` : "";
+        setSyncStatus(`読み込み失敗。更新してください${detail}`);
+      }
+    }
+
+    async function setupRemoteSync() {
+      setSignedOutUi("同期を確認中...");
+
+      if (!isFirebaseConfigured()) {
+        setAuthErrorUi("Firebase設定が読み込まれていません。GitHub SecretsとActionsの公開結果を確認してください。");
+        render();
+        return;
+      }
+
+      try {
+        setSyncStatus("Firebase Authを準備中...");
+        const firebaseApp = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
+        const authModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
+        const app = firebaseApp.initializeApp(FIREBASE_CONFIG);
+        const auth = authModule.getAuth(app);
+        const provider = new authModule.GoogleAuthProvider();
+
+        elements.loginButton.addEventListener("click", () => {
+          setSyncStatus("ログイン画面を開いています...");
+          elements.loginButton.disabled = true;
+          authModule.signInWithPopup(auth, provider).catch((error) => {
+            showToast("ログインできませんでした");
+            setSignedOutUi(getAuthErrorMessage(error, "ポップアップログイン"));
+          });
+        });
+
+        elements.logoutButton.addEventListener("click", () => {
+          authModule.signOut(auth).catch(() => {
+            showToast("ログアウトできませんでした");
+          });
+        });
+
+        startAuthReadyTimer();
+
+        authModule.onAuthStateChanged(auth, async (user) => {
+          stopAuthReadyTimer();
+
+          if (!user) {
+            currentUser = null;
+            records = [];
+            setSignedOutUi();
+            render();
+            return;
+          }
+
+          currentUser = user;
+          setSignedInUi(user);
+          await refreshRemoteData();
+        });
+      } catch (error) {
+        currentUser = null;
+        stopAuthReadyTimer();
+        const detail = error && error.message ? `: ${error.message}` : "";
+        setAuthErrorUi(`Firebase初期化エラー${detail}`);
+        render();
+      }
+    }
+
+    // ---------- 一覧表示 ----------
+    function getAllPlatforms() {
+      const set = new Set(PLATFORM_OPTIONS);
+      records.forEach((record) => {
+        if (record.platform) set.add(record.platform);
+      });
+      return [...set];
+    }
+
+    function renderPlatformFilterOptions() {
+      const current = elements.platformFilter.value;
+      const platforms = getAllPlatforms();
+      elements.platformFilter.innerHTML = "";
+      const allOption = document.createElement("option");
+      allOption.value = "";
+      allOption.textContent = "媒体: すべて";
+      elements.platformFilter.appendChild(allOption);
+      platforms.forEach((platform) => {
+        const option = document.createElement("option");
+        option.value = platform;
+        option.textContent = platform;
+        elements.platformFilter.appendChild(option);
+      });
+      elements.platformFilter.value = platforms.includes(current) ? current : "";
+    }
+
+    function getVisibleRecords() {
+      const query = normalize(elements.searchInput.value);
+      const platform = elements.platformFilter.value;
+      const kind = elements.kindFilter.value;
+      const filtered = records.filter((record) => {
+        if (platform && record.platform !== platform) return false;
+        if (kind && record.kind !== kind) return false;
+        if (!query) return true;
+        return normalize(record.title).includes(query) || normalize(record.originalTitle).includes(query);
+      });
+      return filtered.sort((a, b) => {
+        const aDate = a.watchEnd || "";
+        const bDate = b.watchEnd || "";
+        if (aDate !== bDate) return aDate < bDate ? 1 : -1;
+        return b.updatedAt - a.updatedAt;
+      });
+    }
+
+    function createCard(record) {
+      const card = document.createElement("article");
+      card.className = "card";
+      if (record.reactions.includes("視聴途中")) card.classList.add("is-watching");
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
+      card.addEventListener("click", () => openFormModal(record));
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openFormModal(record);
+        }
+      });
+
+      const poster = document.createElement("div");
+      poster.className = "card-poster";
+      if (record.posterUrl) {
+        const img = document.createElement("img");
+        img.src = record.posterUrl;
+        img.alt = record.title;
+        img.loading = "lazy";
+        poster.appendChild(img);
+      } else {
+        const placeholder = document.createElement("div");
+        placeholder.className = "no-poster";
+        placeholder.textContent = record.title || "NO IMAGE";
+        poster.appendChild(placeholder);
+      }
+      const kindBadge = document.createElement("span");
+      kindBadge.className = "card-kind-badge";
+      kindBadge.textContent = record.kind;
+      kindBadge.style.background = record.kind === "Movie"
+        ? "rgba(45, 90, 115, 0.92)"
+        : "rgba(160, 100, 50, 0.92)";
+      poster.appendChild(kindBadge);
+
+      if (record.reactions.length > 0) {
+        const reactionBadges = document.createElement("div");
+        reactionBadges.className = "card-reaction-badges";
+        record.reactions.forEach((reaction) => {
+          const badge = document.createElement("span");
+          badge.className = "card-reaction-badge";
+          badge.textContent = reaction;
+          const color = getReactionColor(reaction);
+          badge.style.background = color.bg;
+          badge.style.color = color.fg;
+          reactionBadges.appendChild(badge);
+        });
+        poster.appendChild(reactionBadges);
+      }
+
+      card.appendChild(poster);
+
+      const body = document.createElement("div");
+      body.className = "card-body";
+
+      const title = document.createElement("div");
+      title.className = "card-title";
+      title.textContent = record.title || "（無題）";
+      body.appendChild(title);
+
+      const meta = document.createElement("div");
+      meta.className = "card-meta";
+      if (record.platform) {
+        const platformBadge = document.createElement("span");
+        platformBadge.className = "badge";
+        platformBadge.textContent = record.platform;
+        meta.appendChild(platformBadge);
+      }
+      if (record.watchEnd) {
+        const date = document.createElement("span");
+        date.className = "card-date";
+        date.textContent = record.watchEnd;
+        meta.appendChild(date);
+      }
+      body.appendChild(meta);
+
+      card.appendChild(body);
+      return card;
+    }
+
+    function render() {
+      renderPlatformFilterOptions();
+      const locked = isAuthLocked();
+      elements.openAddButton.disabled = locked;
+      elements.fabAddButton.style.display = locked ? "none" : "flex";
+      elements.importButton.disabled = locked;
+      elements.settingsButton.disabled = locked;
+      elements.searchInput.disabled = locked;
+      elements.platformFilter.disabled = locked;
+      elements.kindFilter.disabled = locked;
+
+      elements.gallery.innerHTML = "";
+
+      if (locked) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.innerHTML = "<strong>ログインしてください</strong><span>ログイン後に視聴記録を表示します。</span>";
+        elements.gallery.appendChild(empty);
+        elements.totalCount.textContent = "0";
+        elements.watchingCount.textContent = "0";
+        return;
+      }
+
+      const visible = getVisibleRecords();
+      elements.totalCount.textContent = String(visible.length);
+      elements.watchingCount.textContent = String(
+        visible.filter((record) => record.reactions.includes("視聴途中")).length
+      );
+
+      if (visible.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.innerHTML = records.length === 0
+          ? "<strong>記録がまだありません</strong><span>右下の + から新規追加できます。</span>"
+          : "<strong>該当する記録がありません</strong><span>検索条件を変えてみてください。</span>";
+        elements.gallery.appendChild(empty);
+        return;
+      }
+
+      visible.forEach((record) => {
+        elements.gallery.appendChild(createCard(record));
+      });
+    }
+
+    // ---------- 記録 追加/編集 モーダル ----------
+    let watchEndTouched = false;
+    let tmdbMeta = { tmdbId: "", tmdbType: "" };
+    let tmdbDebounceTimer = null;
+    let tmdbSearchAbortController = null;
+    let isComposingTmdbQuery = false;
+
+    function updateWatchEndClearButton() {
+      elements.watchEndClearButton.hidden = !elements.fieldWatchEnd.value;
+    }
+
+    function populatePlatformSelect(extraPlatform = "") {
+      elements.fieldPlatform.innerHTML = "";
+      const options = [...PLATFORM_OPTIONS];
+      if (extraPlatform && !options.includes(extraPlatform)) {
+        options.push(extraPlatform);
+      }
+      options.forEach((platform) => {
+        const option = document.createElement("option");
+        option.value = platform;
+        option.textContent = platform;
+        elements.fieldPlatform.appendChild(option);
+      });
+    }
+
+    function setPlatformValue(platform) {
+      populatePlatformSelect(platform);
+      elements.fieldPlatform.value = platform || PLATFORM_OPTIONS[0] || "";
+    }
+
+    function getPlatformValue() {
+      return elements.fieldPlatform.value;
+    }
+
+    function renderReactionChips() {
+      elements.reactionChips.innerHTML = "";
+      REACTION_OPTIONS.forEach((reaction) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "chip chip-toggle";
+        chip.textContent = reaction;
+        chip.classList.toggle("is-active", selectedReactions.has(reaction));
+        chip.addEventListener("click", () => {
+          if (selectedReactions.has(reaction)) {
+            selectedReactions.delete(reaction);
+          } else {
+            selectedReactions.add(reaction);
+          }
+          renderReactionChips();
+        });
+        elements.reactionChips.appendChild(chip);
+      });
+    }
+
+    function renderPosterPreview() {
+      elements.posterPreview.innerHTML = "";
+      if (posterDataUrl) {
+        const img = document.createElement("img");
+        img.src = posterDataUrl;
+        img.alt = "ポスター";
+        elements.posterPreview.appendChild(img);
+      } else {
+        const span = document.createElement("span");
+        span.textContent = "画像なし";
+        elements.posterPreview.appendChild(span);
+      }
+    }
+
+    function resizeImageToDataUrl(file, maxWidth) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => reject(new Error("画像の読み込みに失敗しました"));
+          img.onload = () => {
+            const scale = Math.min(1, maxWidth / img.width);
+            const width = Math.max(1, Math.round(img.width * scale));
+            const height = Math.max(1, Math.round(img.height * scale));
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", 0.85));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function openFormModal(record = null) {
+      editingId = record ? record.id : null;
+      selectedReactions = new Set(record ? record.reactions : []);
+      posterDataUrl = record ? record.posterUrl : "";
+      tmdbMeta = record ? { tmdbId: record.tmdbId, tmdbType: record.tmdbType } : { tmdbId: "", tmdbType: "" };
+
+      elements.formModalTitle.textContent = record ? "記録を編集" : "新規記録";
+      elements.deleteRecordButton.hidden = !record;
+      cancelPendingTmdbSearch();
+      elements.tmdbQueryInput.value = "";
+      elements.tmdbStatus.textContent = "";
+      elements.tmdbCandidates.hidden = true;
+      elements.tmdbCandidates.innerHTML = "";
+
+      elements.fieldTitle.value = record?.title || "";
+      elements.fieldOriginalTitle.value = record?.originalTitle || "";
+      setPlatformValue(record?.platform || "");
+      elements.fieldKind.value = record?.kind === "Movie" ? "Movie" : "Drama";
+
+      const today = todayString();
+      elements.fieldWatchStart.value = record?.watchStart || today;
+      elements.fieldWatchEnd.value = record ? (record.watchEnd || "") : "";
+      watchEndTouched = record ? record.watchEnd !== record.watchStart : false;
+      updateWatchEndClearButton();
+
+      elements.fieldUrl.value = record?.url || "";
+      elements.fieldImdbUrl.value = record?.imdbUrl || "";
+      elements.fieldReview.value = record?.review || "";
+
+      renderReactionChips();
+      renderPosterPreview();
+
+      elements.formModalOverlay.hidden = false;
+      if (record) {
+        elements.fieldTitle.focus();
+      } else {
+        elements.tmdbQueryInput.focus();
+      }
+    }
+
+    function closeFormModal() {
+      elements.formModalOverlay.hidden = true;
+      editingId = null;
+    }
+
+    elements.openAddButton.addEventListener("click", () => openFormModal());
+    elements.fabAddButton.addEventListener("click", () => openFormModal());
+    elements.closeFormButton.addEventListener("click", closeFormModal);
+    elements.cancelFormButton.addEventListener("click", closeFormModal);
+    elements.formModalOverlay.addEventListener("click", (event) => {
+      if (event.target === elements.formModalOverlay) closeFormModal();
+    });
+
+    elements.fieldWatchStart.addEventListener("change", () => {
+      if (!watchEndTouched) {
+        elements.fieldWatchEnd.value = elements.fieldWatchStart.value;
+        updateWatchEndClearButton();
+      }
+    });
+    elements.fieldWatchEnd.addEventListener("change", () => {
+      watchEndTouched = true;
+      updateWatchEndClearButton();
+    });
+    elements.watchEndTodayButton.addEventListener("click", () => {
+      elements.fieldWatchEnd.value = todayString();
+      watchEndTouched = true;
+      updateWatchEndClearButton();
+    });
+    elements.watchEndClearButton.addEventListener("click", () => {
+      elements.fieldWatchEnd.value = "";
+      watchEndTouched = true;
+      updateWatchEndClearButton();
+    });
+
+    elements.posterUploadButton.addEventListener("click", () => elements.posterFileInput.click());
+    elements.posterRemoveButton.addEventListener("click", () => {
+      posterDataUrl = "";
+      renderPosterPreview();
+    });
+    elements.posterFileInput.addEventListener("change", async () => {
+      const file = elements.posterFileInput.files?.[0];
+      if (!file) return;
+      try {
+        posterDataUrl = await resizeImageToDataUrl(file, POSTER_MAX_WIDTH);
+        renderPosterPreview();
+      } catch {
+        showToast("画像の読み込みに失敗しました");
+      } finally {
+        elements.posterFileInput.value = "";
+      }
+    });
+
+    elements.recordForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (isSaving) return;
+      if (!currentUser) {
+        showToast("ログインしてください");
+        return;
+      }
+      const title = elements.fieldTitle.value.trim();
+      if (!title) {
+        showToast("タイトルを入力してください");
+        elements.fieldTitle.focus();
+        return;
+      }
+      const watchStart = elements.fieldWatchStart.value;
+      const watchEnd = elements.fieldWatchEnd.value;
+      const now = Date.now();
+      const existing = editingId ? records.find((record) => record.id === editingId) : null;
+      const fields = {
+        title,
+        originalTitle: elements.fieldOriginalTitle.value.trim(),
+        platform: getPlatformValue(),
+        kind: elements.fieldKind.value === "Movie" ? "Movie" : "Drama",
+        watchStart,
+        watchEnd,
+        url: elements.fieldUrl.value.trim(),
+        imdbUrl: elements.fieldImdbUrl.value.trim(),
+        reactions: [...selectedReactions],
+        review: elements.fieldReview.value,
+        posterUrl: posterDataUrl,
+        tmdbId: tmdbMeta.tmdbId || "",
+        tmdbType: tmdbMeta.tmdbType || "",
+        createdAt: existing ? existing.createdAt : now,
+        updatedAt: now,
+      };
+
+      isSaving = true;
+      elements.saveRecordButton.disabled = true;
+      try {
+        if (editingId) {
+          await updateRemoteRecord(currentUser, editingId, fields);
+          showToast("更新しました");
+        } else {
+          await createRemoteRecord(currentUser, fields);
+          showToast("追加しました");
+        }
+        closeFormModal();
+        await refreshRemoteData({ silent: true });
+      } catch (error) {
+        const detail = error && error.message ? `: ${error.message}` : "";
+        showToast(`保存に失敗しました${detail}`);
+      } finally {
+        isSaving = false;
+        elements.saveRecordButton.disabled = false;
+      }
+    });
+
+    elements.deleteRecordButton.addEventListener("click", async () => {
+      if (!editingId || !currentUser) return;
+      if (!confirm("この記録を削除しますか？")) return;
+      try {
+        await deleteRemoteRecord(currentUser, editingId);
+        showToast("削除しました");
+        closeFormModal();
+        await refreshRemoteData({ silent: true });
+      } catch (error) {
+        const detail = error && error.message ? `: ${error.message}` : "";
+        showToast(`削除に失敗しました${detail}`);
+      }
+    });
+
+    elements.searchInput.addEventListener("input", render);
+    elements.platformFilter.addEventListener("change", render);
+    elements.kindFilter.addEventListener("change", render);
+
+    // ---------- TMDB連携 ----------
+    function showTmdbStatus(message) {
+      elements.tmdbStatus.textContent = message;
+    }
+
+    function extractImdbId(value) {
+      const match = String(value || "").match(/tt\d{6,9}/i);
+      return match ? match[0] : "";
+    }
+
+    async function tmdbFetch(path, params = {}, signal) {
+      const url = new URL(`https://api.themoviedb.org/3${path}`);
+      url.searchParams.set("api_key", TMDB_API_KEY);
+      url.searchParams.set("language", "ja-JP");
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          url.searchParams.set(key, value);
+        }
+      });
+      const response = await fetch(url.toString(), { signal });
+      if (!response.ok) {
+        throw new Error(`TMDB APIエラー（${response.status}）`);
+      }
+      return response.json();
+    }
+
+    function renderTmdbCandidates(items) {
+      elements.tmdbCandidates.innerHTML = "";
+      items.slice(0, 10).forEach((item) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "tmdb-candidate";
+
+        const img = document.createElement("img");
+        if (item.poster_path) {
+          img.src = `https://image.tmdb.org/t/p/w92${item.poster_path}`;
+        } else {
+          img.style.visibility = "hidden";
+        }
+        img.alt = "";
+        button.appendChild(img);
+
+        const info = document.createElement("div");
+        info.className = "tmdb-candidate-info";
+
+        const title = document.createElement("span");
+        title.className = "title";
+        const displayTitle = item.title || item.name || "（タイトル不明）";
+        const year = (item.release_date || item.first_air_date || "").slice(0, 4);
+        title.textContent = year ? `${displayTitle}（${year}）` : displayTitle;
+        info.appendChild(title);
+
+        const sub = document.createElement("span");
+        sub.className = "sub";
+        const originalTitle = item.original_title || item.original_name || "";
+        const mediaLabel = item.media_type === "tv" ? "TV" : "MOVIE";
+        sub.textContent = [mediaLabel, originalTitle].filter(Boolean).join(" / ");
+        info.appendChild(sub);
+
+        button.appendChild(info);
+        button.addEventListener("click", () => selectTmdbCandidate(item));
+        elements.tmdbCandidates.appendChild(button);
+      });
+      elements.tmdbCandidates.hidden = items.length === 0;
+    }
+
+    async function selectTmdbCandidate(item) {
+      showTmdbStatus("詳細を取得中...");
+      try {
+        const mediaType = item.media_type === "tv" ? "tv" : "movie";
+        const detail = await tmdbFetch(`/${mediaType}/${item.id}`, { append_to_response: "external_ids" });
+
+        const title = detail.title || detail.name || item.title || item.name || "";
+        const originalTitle = detail.original_title || detail.original_name || "";
+        if (title) elements.fieldTitle.value = title;
+        elements.fieldOriginalTitle.value = originalTitle;
+        elements.fieldKind.value = mediaType === "tv" ? "Drama" : "Movie";
+
+        const imdbId = detail.imdb_id || detail.external_ids?.imdb_id || "";
+        if (imdbId) {
+          elements.fieldImdbUrl.value = `https://www.imdb.com/title/${imdbId}/`;
+        }
+
+        if (detail.poster_path) {
+          posterDataUrl = `https://image.tmdb.org/t/p/w500${detail.poster_path}`;
+          renderPosterPreview();
+        }
+
+        tmdbMeta = { tmdbId: detail.id, tmdbType: mediaType };
+
+        elements.tmdbCandidates.hidden = true;
+        elements.tmdbCandidates.innerHTML = "";
+        showTmdbStatus(`「${title}」の情報を反映しました（imdb_idが無い項目は空のままです）`);
+      } catch (error) {
+        const detail = error && error.message ? `: ${error.message}` : "";
+        showTmdbStatus(`詳細取得に失敗しました${detail}`);
+      }
+    }
+
+    async function findTmdbByImdbId(imdbId, signal) {
+      const data = await tmdbFetch(`/find/${imdbId}`, { external_source: "imdb_id" }, signal);
+      return [
+        ...(data.movie_results || []).map((entry) => ({ ...entry, media_type: "movie" })),
+        ...(data.tv_results || []).map((entry) => ({ ...entry, media_type: "tv" })),
+      ];
+    }
+
+    async function searchTmdbMulti(query, signal) {
+      const data = await tmdbFetch("/search/multi", { query, include_adult: "false" }, signal);
+      return (data.results || []).filter((entry) => entry.media_type === "movie" || entry.media_type === "tv");
+    }
+
+    // クエリで0件のとき、先頭から短縮して再検索する（「・」などの区切り文字に依存しないフォールバック）
+    async function performTmdbSearch(query, signal) {
+      const imdbId = extractImdbId(query);
+      if (imdbId) {
+        return { items: await findTmdbByImdbId(imdbId, signal), usedQuery: query };
+      }
+
+      let items = await searchTmdbMulti(query, signal);
+      let usedQuery = query;
+      if (items.length === 0) {
+        for (const length of TMDB_FALLBACK_LENGTHS) {
+          if (query.length <= length) continue;
+          const shortened = query.slice(0, length);
+          if (shortened.length < TMDB_MIN_QUERY_LENGTH) break;
+          items = await searchTmdbMulti(shortened, signal);
+          usedQuery = shortened;
+          if (items.length > 0) break;
+        }
+      }
+      return { items, usedQuery };
+    }
+
+    function cancelPendingTmdbSearch() {
+      clearTimeout(tmdbDebounceTimer);
+      tmdbDebounceTimer = null;
+      if (tmdbSearchAbortController) {
+        tmdbSearchAbortController.abort();
+        tmdbSearchAbortController = null;
+      }
+    }
+
+    async function runTmdbSearch(query) {
+      if (!query) {
+        showTmdbStatus("検索語を入力してください");
+        elements.tmdbCandidates.hidden = true;
+        elements.tmdbCandidates.innerHTML = "";
+        return;
+      }
+      if (!TMDB_API_KEY) {
+        showTmdbStatus("TMDB APIキーが設定されていません。手動で入力してください");
+        return;
+      }
+
+      if (tmdbSearchAbortController) {
+        tmdbSearchAbortController.abort();
+      }
+      const controller = new AbortController();
+      tmdbSearchAbortController = controller;
+
+      showTmdbStatus("検索中...");
+      elements.tmdbCandidates.hidden = true;
+      elements.tmdbCandidates.innerHTML = "";
+
+      try {
+        const { items, usedQuery } = await performTmdbSearch(query, controller.signal);
+        if (controller.signal.aborted) return;
+
+        if (items.length === 0) {
+          showTmdbStatus("候補が見つかりませんでした。手動で入力してください");
+          return;
+        }
+
+        renderTmdbCandidates(items);
+        showTmdbStatus(
+          usedQuery !== query
+            ? `「${usedQuery}」で絞り込んで${items.length}件の候補が見つかりました`
+            : `${items.length}件の候補が見つかりました`
+        );
+      } catch (error) {
+        if (error.name === "AbortError" || controller.signal.aborted) return;
+        const detail = error && error.message ? `: ${error.message}` : "";
+        showTmdbStatus(`検索に失敗しました${detail}`);
+      } finally {
+        if (tmdbSearchAbortController === controller) {
+          tmdbSearchAbortController = null;
+        }
+      }
+    }
+
+    function scheduleTmdbAutoSearch() {
+      clearTimeout(tmdbDebounceTimer);
+      const query = elements.tmdbQueryInput.value.trim();
+      if (query.length < TMDB_MIN_QUERY_LENGTH) {
+        cancelPendingTmdbSearch();
+        elements.tmdbCandidates.hidden = true;
+        elements.tmdbCandidates.innerHTML = "";
+        showTmdbStatus("");
+        return;
+      }
+      tmdbDebounceTimer = setTimeout(() => {
+        runTmdbSearch(query);
+      }, TMDB_DEBOUNCE_MS);
+    }
+
+    elements.tmdbSearchButton.addEventListener("click", () => {
+      clearTimeout(tmdbDebounceTimer);
+      runTmdbSearch(elements.tmdbQueryInput.value.trim());
+    });
+    elements.tmdbQueryInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        clearTimeout(tmdbDebounceTimer);
+        runTmdbSearch(elements.tmdbQueryInput.value.trim());
+      }
+    });
+    elements.tmdbQueryInput.addEventListener("compositionstart", () => {
+      isComposingTmdbQuery = true;
+    });
+    elements.tmdbQueryInput.addEventListener("compositionend", () => {
+      isComposingTmdbQuery = false;
+      scheduleTmdbAutoSearch();
+    });
+    elements.tmdbQueryInput.addEventListener("input", () => {
+      if (isComposingTmdbQuery) return;
+      scheduleTmdbAutoSearch();
+    });
+
+    // ---------- JSONインポート ----------
+    function openImportModal() {
+      elements.importFileInput.value = "";
+      elements.importTextarea.value = "";
+      elements.importResult.textContent = "";
+      elements.importModalOverlay.hidden = false;
+    }
+
+    function closeImportModal() {
+      elements.importModalOverlay.hidden = true;
+    }
+
+    async function readImportSource() {
+      const file = elements.importFileInput.files?.[0];
+      if (file) return file.text();
+      return elements.importTextarea.value;
+    }
+
+    elements.importButton.addEventListener("click", openImportModal);
+    elements.closeImportButton.addEventListener("click", closeImportModal);
+    elements.cancelImportButton.addEventListener("click", closeImportModal);
+    elements.importModalOverlay.addEventListener("click", (event) => {
+      if (event.target === elements.importModalOverlay) closeImportModal();
+    });
+
+    elements.runImportButton.addEventListener("click", async () => {
+      if (!currentUser) {
+        showToast("ログインしてください");
+        return;
+      }
+
+      let raw;
+      try {
+        raw = await readImportSource();
+      } catch {
+        elements.importResult.textContent = "ファイルの読み込みに失敗しました";
+        return;
+      }
+      if (!raw || !raw.trim()) {
+        elements.importResult.textContent = "JSONを入力するか、ファイルを選択してください";
+        return;
+      }
+
+      let items;
+      try {
+        items = JSON.parse(raw);
+      } catch (error) {
+        elements.importResult.textContent = `JSONの解析に失敗しました: ${error.message}`;
+        return;
+      }
+      if (!Array.isArray(items)) {
+        elements.importResult.textContent = "JSONは配列形式で指定してください";
+        return;
+      }
+
+      elements.runImportButton.disabled = true;
+      let success = 0;
+      let failed = 0;
+      for (const item of items) {
+        try {
+          const now = Date.now();
+          const normalized = normalizeRecord(item);
+          const fields = { ...normalized };
+          delete fields.id;
+          fields.createdAt = normalized.createdAt || now;
+          fields.updatedAt = now;
+          await createRemoteRecord(currentUser, fields);
+          success += 1;
+        } catch {
+          failed += 1;
+        }
+        elements.importResult.textContent = `処理中... 成功: ${success} / 失敗: ${failed} / 全${items.length}件`;
+      }
+      elements.runImportButton.disabled = false;
+      elements.importResult.textContent = `完了しました。成功: ${success} / 失敗: ${failed} / 全${items.length}件`;
+      await refreshRemoteData({ silent: true });
+    });
+
+    // ---------- 設定（媒体・視聴タグ） ----------
+    const CHEVRON_UP_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>';
+    const CHEVRON_DOWN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
+    function createOptionItemButton(className, label, html, disabled, onClick) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `option-item-button ${className}`;
+      button.setAttribute("aria-label", label);
+      button.innerHTML = html;
+      button.disabled = disabled;
+      button.addEventListener("click", onClick);
+      return button;
+    }
+
+    function renderOptionList(container, list, { onRemove, onMove, getColor }) {
+      container.innerHTML = "";
+      if (list.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "option-empty";
+        empty.textContent = "項目がありません";
+        container.appendChild(empty);
+        return;
+      }
+      list.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "option-item";
+
+        const main = document.createElement("div");
+        main.className = "option-item-main";
+
+        if (getColor) {
+          const swatch = document.createElement("span");
+          swatch.className = "option-color-swatch";
+          swatch.style.background = getColor(item).bg;
+          main.appendChild(swatch);
+        }
+
+        const label = document.createElement("span");
+        label.className = "option-item-label";
+        label.textContent = item;
+        main.appendChild(label);
+
+        row.appendChild(main);
+
+        const actions = document.createElement("div");
+        actions.className = "option-item-actions";
+        actions.appendChild(
+          createOptionItemButton("option-item-move", `${item}を上へ`, CHEVRON_UP_SVG, index === 0, () => onMove(index, -1))
+        );
+        actions.appendChild(
+          createOptionItemButton("option-item-move", `${item}を下へ`, CHEVRON_DOWN_SVG, index === list.length - 1, () => onMove(index, 1))
+        );
+        const removeButton = createOptionItemButton("option-item-remove", `${item}を削除`, "×", false, () => onRemove(index));
+        actions.appendChild(removeButton);
+        row.appendChild(actions);
+
+        container.appendChild(row);
+      });
+    }
+
+    function renderSettingsLists() {
+      renderOptionList(elements.platformOptionList, PLATFORM_OPTIONS, {
+        onRemove: removePlatformOption,
+        onMove: movePlatformOption,
+      });
+      renderOptionList(elements.reactionOptionList, REACTION_OPTIONS, {
+        onRemove: removeReactionOption,
+        onMove: moveReactionOption,
+        getColor: getReactionColor,
+      });
+    }
+
+    async function persistOptions() {
+      if (!currentUser) return;
+      try {
+        await saveRemoteOptions(currentUser, PLATFORM_OPTIONS, REACTION_OPTIONS);
+      } catch (error) {
+        const detail = error && error.message ? `: ${error.message}` : "";
+        showToast(`設定の保存に失敗しました${detail}`);
+      }
+    }
+
+    function removePlatformOption(index) {
+      PLATFORM_OPTIONS.splice(index, 1);
+      renderSettingsLists();
+      populatePlatformSelect();
+      renderPlatformFilterOptions();
+      persistOptions();
+    }
+
+    function removeReactionOption(index) {
+      REACTION_OPTIONS.splice(index, 1);
+      renderSettingsLists();
+      persistOptions();
+    }
+
+    function movePlatformOption(index, direction) {
+      const target = index + direction;
+      if (target < 0 || target >= PLATFORM_OPTIONS.length) return;
+      const [item] = PLATFORM_OPTIONS.splice(index, 1);
+      PLATFORM_OPTIONS.splice(target, 0, item);
+      renderSettingsLists();
+      populatePlatformSelect();
+      renderPlatformFilterOptions();
+      persistOptions();
+    }
+
+    function moveReactionOption(index, direction) {
+      const target = index + direction;
+      if (target < 0 || target >= REACTION_OPTIONS.length) return;
+      const [item] = REACTION_OPTIONS.splice(index, 1);
+      REACTION_OPTIONS.splice(target, 0, item);
+      renderSettingsLists();
+      persistOptions();
+    }
+
+    function addPlatformOption() {
+      const value = elements.platformAddInput.value.trim();
+      if (!value || PLATFORM_OPTIONS.includes(value)) return;
+      PLATFORM_OPTIONS.push(value);
+      elements.platformAddInput.value = "";
+      renderSettingsLists();
+      populatePlatformSelect();
+      renderPlatformFilterOptions();
+      persistOptions();
+    }
+
+    function addReactionOption() {
+      const value = elements.reactionAddInput.value.trim();
+      if (!value || REACTION_OPTIONS.includes(value)) return;
+      REACTION_OPTIONS.push(value);
+      elements.reactionAddInput.value = "";
+      renderSettingsLists();
+      persistOptions();
+    }
+
+    function openSettingsModal() {
+      renderSettingsLists();
+      elements.settingsModalOverlay.hidden = false;
+    }
+
+    function closeSettingsModal() {
+      elements.settingsModalOverlay.hidden = true;
+    }
+
+    elements.settingsButton.addEventListener("click", openSettingsModal);
+    elements.closeSettingsButton.addEventListener("click", closeSettingsModal);
+    elements.closeSettingsFooterButton.addEventListener("click", closeSettingsModal);
+    elements.settingsModalOverlay.addEventListener("click", (event) => {
+      if (event.target === elements.settingsModalOverlay) closeSettingsModal();
+    });
+
+    elements.platformAddButton.addEventListener("click", addPlatformOption);
+    elements.platformAddInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addPlatformOption();
+      }
+    });
+
+    elements.reactionAddButton.addEventListener("click", addReactionOption);
+    elements.reactionAddInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addReactionOption();
+      }
+    });
+
+    // ---------- 初期化 ----------
+    populatePlatformSelect();
+    render();
+    setupRemoteSync();
+  </script>
+</body>
+</html>
