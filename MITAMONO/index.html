@@ -125,6 +125,7 @@
       font-size: 12px;
       font-weight: 700;
       white-space: nowrap;
+      text-decoration: none;
       transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
 
@@ -975,12 +976,18 @@
 
           <div class="field">
             <span class="label">視聴先URL</span>
-            <input id="fieldUrl" type="url" autocomplete="off" placeholder="https://...">
+            <div class="watch-end-row">
+              <input id="fieldUrl" type="url" autocomplete="off" placeholder="https://...">
+              <a id="fieldUrlOpen" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">開く</a>
+            </div>
           </div>
 
           <div class="field">
             <span class="label">IMDB</span>
-            <input id="fieldImdbUrl" type="url" autocomplete="off" placeholder="https://www.imdb.com/title/tt.../">
+            <div class="watch-end-row">
+              <input id="fieldImdbUrl" type="url" autocomplete="off" placeholder="https://www.imdb.com/title/tt.../">
+              <a id="fieldImdbUrlOpen" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">開く</a>
+            </div>
           </div>
 
           <div class="field">
@@ -1120,18 +1127,19 @@
     ];
 
     const REACTION_COLORS = {
-      "視聴途中": { bg: "#A9C3E8", fg: "#3a2a1a" },
-      "そこで終わるんかい！？": { bg: "#C7B8DE", fg: "#3a2a1a" },
-      "ブラボー": { bg: "#F2C97D", fg: "#3a2a1a" },
-      "感動": { bg: "#EFAEBD", fg: "#3a2a1a" },
-      "普通": { bg: "#ABC9A0", fg: "#3a2a1a" },
-      "微妙": { bg: "#DECB80", fg: "#3a2a1a" },
-      "時間を返せ": { bg: "#D99D9A", fg: "#3a2a1a" },
-      "断念": { bg: "#B7AFA9", fg: "#3a2a1a" },
+      "視聴途中": { bg: "#3A86D4", fg: "#ffffff" },
+      "そこで終わるんかい！？": { bg: "#7E5FC4", fg: "#ffffff" },
+      "ブラボー": { bg: "#ff7f00", fg: "#ffffff" },
+      "感動": { bg: "#C74A72", fg: "#ffffff" },
+      "普通": { bg: "#3C963F", fg: "#ffffff" },
+      "微妙": { bg: "#A6841F", fg: "#ffffff" },
+      "時間を返せ": { bg: "#C6543F", fg: "#ffffff" },
+      "断念": { bg: "#857B72", fg: "#ffffff" },
+      "まぁまぁ面白かった": { bg: "#1E8F82", fg: "#ffffff" },
     };
 
     function getReactionColor(reaction) {
-      return REACTION_COLORS[reaction] || { bg: "#ff7f00", fg: "#ffffff" };
+      return REACTION_COLORS[reaction] || { bg: "#857B72", fg: "#ffffff" };
     }
 
     // ---------- DOM ----------
@@ -1166,7 +1174,9 @@
       watchEndTodayButton: document.getElementById("watchEndTodayButton"),
       watchEndClearButton: document.getElementById("watchEndClearButton"),
       fieldUrl: document.getElementById("fieldUrl"),
+      fieldUrlOpen: document.getElementById("fieldUrlOpen"),
       fieldImdbUrl: document.getElementById("fieldImdbUrl"),
+      fieldImdbUrlOpen: document.getElementById("fieldImdbUrlOpen"),
       reactionChips: document.getElementById("reactionChips"),
       fieldReview: document.getElementById("fieldReview"),
       posterPreview: document.getElementById("posterPreview"),
@@ -1221,6 +1231,7 @@
 
     function setSyncStatus(message) {
       elements.syncStatus.textContent = message;
+      elements.syncStatus.style.display = message ? "" : "none";
     }
 
     function todayString() {
@@ -1585,7 +1596,7 @@
           closeFormModal();
         }
         render();
-        setSyncStatus(`同期済み（users/${currentUser.uid}/${FIRESTORE_COLLECTION}）`);
+        setSyncStatus("");
       } catch (error) {
         const detail = error && error.message ? `: ${error.message}` : "";
         setSyncStatus(`読み込み失敗。更新してください${detail}`);
@@ -1726,8 +1737,8 @@
       kindBadge.className = "card-kind-badge";
       kindBadge.textContent = record.kind;
       kindBadge.style.background = record.kind === "Movie"
-        ? "rgba(45, 90, 115, 0.92)"
-        : "rgba(160, 100, 50, 0.92)";
+        ? "#2779BC"
+        : "#D26A2E";
       poster.appendChild(kindBadge);
 
       if (record.reactions.length > 0) {
@@ -1911,6 +1922,22 @@
       });
     }
 
+    function updateOpenLink(anchorEl, value) {
+      const url = String(value || "").trim();
+      const ok = /^https?:\/\//i.test(url);
+      if (ok) {
+        anchorEl.href = url;
+        anchorEl.removeAttribute("aria-disabled");
+        anchorEl.style.pointerEvents = "";
+        anchorEl.style.opacity = "";
+      } else {
+        anchorEl.removeAttribute("href");
+        anchorEl.setAttribute("aria-disabled", "true");
+        anchorEl.style.pointerEvents = "none";
+        anchorEl.style.opacity = "0.4";
+      }
+    }
+
     function openFormModal(record = null) {
       editingId = record ? record.id : null;
       selectedReactions = new Set(record ? record.reactions : []);
@@ -1938,6 +1965,8 @@
 
       elements.fieldUrl.value = record?.url || "";
       elements.fieldImdbUrl.value = record?.imdbUrl || "";
+      updateOpenLink(elements.fieldUrlOpen, elements.fieldUrl.value);
+      updateOpenLink(elements.fieldImdbUrlOpen, elements.fieldImdbUrl.value);
       elements.fieldReview.value = record?.review || "";
 
       renderReactionChips();
@@ -1984,6 +2013,9 @@
       watchEndTouched = true;
       updateWatchEndClearButton();
     });
+
+    elements.fieldUrl.addEventListener("input", () => updateOpenLink(elements.fieldUrlOpen, elements.fieldUrl.value));
+    elements.fieldImdbUrl.addEventListener("input", () => updateOpenLink(elements.fieldImdbUrlOpen, elements.fieldImdbUrl.value));
 
     elements.posterUploadButton.addEventListener("click", () => elements.posterFileInput.click());
     elements.posterRemoveButton.addEventListener("click", () => {
