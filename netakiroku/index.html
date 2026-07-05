@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ネタキロク</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="./styles.css?v=2026.07.03-03">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23FF7F00'/%3E%3Cpath d='M18 18h28v28H18z' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M24 30h16M24 39h10' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i data-lucide="notebook-pen"></i></span>
+        <div>
+          <h1><span>ネタキロク</span> <span class="app-version">v2026.07.03-03</span></h1>
+          <p id="syncStatus">未ログイン</p>
+        </div>
+      </div>
+      <div class="account">
+        <button class="btn primary" id="loginButton" type="button"><i data-lucide="log-in"></i><span>Googleでログイン</span></button>
+        <button class="btn ghost" id="logoutButton" type="button" hidden><i data-lucide="log-out"></i><span>ログアウト</span></button>
+        <button class="icon-btn" id="settingsButton" type="button" aria-label="設定" title="設定" hidden><i data-lucide="settings"></i></button>
+        <span id="accountName" hidden></span>
+      </div>
+    </header>
+
+    <main>
+      <section id="listView" hidden>
+        <div class="toolbar">
+          <button class="btn primary" id="newButton" type="button"><i data-lucide="plus"></i><span>新規作成</span></button>
+          <label class="search-field">
+            <i data-lucide="search"></i>
+            <input id="searchInput" type="search" autocomplete="off" placeholder="タイトル・詳細・タグで検索">
+          </label>
+          <select id="statusFilter" aria-label="ステータス絞り込み"></select>
+          <select id="categoryFilter" aria-label="カテゴリ絞り込み"></select>
+          <select id="sortSelect" aria-label="並び替え">
+            <option value="updatedDesc">更新日順</option>
+            <option value="createdDesc">作成日順</option>
+          </select>
+          <label class="file-btn">
+            <input id="csvImportInput" type="file" accept=".csv,text/csv">
+            <i data-lucide="upload"></i><span>CSVインポート</span>
+          </label>
+        </div>
+        <div class="count-row"><span id="countText">0件</span></div>
+        <div class="neta-grid" id="netaList"></div>
+      </section>
+
+      <section id="editorView" hidden>
+        <form id="editorForm" class="editor-panel">
+          <div class="editor-head">
+            <button class="btn ghost" id="backButton" type="button"><i data-lucide="arrow-left"></i><span>一覧へ</span></button>
+            <div class="editor-actions">
+              <button class="btn ghost" id="editorCopyButton" type="button"><i data-lucide="copy"></i><span>CSVコピー</span></button>
+              <button class="btn ghost" id="editorDownloadButton" type="button"><i data-lucide="download"></i><span>CSV</span></button>
+              <button class="btn primary" id="saveButton" type="submit"><i data-lucide="save"></i><span>保存</span></button>
+            </div>
+          </div>
+
+          <div class="basic-grid">
+            <label>タイトル<input id="titleInput" type="text" required autocomplete="off" placeholder="漫画ネタのタイトル"></label>
+            <label>ページ数<input id="pageCountInput" type="number" min="1" step="1" inputmode="numeric"></label>
+            <label>ステータス<select id="statusInput"></select></label>
+            <label>カテゴリ<select id="categoryInput"></select></label>
+            <label class="tag-field">タグ<input id="tagsInput" type="text" autocomplete="off" placeholder="カンマ区切り"></label>
+            <label class="memo-field">自分用メモ<input id="memoInput" type="text" autocomplete="off" placeholder="制作時の注意や補足"></label>
+          </div>
+
+          <div class="draft-status" id="draftStatus" aria-live="polite"></div>
+
+          <div class="rows-head">
+            <div>
+              <h2>本文行</h2>
+              <p>A列タイトル・B列ページ番号・C列コマIDをCSVへ出力します。</p>
+            </div>
+            <div class="rows-head-actions">
+              <button class="btn ghost" id="addPageButton" type="button"><i data-lucide="file-plus-2"></i><span>ページ追加</span></button>
+              <button class="btn ghost" id="addRowButton" type="button"><i data-lucide="list-plus"></i><span>コマ追加</span></button>
+            </div>
+          </div>
+          <div class="rows-table" id="rowsEditor"></div>
+
+          <div class="mobile-editor-bar" id="mobileEditorBar">
+            <button class="btn ghost" id="mobileAddPageButton" type="button"><i data-lucide="file-plus-2"></i><span>ページ追加</span></button>
+            <button class="btn primary" id="mobileAddRowButton" type="button"><i data-lucide="list-plus"></i><span>コマ追加</span></button>
+          </div>
+        </form>
+      </section>
+
+      <section id="settingsView" hidden>
+        <div class="settings-panel">
+          <div class="editor-head">
+            <button class="btn ghost" id="settingsBackButton" type="button"><i data-lucide="arrow-left"></i><span>戻る</span></button>
+            <h2>設定</h2>
+          </div>
+          <div class="settings-grid">
+            <section class="settings-section" data-kind="categories">
+              <h3>カテゴリ</h3>
+              <div class="add-option"><input id="categoryOptionInput" type="text" placeholder="新しいカテゴリ"><button class="btn primary" type="button" data-add="categories">追加</button></div>
+              <div class="option-list" id="categoriesList"></div>
+            </section>
+            <section class="settings-section" data-kind="statuses">
+              <h3>ステータス</h3>
+              <div class="add-option"><input id="statusOptionInput" type="text" placeholder="新しいステータス"><button class="btn primary" type="button" data-add="statuses">追加</button></div>
+              <div class="option-list" id="statusesList"></div>
+            </section>
+            <section class="settings-section" data-kind="tagSuggestions">
+              <h3>タグ候補</h3>
+              <div class="add-option"><input id="tagOptionInput" type="text" placeholder="新しいタグ候補"><button class="btn primary" type="button" data-add="tagSuggestions">追加</button></div>
+              <div class="option-list" id="tagSuggestionsList"></div>
+            </section>
+            <section class="settings-section" data-kind="actorSuggestions">
+              <h3>人物名候補</h3>
+              <div class="add-option"><input id="actorOptionInput" type="text" placeholder="新しい人物名"><button class="btn primary" type="button" data-add="actorSuggestions">追加</button></div>
+              <div class="option-list" id="actorSuggestionsList"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="./firebase-config.js"></script>
+  <script src="./firebase-config.local.js"></script>
+  <script type="module" src="./app.js?v=2026.07.03-03"></script>
+</body>
+</html>
