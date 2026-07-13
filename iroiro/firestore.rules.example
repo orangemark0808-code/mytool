@@ -1,0 +1,15 @@
+// Firebase Consoleで内容を確認してから手動で適用するための案です。
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/iroiroNotes/{noteId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/iroiroSettings/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/iroiroMigrations/{migrationId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

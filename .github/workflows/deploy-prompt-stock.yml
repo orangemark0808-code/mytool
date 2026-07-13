@@ -62,6 +62,7 @@ jobs:
           mkdir -p dist/horoscope
           mkdir -p dist/netakiroku
           mkdir -p dist/MITAMONO
+          mkdir -p dist/iroiro
           cp "index.html" "dist/index.html"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
           cp "PROMPT_STOCK/README.md" "dist/PROMPT_STOCK/README.md"
@@ -77,6 +78,10 @@ jobs:
           cp "netakiroku/README.md" "dist/netakiroku/README.md"
           cp "MITAMONO/index.html" "dist/MITAMONO/index.html"
           cp "MITAMONO/README.md" "dist/MITAMONO/README.md"
+          cp "iroiro/index.html" "dist/iroiro/index.html"
+          cp "iroiro/style.css" "dist/iroiro/style.css"
+          cp "iroiro/script.js" "dist/iroiro/script.js"
+          cp "iroiro/README.md" "dist/iroiro/README.md"
           cat > "dist/firebase-config.js" <<'EOF'
           window.PROMPT_STOCK_FIREBASE_CONFIG = {
             apiKey: "__FIREBASE_API_KEY__",
@@ -100,6 +105,7 @@ jobs:
           cp "dist/firebase-config.js" "dist/PROMPT_STOCK/firebase-config.js"
           sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.NETAKIROKU_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/netakiroku/firebase-config.js"
           sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.MITAMONO_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/MITAMONO/firebase-config.js"
+          sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.IROIRO_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/iroiro/firebase-config.js"
           printf 'window.MITAMONO_TMDB_KEY = "%s";\n' "$TMDB_API_KEY" > "dist/MITAMONO/tmdb-config.js"
 
       - name: Setup Pages
