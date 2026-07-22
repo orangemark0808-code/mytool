@@ -63,6 +63,7 @@ jobs:
           mkdir -p dist/netakiroku
           mkdir -p dist/MITAMONO
           mkdir -p dist/iroiro
+          mkdir -p dist/blog-editor
           cp "index.html" "dist/index.html"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
           cp "PROMPT_STOCK/README.md" "dist/PROMPT_STOCK/README.md"
@@ -82,6 +83,11 @@ jobs:
           cp "iroiro/style.css" "dist/iroiro/style.css"
           cp "iroiro/script.js" "dist/iroiro/script.js"
           cp "iroiro/README.md" "dist/iroiro/README.md"
+          cp "blog-editor/README.md" "dist/blog-editor/README.md"
+          cp "blog-editor/index.html" "dist/blog-editor/index.html"
+          cp "blog-editor/layout-overrides.css" "dist/blog-editor/layout-overrides.css"
+          cp "blog-editor/script.js" "dist/blog-editor/script.js"
+          cp "blog-editor/style.css" "dist/blog-editor/style.css"
           cat > "dist/firebase-config.js" <<'EOF'
           window.PROMPT_STOCK_FIREBASE_CONFIG = {
             apiKey: "__FIREBASE_API_KEY__",
