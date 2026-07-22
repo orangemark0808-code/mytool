@@ -1,0 +1,191 @@
+/* 単独表示では、本文40emと必要最小限のパネル余白を共通で使う。 */
+.workspace.mode-edit,
+.workspace.mode-preview {
+  width: min(calc(100% - 32px), calc(40em + 48px));
+  max-width: calc(40em + 48px);
+  margin-inline: auto;
+}
+
+.workspace.mode-edit .editor-pane,
+.workspace.mode-preview .preview-pane {
+  padding-inline: 24px;
+}
+
+.workspace.mode-edit .pane-label,
+.workspace.mode-preview .pane-label {
+  margin-inline: -24px;
+  padding-inline: 24px;
+}
+
+.workspace.mode-edit .editor-stack {
+  width: 40em;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+.workspace.mode-preview .preview-content {
+  width: 40em;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 22px 0;
+}
+
+.editor-view.single-mode .toolbar-wrap {
+  width: min(calc(100% - 32px), calc(40em + 48px));
+  margin-inline: auto;
+}
+
+/* 入力補助は本文直前に置き、横方向はこのバーだけをスクロールさせる。 */
+.editor-pane > .toolbar-wrap {
+  width: auto;
+  margin: 0;
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace.mode-preview .toolbar-wrap {
+  display: none;
+}
+
+.toolbar button {
+  min-width: 36px;
+  padding-inline: 10px;
+  text-align: center;
+}
+
+.toolbar button[data-action="heading"],
+.toolbar button[data-action="subheading"],
+.toolbar button[data-action="number"] {
+  min-width: 42px;
+}
+
+.toolbar .toolbar-bold {
+  font-weight: 700;
+}
+
+/* textarea と改行記号レイヤーは、同じ文字組み・幅計算で重ねる。 */
+.editor-stack {
+  --editor-padding: 22px;
+  --editor-font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  --editor-font-size: 16px;
+  --editor-font-weight: 400;
+  --editor-line-height: 1.8;
+  --editor-letter-spacing: normal;
+  overflow-x: hidden;
+}
+
+.editor-stack textarea,
+.editor-mirror {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: var(--editor-padding);
+  border: 0;
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
+  font-weight: var(--editor-font-weight);
+  line-height: var(--editor-line-height);
+  letter-spacing: var(--editor-letter-spacing);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  tab-size: 8;
+  overflow-x: hidden;
+}
+
+.editor-stack textarea {
+  resize: vertical;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* 本文はtextareaだけに描画し、ミラーは↵の位置計測だけに用いる。 */
+.editor-stack textarea {
+  color: var(--text);
+  caret-color: var(--text);
+}
+
+.editor-stack textarea::selection {
+  background: #f5c9a2;
+  color: var(--text);
+}
+
+.editor-mirror {
+  /* textareaの実際の改行座標を標準APIで取得できないため、誤表示を避けて一時的に非表示にする。 */
+  display: none;
+  overflow-y: hidden;
+  color: transparent;
+  user-select: none;
+}
+
+.toolbar-wrap { overflow-x: auto; overflow-y: hidden; }
+.toolbar-wrap::-webkit-scrollbar { height: 6px; }
+.toolbar-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+
+.top-operation-area {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 10px;
+}
+
+.top-operation-area .view-tabs { margin: 0; }
+.output-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+.line-break::after {
+  top: 0;
+  color: #a95518;
+  opacity: 1;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.8;
+}
+
+/* 空のinlineアンカーなので、↵自体は折り返し幅を消費しない。 */
+.line-break {
+  display: inline;
+  width: auto;
+  height: auto;
+  font-size: 0;
+  line-height: 0;
+  vertical-align: baseline;
+}
+
+@media (max-width: 700px) {
+  .workspace.mode-edit,
+  .workspace.mode-preview {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .workspace.mode-edit .editor-pane,
+  .workspace.mode-preview .preview-pane {
+    padding-inline: 0;
+  }
+
+  .workspace.mode-edit .pane-label,
+  .workspace.mode-preview .pane-label {
+    margin-inline: 0;
+    padding-inline: 18px;
+  }
+
+  .workspace.mode-edit .editor-stack,
+  .workspace.mode-preview .preview-content {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .editor-view.single-mode .toolbar-wrap { width: 100%; }
+
+  .top-operation-area { display: block; margin: 0; }
+  .top-operation-area .view-tabs { margin: 0; }
+  .output-actions { display: grid; grid-template-columns: 1fr 1fr; padding: 10px 0; }
+  .output-actions .primary-button { grid-column: 1 / -1; min-height: 42px; }
+
+  .workspace.mode-preview .preview-content { padding: 22px 28px; }
+  .line-break::after { font-size: 15px; }
+}

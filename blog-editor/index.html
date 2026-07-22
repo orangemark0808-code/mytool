@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ef7d22" />
+    <title>Blog Editor</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='serif' font-size='42' font-weight='700' fill='white'%3EB%3C/text%3E%3C/svg%3E" />
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,600;1,400&family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="layout-overrides.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <button class="brand" id="homeButton" type="button">Blog Editor</button>
+      <nav class="header-actions" aria-label="メインメニュー">
+        <button class="text-button" id="draftsButton" type="button">下書き一覧</button>
+        <button class="text-button" id="newButton" type="button">新規作成</button>
+        <button class="text-button" id="settingsButton" type="button">設定</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="editor-view" id="editorView">
+        <div class="article-meta">
+          <label class="title-field" for="titleInput"><span>タイトル</span><input id="titleInput" placeholder="記事のタイトル" autocomplete="off" /></label>
+          <span class="save-status" id="saveStatus" aria-live="polite"><i></i>未保存</span>
+        </div>
+        <div class="top-operation-area">
+          <div class="view-tabs" role="tablist" aria-label="表示切替">
+            <button id="editTab" type="button" role="tab" aria-selected="false">入力</button>
+            <button id="previewTab" type="button" role="tab" aria-selected="false">プレビュー</button>
+            <button class="active split-tab" id="splitTab" type="button" role="tab" aria-selected="true">分割</button>
+          </div>
+          <div class="output-actions" aria-label="コピーと保存">
+            <button class="secondary-button" id="markdownCopyButton" type="button">Markdownをコピー</button>
+            <button class="secondary-button" id="downloadButton" type="button">.md保存</button>
+            <button class="primary-button" id="noteCopyButton" type="button">note用にコピー</button>
+          </div>
+        </div>
+        <div class="workspace" id="workspace">
+          <section class="editor-pane" aria-label="Markdown入力">
+            <div class="pane-label"><span>Markdown入力</span><span class="input-hint">Enter：段落　Shift + Enter：改行</span><span id="characterCount">0文字</span></div>
+            <div class="toolbar-wrap">
+              <div class="toolbar" aria-label="Markdown入力補助">
+                <button id="undoButton" data-action="undo" type="button" disabled aria-label="取り消し" title="取り消し（Ctrl+Z）">↶</button>
+                <button id="redoButton" data-action="redo" type="button" disabled aria-label="やり直し" title="やり直し">↷</button>
+                <button class="break-button" data-action="linebreak" type="button" aria-label="改行" title="改行（Shift+Enter）">↵</button>
+                <button data-action="paragraph" type="button" aria-label="段落" title="段落（Enter）">¶</button>
+                <button data-action="heading" type="button" aria-label="見出し" title="見出し">H2</button>
+                <button data-action="subheading" type="button" aria-label="小見出し" title="小見出し">H3</button>
+                <button class="toolbar-bold" data-action="bold" type="button" aria-label="太字" title="太字">B</button>
+                <button data-action="bullet" type="button" aria-label="箇条書き" title="箇条書き">•</button>
+                <button data-action="number" type="button" aria-label="番号付きリスト" title="番号付きリスト">1.</button>
+                <button data-action="quote" type="button" aria-label="引用" title="引用">❝</button>
+                <button data-action="link" type="button" aria-label="リンク" title="リンク">🔗</button>
+                <button data-action="rule" type="button" aria-label="区切り線" title="区切り線">―</button>
+              </div>
+            </div>
+            <div class="editor-stack" id="editorStack">
+              <pre class="editor-mirror" id="editorMirror" aria-hidden="true"></pre>
+              <textarea id="bodyInput" wrap="soft" placeholder="ここから書き始めます。&#10;&#10;Markdownで見出し、太字、リンクなどを入力できます。" spellcheck="true"></textarea>
+            </div>
+          </section>
+          <section class="preview-pane" aria-label="プレビュー">
+            <div class="pane-label"><span>プレビュー</span><span>note貼り付けイメージ</span></div>
+            <article id="preview" class="preview-content"><p class="placeholder">本文を入力すると、ここにプレビューが表示されます。</p></article>
+          </section>
+        </div>
+      </section>
+
+      <section class="list-view hidden" id="listView">
+        <div class="view-heading"><div><h1>下書き一覧</h1><p>ブラウザに保存されている記事</p></div><button class="primary-button" id="listNewButton" type="button">新規作成</button></div>
+        <div class="draft-list" id="draftList"></div>
+      </section>
+
+      <section class="settings-view hidden" id="settingsView">
+        <div class="view-heading"><div><h1>設定</h1><p>編集環境の表示を調整します</p></div></div>
+        <div class="settings-form"><label>自動保存<span>入力後、ブラウザ内に自動で保存します。</span><input value="有効" disabled /></label><label>保存先<span>この端末のブラウザ（localStorage）に保存されます。</span><input value="localStorage" disabled /></label></div>
+      </section>
+    </main>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="script.js"></script>
+  </body>
+</html>
