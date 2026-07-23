@@ -189,3 +189,38 @@
   .workspace.mode-preview .preview-content { padding: 22px 28px; }
   .line-break::after { font-size: 15px; }
 }
+.sync-status {
+  font-family: "DM Mono", "Meiryo", monospace;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sync-status::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #4f9b63;
+}
+
+.brand-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.app-version {
+  color: var(--muted);
+  font-family: "DM Mono", "Meiryo", monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .app-header { height: auto; min-height: 52px; flex-wrap: wrap; gap: 0 8px; padding-block: 5px; }
+  .brand-meta { flex-wrap: wrap; gap: 4px 7px; }
+}

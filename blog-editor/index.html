@@ -12,7 +12,11 @@
   </head>
   <body>
     <header class="app-header">
-      <button class="brand" id="homeButton" type="button">Blog Editor</button>
+      <div class="brand-meta">
+        <button class="brand" id="homeButton" type="button">Blog Editor</button>
+        <span class="app-version" id="appVersion"></span>
+        <span class="sync-status" id="syncStatus" aria-live="polite">同期済み</span>
+      </div>
       <nav class="header-actions" aria-label="メインメニュー">
         <button class="text-button" id="draftsButton" type="button">下書き一覧</button>
         <button class="text-button" id="newButton" type="button">新規作成</button>
@@ -24,13 +28,12 @@
       <section class="editor-view" id="editorView">
         <div class="article-meta">
           <label class="title-field" for="titleInput"><span>タイトル</span><input id="titleInput" placeholder="記事のタイトル" autocomplete="off" /></label>
-          <span class="save-status" id="saveStatus" aria-live="polite"><i></i>未保存</span>
         </div>
         <div class="top-operation-area">
           <div class="view-tabs" role="tablist" aria-label="表示切替">
-            <button id="editTab" type="button" role="tab" aria-selected="false">入力</button>
+            <button class="active" id="editTab" type="button" role="tab" aria-selected="true">入力</button>
             <button id="previewTab" type="button" role="tab" aria-selected="false">プレビュー</button>
-            <button class="active split-tab" id="splitTab" type="button" role="tab" aria-selected="true">分割</button>
+            <button class="split-tab" id="splitTab" type="button" role="tab" aria-selected="false">分割</button>
           </div>
           <div class="output-actions" aria-label="コピーと保存">
             <button class="secondary-button" id="markdownCopyButton" type="button">Markdownをコピー</button>
