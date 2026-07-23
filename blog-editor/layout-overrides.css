@@ -189,6 +189,7 @@
   .workspace.mode-preview .preview-content { padding: 22px 28px; }
   .line-break::after { font-size: 15px; }
 }
+
 .sync-status {
   font-family: "DM Mono", "Meiryo", monospace;
   color: var(--muted);
@@ -203,8 +204,11 @@
   height: 7px;
   margin-right: 5px;
   border-radius: 50%;
-  background: #4f9b63;
+  background: var(--border);
 }
+
+.sync-status.synced::before { background: #4f9b63; }
+.sync-status.error::before { background: var(--danger); }
 
 .brand-meta {
   display: flex;
@@ -220,7 +224,90 @@
   white-space: nowrap;
 }
 
+.brand {
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.migration-panel {
+  max-width: 720px;
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid #edc49d;
+  border-radius: var(--radius);
+  background: var(--accent-light);
+}
+
+.migration-panel h2 { margin: 0 0 6px; font-size: 18px; }
+.migration-panel p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+
+.diagnostic-panel { max-width: 720px; margin-top: 24px; padding: 18px; border: 1px dashed var(--border); border-radius: var(--radius); }
+.diagnostic-panel h2 { margin: 0 0 6px; font-size: 18px; }
+.diagnostic-panel p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+
+.draft-timestamps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding-bottom: 2px;
+  color: var(--muted);
+  font-family: "DM Mono", "Meiryo", monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.draft-dates { display: flex; flex-wrap: wrap; gap: 3px 12px; color: var(--muted); font-size: 13px; }
+
+.header-icon-button {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #dcd7cf;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #665e56;
+  transition: border-color .16s ease, background-color .16s ease, color .16s ease;
+}
+
+.header-icon-button[hidden] { display: none !important; }
+
+.header-icon-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.header-icon-button:hover, .header-icon-button.active {
+  border-color: #e7bf99;
+  border-bottom-color: #e7bf99;
+  background: var(--accent-light);
+  color: #9a541e;
+}
+
+.header-icon-button:active { background: #ffe5cc; }
+
+.header-icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 @media (max-width: 700px) {
   .app-header { height: auto; min-height: 52px; flex-wrap: wrap; gap: 0 8px; padding-block: 5px; }
   .brand-meta { flex-wrap: wrap; gap: 4px 7px; }
+  .header-actions { flex: 1; justify-content: flex-end; flex-wrap: wrap; }
+  .header-actions .login-button, .header-actions #logoutButton { display: inline-block; }
+  .header-actions .header-icon-button, .header-actions #logoutButton.header-icon-button { display: inline-grid; }
+  .brand { font-size: 18px; }
+  .article-meta { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .draft-timestamps { width: 100%; white-space: normal; }
 }

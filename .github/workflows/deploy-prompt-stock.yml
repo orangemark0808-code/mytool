@@ -112,6 +112,7 @@ jobs:
           sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.NETAKIROKU_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/netakiroku/firebase-config.js"
           sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.MITAMONO_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/MITAMONO/firebase-config.js"
           sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.IROIRO_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/iroiro/firebase-config.js"
+          sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.BLOG_EDITOR_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/blog-editor/firebase-config.js"
           printf 'window.MITAMONO_TMDB_KEY = "%s";\n' "$TMDB_API_KEY" > "dist/MITAMONO/tmdb-config.js"
 
       - name: Setup Pages

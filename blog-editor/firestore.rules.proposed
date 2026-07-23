@@ -1,0 +1,10 @@
+// Firebase Consoleで既存の実運用ルールを確認してから、以下のmatchを追加してください。
+match /users/{userId}/blogEditorDrafts/{draftId} {
+  allow read, write: if request.auth != null
+    && request.auth.uid == userId;
+}
+
+match /users/{userId}/blogEditorMigrations/{migrationId} {
+  allow read, write: if request.auth != null
+    && request.auth.uid == userId;
+}
