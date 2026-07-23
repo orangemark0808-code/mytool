@@ -183,8 +183,8 @@
 
   .top-operation-area { display: block; margin: 0; }
   .top-operation-area .view-tabs { margin: 0; }
-  .output-actions { display: grid; grid-template-columns: 1fr 1fr; padding: 10px 0; }
-  .output-actions .primary-button { grid-column: 1 / -1; min-height: 42px; }
+  .output-actions { display: flex; flex-wrap: nowrap; gap: 5px; padding: 10px 0; }
+  .output-actions .secondary-button, .output-actions .primary-button { flex: 1 1 0; min-width: 0; min-height: 42px; padding: 10px 6px; font-size: 12px; white-space: nowrap; }
 
   .workspace.mode-preview .preview-content { padding: 22px 28px; }
   .line-break::after { font-size: 15px; }
@@ -276,6 +276,7 @@
 }
 
 .header-icon-button[hidden] { display: none !important; }
+.header-actions [hidden] { display: none !important; }
 
 .header-icon-button svg {
   width: 18px;
@@ -302,12 +303,21 @@
 }
 
 @media (max-width: 700px) {
-  .app-header { height: auto; min-height: 52px; flex-wrap: wrap; gap: 0 8px; padding-block: 5px; }
-  .brand-meta { flex-wrap: wrap; gap: 4px 7px; }
-  .header-actions { flex: 1; justify-content: flex-end; flex-wrap: wrap; }
-  .header-actions .login-button, .header-actions #logoutButton { display: inline-block; }
-  .header-actions .header-icon-button, .header-actions #logoutButton.header-icon-button { display: inline-grid; }
+  .app-header { height: auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; justify-content: stretch; gap: 6px; padding: 8px 14px; }
+  .brand-meta { width: 100%; min-width: 0; flex-wrap: wrap; gap: 3px 7px; }
+  .header-actions { width: 100%; flex: 0 0 auto; justify-content: flex-start; flex-wrap: nowrap; gap: 6px; overflow: hidden; }
+  .header-actions .header-icon-button, .header-actions #logoutButton.header-icon-button { display: inline-grid; flex: 0 0 40px; }
+  .header-actions .login-button:not([hidden]) { display: inline-flex; align-items: center; min-height: 40px; min-width: 0; padding-inline: 10px; white-space: nowrap; }
   .brand { font-size: 18px; }
   .article-meta { align-items: flex-start; flex-direction: column; gap: 7px; }
   .draft-timestamps { width: 100%; white-space: normal; }
+  .list-view .view-heading { align-items: center; gap: 10px; padding-bottom: 14px; margin-bottom: 6px; }
+  .list-view .view-heading h1 { margin-bottom: 3px; font-family: inherit; font-size: 17px; line-height: 1.35; }
+}
+
+.list-view .view-heading { align-items: center; padding-bottom: 14px; margin-bottom: 6px; }
+.list-view .view-heading h1 { margin-bottom: 3px; font-family: inherit; font-size: 18px; line-height: 1.35; }
+
+@media (max-width: 700px) {
+  .list-view .view-heading h1 { font-size: 17px; }
 }
