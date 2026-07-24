@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ef7d22" />
-    <title>Blog Editor</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='serif' font-size='42' font-weight='700' fill='white'%3EB%3C/text%3E%3C/svg%3E" />
+    <title>Journal Editor</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='serif' font-size='42' font-weight='700' fill='white'%3EJ%3C/text%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,600;1,400&family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="layout-overrides.css" />
@@ -13,7 +13,7 @@
   <body>
     <header class="app-header">
       <div class="brand-meta">
-        <button class="brand" id="homeButton" type="button">Blog Editor</button>
+        <button class="brand" id="homeButton" type="button">Journal Editor</button>
         <span class="app-version" id="appVersion"></span>
         <span class="sync-status" id="syncStatus" aria-live="polite">ローカル保存済み</span>
       </div>
@@ -29,7 +29,7 @@
     <main>
       <section class="editor-view" id="editorView">
         <div class="article-meta">
-          <label class="title-field" for="titleInput"><span>タイトル</span><input id="titleInput" placeholder="記事のタイトル" autocomplete="off" /></label>
+          <label class="title-field" for="titleInput"><span>タイトル</span><input id="titleInput" placeholder="記録のタイトル" autocomplete="off" /></label>
           <div class="draft-timestamps" aria-live="polite"><span id="createdAtDisplay">作成日 —</span><span id="updatedAtDisplay">更新日 —</span></div>
         </div>
         <div class="top-operation-area">
@@ -41,7 +41,6 @@
           <div class="output-actions" aria-label="コピーと保存">
             <button class="secondary-button" id="markdownCopyButton" type="button">Markdownをコピー</button>
             <button class="secondary-button" id="downloadButton" type="button">.md保存</button>
-            <button class="primary-button" id="noteCopyButton" type="button">note用にコピー</button>
           </div>
         </div>
         <div class="workspace" id="workspace">
@@ -76,7 +75,7 @@
       </section>
 
       <section class="list-view hidden" id="listView">
-        <div class="view-heading"><div><h1>下書一覧</h1><p>ブラウザに保存されている記事</p></div><button class="primary-button" id="listNewButton" type="button">新規作成</button></div>
+        <div class="view-heading"><div><h1>下書一覧</h1><p>この端末に保存されている記録</p></div><button class="primary-button" id="listNewButton" type="button">新規作成</button></div>
         <div class="draft-list" id="draftList"></div>
       </section>
 
