@@ -15,10 +15,10 @@
       <div class="brand-meta">
         <button class="brand" id="homeButton" type="button">Journal Editor</button>
         <span class="app-version" id="appVersion"></span>
-        <span class="sync-status" id="syncStatus" aria-live="polite">ローカル保存済み</span>
+        <span class="sync-status" id="syncStatus" aria-live="polite">ログインが必要</span>
       </div>
-      <nav class="header-actions" aria-label="メインメニュー">
-        <button class="text-button header-icon-button" id="draftsButton" type="button" aria-label="下書き一覧" title="下書き一覧"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M8 12h8M8 16h8"/></svg></button>
+      <nav class="header-actions hidden" aria-label="メインメニュー">
+        <button class="text-button header-icon-button" id="draftsButton" type="button" aria-label="Journal一覧" title="Journal一覧"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M8 12h8M8 16h8"/></svg></button>
         <button class="text-button header-icon-button" id="newButton" type="button" aria-label="新しい下書きを作成" title="新しい下書きを作成"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M12 11v6M9 14h6"/></svg></button>
         <button class="text-button header-icon-button" id="settingsButton" type="button" aria-label="設定" title="設定"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
         <button class="text-button login-button" id="loginButton" type="button">Googleでログイン</button>
@@ -27,7 +27,14 @@
     </header>
 
     <main>
-      <section class="editor-view" id="editorView">
+      <section class="auth-gate" id="authGate" aria-labelledby="authGateTitle">
+        <h1 id="authGateTitle">Googleでログインしてください</h1>
+        <p>Journal Editorを使用するにはGoogleでログインしてください。</p>
+        <p>ログイン後、PC・スマホ・iPad間でJournalを同期できます。</p>
+        <button class="primary-button" id="gateLoginButton" type="button">Googleでログイン</button>
+      </section>
+
+      <section class="editor-view hidden" id="editorView">
         <div class="article-meta">
           <label class="title-field" for="titleInput"><span>タイトル</span><input id="titleInput" placeholder="記録のタイトル" autocomplete="off" /></label>
           <div class="draft-timestamps" aria-live="polite"><span id="createdAtDisplay">作成日 —</span><span id="updatedAtDisplay">更新日 —</span></div>
@@ -75,7 +82,7 @@
       </section>
 
       <section class="list-view hidden" id="listView">
-        <div class="view-heading"><div><h1>下書一覧</h1><p>この端末に保存されている記録</p></div><button class="primary-button" id="listNewButton" type="button">新規作成</button></div>
+        <div class="view-heading"><div><h1>Journal一覧</h1><p>この端末に保存されている記録</p></div><button class="primary-button" id="listNewButton" type="button">新規作成</button></div>
         <div class="draft-list" id="draftList"></div>
       </section>
 

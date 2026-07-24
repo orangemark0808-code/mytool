@@ -318,6 +318,21 @@
 .list-view .view-heading { align-items: center; padding-bottom: 14px; margin-bottom: 6px; }
 .list-view .view-heading h1 { margin-bottom: 3px; font-family: inherit; font-size: 18px; line-height: 1.35; }
 
+.auth-gate {
+  max-width: 620px;
+  margin: 76px auto;
+  padding: 32px;
+  border: 1px solid #edc49d;
+  border-radius: var(--radius);
+  background: var(--accent-light);
+}
+
+.auth-gate h1 { margin: 0 0 12px; font-size: 24px; }
+.auth-gate p { margin: 6px 0; color: var(--muted); line-height: 1.7; }
+.auth-gate .primary-button { margin-top: 20px; }
+
 @media (max-width: 700px) {
   .list-view .view-heading h1 { font-size: 17px; }
+  .auth-gate { margin: 32px 0; padding: 24px 20px; }
+  .auth-gate h1 { font-size: 20px; }
 }
