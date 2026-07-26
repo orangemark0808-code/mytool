@@ -64,6 +64,7 @@ jobs:
           mkdir -p dist/MITAMONO
           mkdir -p dist/iroiro
           mkdir -p dist/journal-editor
+          mkdir -p dist/pomodoro-timer
           cp "index.html" "dist/index.html"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
           cp "PROMPT_STOCK/README.md" "dist/PROMPT_STOCK/README.md"
@@ -88,6 +89,9 @@ jobs:
           cp "journal-editor/layout-overrides.css" "dist/journal-editor/layout-overrides.css"
           cp "journal-editor/script.js" "dist/journal-editor/script.js"
           cp "journal-editor/style.css" "dist/journal-editor/style.css"
+          cp "pomodoro-timer/index.html" "dist/pomodoro-timer/index.html"
+          cp "pomodoro-timer/app.js" "dist/pomodoro-timer/app.js"
+          cp "pomodoro-timer/sw.js" "dist/pomodoro-timer/sw.js"
           cat > "dist/firebase-config.js" <<'EOF'
           window.PROMPT_STOCK_FIREBASE_CONFIG = {
             apiKey: "__FIREBASE_API_KEY__",
