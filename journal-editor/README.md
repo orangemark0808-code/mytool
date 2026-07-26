@@ -7,11 +7,13 @@ OrangeMania UIに合わせた、ブラウザで動作するMarkdownエディタ�
 `index.html` を直接開かず、ローカルサーバー経由で起動してください。
 
 ```powershell
-cd C:\Users\antig\mytool\blog-editor
+cd C:\Users\antig\mytool\journal-editor
 python -m http.server 8080
 ```
 
 ブラウザで `http://localhost:8080/` を開いてください。`file://` と `127.0.0.1` は使用しません。
+
+公開URL: https://orangemark0808-code.github.io/mytool/journal-editor/
 
 ## 主な機能
 

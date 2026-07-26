@@ -63,7 +63,7 @@ jobs:
           mkdir -p dist/netakiroku
           mkdir -p dist/MITAMONO
           mkdir -p dist/iroiro
-          mkdir -p dist/blog-editor
+          mkdir -p dist/journal-editor
           cp "index.html" "dist/index.html"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
           cp "PROMPT_STOCK/README.md" "dist/PROMPT_STOCK/README.md"
@@ -83,11 +83,11 @@ jobs:
           cp "iroiro/style.css" "dist/iroiro/style.css"
           cp "iroiro/script.js" "dist/iroiro/script.js"
           cp "iroiro/README.md" "dist/iroiro/README.md"
-          cp "blog-editor/README.md" "dist/blog-editor/README.md"
-          cp "blog-editor/index.html" "dist/blog-editor/index.html"
-          cp "blog-editor/layout-overrides.css" "dist/blog-editor/layout-overrides.css"
-          cp "blog-editor/script.js" "dist/blog-editor/script.js"
-          cp "blog-editor/style.css" "dist/blog-editor/style.css"
+          cp "journal-editor/README.md" "dist/journal-editor/README.md"
+          cp "journal-editor/index.html" "dist/journal-editor/index.html"
+          cp "journal-editor/layout-overrides.css" "dist/journal-editor/layout-overrides.css"
+          cp "journal-editor/script.js" "dist/journal-editor/script.js"
+          cp "journal-editor/style.css" "dist/journal-editor/style.css"
           cat > "dist/firebase-config.js" <<'EOF'
           window.PROMPT_STOCK_FIREBASE_CONFIG = {
             apiKey: "__FIREBASE_API_KEY__",
@@ -112,7 +112,7 @@ jobs:
           sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.NETAKIROKU_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/netakiroku/firebase-config.js"
           sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.MITAMONO_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/MITAMONO/firebase-config.js"
           sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.IROIRO_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/iroiro/firebase-config.js"
-          sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.BLOG_EDITOR_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/blog-editor/firebase-config.js"
+          sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.BLOG_EDITOR_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/journal-editor/firebase-config.js"
           printf 'window.MITAMONO_TMDB_KEY = "%s";\n' "$TMDB_API_KEY" > "dist/MITAMONO/tmdb-config.js"
 
       - name: Setup Pages
