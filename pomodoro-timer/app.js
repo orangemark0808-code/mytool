@@ -2,7 +2,7 @@ const STORAGE_KEY = 'pomodoro_state';
 const SETTINGS_KEY = 'pomodoro_settings';
 const DEFAULT_WORK_MIN = 50;
 const DEFAULT_BREAK_MIN = 10;
-const APP_VERSION = '2026-07-27-01';
+const APP_VERSION = '2026-07-27-02';
 const DEFAULT_SET_COUNT = 3;
 let WORK_SECONDS = DEFAULT_WORK_MIN * 60;
 let BREAK_SECONDS = DEFAULT_BREAK_MIN * 60;
@@ -24,7 +24,6 @@ let soundCtx = null;
 let soundLoopTimer = null;
 let completionNoticeTimer = null;
 let backgroundFeedbackTimer = null;
-let bannerTimer = null;
 let lastSoundResult = '未初期化';
 let lastSoundKind = '未実行';
 let activeOscillators = [];
@@ -173,11 +172,10 @@ function playSound(kind = 'work') {
   if (context.state === 'running') startNotes(); else context.resume().then(startNotes).catch(error => { soundLooping = false; lastSoundResult = 'resume失敗'; lastAudioResumeResult = `${error.name}: ${error.message}`; refreshDiagnostics(); });
 }
 function stopSound() { activeOscillators.forEach(oscillator => { try { oscillator.stop(); } catch (error) {} }); activeOscillators = []; clearTimeout(soundLoopTimer); soundLooping = false; lastSoundResult = '停止中'; refreshDiagnostics(); const button = document.getElementById('soundTestBtn'); if (button) button.textContent = '通知音をテスト'; }
-function toggleTestSound() { if (soundLooping) { stopSound(); return; } playSound(document.getElementById('soundType').value); }function clearEndFeedback() { clearTimeout(completionNoticeTimer); clearTimeout(backgroundFeedbackTimer); clearTimeout(bannerTimer); document.body.classList.remove('notification-active'); const notice = document.getElementById('completionNotice'); if (notice) notice.classList.remove('show'); const banner = document.getElementById('notifyBanner'); if (banner) banner.classList.remove('show'); }
+function toggleTestSound() { if (soundLooping) { stopSound(); return; } playSound(document.getElementById('soundType').value); }function clearEndFeedback() { clearTimeout(completionNoticeTimer); clearTimeout(backgroundFeedbackTimer); document.body.classList.remove('notification-active'); const notice = document.getElementById('completionNotice'); if (notice) notice.classList.remove('show'); }
 function presentEndFeedback(kind) { lastAppNotificationKind = kind === 'work' ? '作業' : kind === 'break' ? '休憩' : '全セット完了';
   clearEndFeedback();
   playSound(kind);
-  showNotify();
   const notice = document.getElementById('completionNotice');
   const messages = kind === 'complete' ? { eyebrow: 'ALL SETS COMPLETE', title: `${SET_COUNT}セット完了しました`, detail: '', duration: 8000 } : kind === 'work' ? { eyebrow: 'FOCUS COMPLETE', title: '作業時間が終了しました', detail: '休憩を開始します', duration: 5000 } : { eyebrow: 'BREAK COMPLETE', title: '休憩時間が終了しました', detail: '次の作業を開始します', duration: 5000 };
   document.getElementById('completionEyebrow').textContent = messages.eyebrow; document.getElementById('completionTitle').textContent = messages.title; document.getElementById('completionDetail').textContent = messages.detail;
@@ -185,7 +183,6 @@ function presentEndFeedback(kind) { lastAppNotificationKind = kind === 'work' ? 
   completionNoticeTimer = setTimeout(() => notice.classList.remove('show'), messages.duration);
   backgroundFeedbackTimer = setTimeout(() => document.body.classList.remove('notification-active'), 2000);
 }
-function showNotify() { const banner = document.getElementById('notifyBanner'); clearTimeout(bannerTimer); banner.textContent = mode === 'work' ? '作業時間が終了しました' : '休憩時間が終了しました'; banner.classList.add('show'); bannerTimer = setTimeout(() => banner.classList.remove('show'), 4000); }
 function updateNotificationStatus() {
   const target = document.getElementById('notificationStatus'); if (!target) return;
   const permission = !notifSupported ? '非対応' : Notification.permission === 'granted' ? '許可済み' : Notification.permission === 'denied' ? '拒否' : '未選択';
@@ -203,7 +200,7 @@ async function init() {
   loadSettings(); document.getElementById('inputWork').value = WORK_SECONDS / 60; document.getElementById('inputBreak').value = BREAK_SECONDS / 60; document.getElementById('inputSets').value = SET_COUNT; setTabLabels();
   document.getElementById('startBtn').addEventListener('click', toggleTimer); document.getElementById('resetBtn').addEventListener('click', resetTimer); document.getElementById('applyBtn').addEventListener('click', applySettings); document.getElementById('tabWork').addEventListener('click', () => switchMode('work')); document.getElementById('tabBreak').addEventListener('click', () => switchMode('break')); document.getElementById('soundTestBtn').addEventListener('click', toggleTestSound); document.getElementById('notifAllowBtn').addEventListener('click', requestNotificationPermission); document.getElementById('notifLaterBtn').addEventListener('click', () => document.getElementById('permissionBar').classList.add('hidden')); document.getElementById('completionNotice').addEventListener('click', clearEndFeedback); document.getElementById('notificationTestBtn').addEventListener('click', testOsNotification); document.getElementById('diagnosticsRefreshBtn').addEventListener('click', refreshDiagnostics); document.getElementById('diagnosticsCopyBtn').addEventListener('click', copyDiagnostics);
   await registerSW(); checkNotificationPermission(); const restored = loadState();
-  if (restored && running) { recalcRemaining(); if (remaining <= 0) { running = false; remaining = 0; document.getElementById('logText').textContent = '閉じている間にタイマーが終了しました'; saveState(); showNotify(); } else { document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); intervalId = setInterval(tick, 1000); } }
+  if (restored && running) { recalcRemaining(); if (remaining <= 0) { running = false; remaining = 0; document.getElementById('logText').textContent = '閉じている間にタイマーが終了しました'; saveState(); } else { document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); intervalId = setInterval(tick, 1000); } }
   if (completed) document.getElementById('startBtn').textContent = 'もう一度'; updateModeUI(); updateDisplay(); refreshDiagnostics();
 }
 document.addEventListener('DOMContentLoaded', init);
