@@ -68,6 +68,18 @@
     .permission-bar #notifAllowBtn { background:var(--accent); color:#fff; padding:7px 14px; }
     .permission-bar.hidden { display:none; }
     @media (max-width:420px) { body { padding-top:16px; } .container { padding:22px 16px; } .app-header { flex-direction:column; gap:8px; margin-bottom:25px; } .app-header h1 { font-size:clamp(20px,6vw,24px); white-space:nowrap; } .settings-grid { grid-template-columns:1fr 1fr; } .settings label:last-child { grid-column:1 / -1; } .permission-bar { align-items:stretch; flex-direction:column; text-align:center; } .permission-bar__actions { justify-content:center; } }
+      .sound-settings { margin-top:20px; text-align:left; }
+    .sound-settings__label { display:block; margin-bottom:8px; }
+    .sound-settings__controls { display:grid; gap:8px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .sound-select,.sound-test-button,.diagnostic-button { border:1px solid var(--border); border-radius:10px; color:var(--text); font-family:'Nunito',sans-serif; font-size:14px; min-height:44px; padding:9px 12px; }
+    .sound-select { background:var(--surface); width:100%; }
+    .sound-select:focus { border-color:var(--accent); outline:1px solid var(--accent); }
+    .sound-test-button,.diagnostic-button { background:var(--surface2); cursor:pointer; }
+    .diagnostic-actions { display:grid; gap:8px; grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:16px; }
+    .diagnostic-actions button { margin:0; min-height:44px; padding:8px 10px; white-space:nowrap; width:100%; }
+    .notification-diagnostics { margin-top:18px; }
+    .diagnostics-text { box-sizing:border-box; max-width:100%; overflow-x:hidden; white-space:pre-wrap; overflow-wrap:anywhere; width:100%; }
+    @media (max-width:420px) { .sound-settings__controls,.diagnostic-actions { grid-template-columns:1fr; } .sound-select,.sound-test-button,.diagnostic-actions button { min-height:44px; width:100%; } .diagnostic-actions button { white-space:normal; } }
   </style>
 </head>
 <body>
@@ -75,13 +87,13 @@
   <div class="completion-notice" id="completionNotice" role="status" aria-live="assertive"><p class="completion-notice__eyebrow" id="completionEyebrow"></p><p class="completion-notice__title" id="completionTitle"></p><p class="completion-notice__detail" id="completionDetail"></p></div>
   <div class="permission-bar hidden" id="permissionBar"><p class="permission-bar__text">画面を閉じている間も通知を受け取るには、通知を許可してください。</p><div class="permission-bar__actions"><button id="notifAllowBtn">通知を許可</button><button class="btn-later" id="notifLaterBtn">後で</button></div></div>
   <main class="container">
-    <header class="app-header"><h1>ポモドーロタイマー</h1><span class="version-badge">2026-07-26-06</span></header>
+    <header class="app-header"><h1>ポモドーロタイマー</h1><span class="version-badge">2026-07-27-01</span></header>
     <div class="mode-label"><span class="eyebrow" id="modeLabelEn">FOCUS</span><span class="mode-name" id="modeLabelJa">作業中</span></div>
     <div class="progress-ring-wrapper"><svg class="progress-ring" viewBox="0 0 240 240" aria-label="タイマー進行状況"><circle class="progress-ring__track" cx="120" cy="120" r="108"/><circle class="progress-ring__progress" id="progressCircle" cx="120" cy="120" r="108"/></svg><div class="timer-display"><div class="time" id="timeDisplay">50:00</div><div class="session-count" id="sessionCount">SET 01 / 03 · FOCUS</div></div></div>
     <div class="controls"><button class="btn-start" id="startBtn">開始</button><button class="btn-reset" id="resetBtn">リセット</button></div>
     <div class="mode-tabs"><button class="tab active-work" id="tabWork">作業 50分</button><button class="tab" id="tabBreak">休憩 10分</button></div>
     <div class="log" id="logText" aria-live="polite"></div>
-    <section class="settings" aria-label="設定"><span class="eyebrow settings-title">SETTINGS</span><div class="settings-grid"><label>作業時間 <span class="input-row"><input type="number" id="inputWork" min="1" max="180" value="50">分</span></label><label>休憩時間 <span class="input-row"><input type="number" id="inputBreak" min="1" max="60" value="10">分</span></label><label>セット数 <span class="input-row"><input type="number" id="inputSets" min="1" max="99" value="3">回</span></label></div><div class="settings-actions"><button class="btn-apply" id="applyBtn">設定を適用</button><label class="eyebrow" for="soundType">通知音の種類</label><select id="soundType" class="sound-test"><option value="work">作業終了</option><option value="break">休憩終了</option><option value="complete">全セット完了</option></select><button class="sound-test" id="soundTestBtn">通知音をテスト</button><div class="diagnostic-actions"><button class="sound-test" id="notificationTestBtn">通知をテスト</button><button class="sound-test" id="diagnosticsRefreshBtn">通知状態を更新</button><button class="sound-test" id="diagnosticsCopyBtn">診断情報をコピー</button></div><div class="notification-diagnostics" id="notificationStatus" aria-live="polite"></div><label class="eyebrow" for="diagnosticsText">診断情報</label><textarea class="diagnostics-text" id="diagnosticsText" readonly aria-label="診断情報"></textarea></div></section>
+    <section class="settings" aria-label="設定"><span class="eyebrow settings-title">SETTINGS</span><div class="settings-grid"><label>作業時間 <span class="input-row"><input type="number" id="inputWork" min="1" max="180" value="50">分</span></label><label>休憩時間 <span class="input-row"><input type="number" id="inputBreak" min="1" max="60" value="10">分</span></label><label>セット数 <span class="input-row"><input type="number" id="inputSets" min="1" max="99" value="3">回</span></label></div><div class="settings-actions"><button class="btn-apply" id="applyBtn">設定を適用</button><div class="sound-settings"><label class="eyebrow sound-settings__label" for="soundType">通知音の種類</label><div class="sound-settings__controls"><select id="soundType" class="sound-select"><option value="work">作業終了</option><option value="break">休憩終了</option><option value="complete">全セット完了</option></select><button class="sound-test-button" id="soundTestBtn">通知音をテスト</button></div></div><div class="diagnostic-actions"><button class="diagnostic-button" id="notificationTestBtn">通知をテスト</button><button class="diagnostic-button" id="diagnosticsRefreshBtn">通知状態を更新</button><button class="diagnostic-button" id="diagnosticsCopyBtn">診断情報をコピー</button></div><div class="notification-diagnostics" id="notificationStatus" aria-live="polite"></div><label class="eyebrow" for="diagnosticsText">診断情報</label><textarea class="diagnostics-text" id="diagnosticsText" readonly aria-label="診断情報"></textarea></div></section>
   </main>
   <script src="app.js"></script>
 </body>
