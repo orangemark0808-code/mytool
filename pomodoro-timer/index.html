@@ -65,7 +65,7 @@
     .permission-bar button { min-height:38px; font-size:13px; padding:7px 14px; }
     .permission-bar #notifAllowBtn { background:var(--accent); color:#fff; padding:7px 14px; }
     .permission-bar.hidden { display:none; }
-    @media (max-width:420px) { body { padding-top:16px; } .container { padding:22px 16px; } .app-header { flex-direction:column; gap:8px; margin-bottom:25px; } .app-header h1 { font-size:clamp(20px,6vw,24px); white-space:nowrap; } .settings-grid { grid-template-columns:1fr 1fr; } .settings label:last-child { grid-column:1 / -1; } .permission-bar { align-items:stretch; flex-direction:column; text-align:center; } .permission-bar__actions { justify-content:center; } }
+    @media (max-width:420px) { body { padding-top:16px; } .container { padding:22px 16px; } .app-header { flex-direction:column; gap:8px; margin-bottom:25px; } .app-header h1 { font-size:clamp(20px,6vw,24px); white-space:nowrap; } .settings-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; } .settings label { font-size:12px; } .settings input[type="number"] { padding:6px 4px; } .permission-bar { align-items:stretch; flex-direction:column; text-align:center; } .permission-bar__actions { justify-content:center; } }
       .sound-settings { margin-top:20px; text-align:left; }
     .sound-settings__label { display:block; margin-bottom:8px; }
     .sound-settings__controls { display:grid; gap:8px; grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -84,7 +84,7 @@
   <div class="completion-notice" id="completionNotice" role="status" aria-live="assertive"><p class="completion-notice__eyebrow" id="completionEyebrow"></p><p class="completion-notice__title" id="completionTitle"></p><p class="completion-notice__detail" id="completionDetail"></p></div>
   <div class="permission-bar hidden" id="permissionBar"><p class="permission-bar__text">画面を閉じている間も通知を受け取るには、通知を許可してください。</p><div class="permission-bar__actions"><button id="notifAllowBtn">通知を許可</button><button class="btn-later" id="notifLaterBtn">後で</button></div></div>
   <main class="container">
-    <header class="app-header"><h1>ポモドーロタイマー</h1><span class="version-badge">2026-07-27-03</span></header>
+    <header class="app-header"><h1>ポモドーロタイマー</h1><span class="version-badge">2026-07-27-04</span></header>
     <div class="mode-label"><span class="eyebrow" id="modeLabelEn">FOCUS</span><span class="mode-name" id="modeLabelJa">作業中</span></div>
     <div class="progress-ring-wrapper"><svg class="progress-ring" viewBox="0 0 240 240" aria-label="タイマー進行状況"><circle class="progress-ring__track" cx="120" cy="120" r="108"/><circle class="progress-ring__progress" id="progressCircle" cx="120" cy="120" r="108"/></svg><div class="timer-display"><div class="time" id="timeDisplay">50:00</div><div class="session-count" id="sessionCount">SET 01 / 03 · FOCUS</div></div></div>
     <div class="controls"><button class="btn-start" id="startBtn">開始</button><button class="btn-reset" id="resetBtn">リセット</button></div>
