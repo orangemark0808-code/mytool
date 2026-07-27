@@ -2,7 +2,7 @@ const STORAGE_KEY = 'pomodoro_state';
 const SETTINGS_KEY = 'pomodoro_settings';
 const DEFAULT_WORK_MIN = 50;
 const DEFAULT_BREAK_MIN = 10;
-const APP_VERSION = '2026-07-27-05';
+const APP_VERSION = '2026-07-27-06';
 const DEFAULT_SET_COUNT = 3;
 let WORK_SECONDS = DEFAULT_WORK_MIN * 60;
 let BREAK_SECONDS = DEFAULT_BREAK_MIN * 60;
@@ -230,11 +230,14 @@ function buildDiagnostics() { return Object.entries({ appVersion: APP_VERSION, u
 function refreshDiagnostics() { updateNotificationStatus(); const textarea = document.getElementById('diagnosticsText'); if (textarea) textarea.value = buildDiagnostics(); }
 async function copyDiagnostics() { const text = buildDiagnostics(); const textarea = document.getElementById('diagnosticsText'); textarea.value = text; let copied = false; try { await navigator.clipboard.writeText(text); copied = true; } catch (error) { try { textarea.focus(); textarea.select(); copied = document.execCommand('copy'); } catch (fallbackError) {} } textarea.focus(); textarea.select(); document.getElementById('logText').textContent = copied ? '診断情報をコピーしました' : '自動コピーできませんでした。下の診断情報を長押ししてコピーしてください。'; }
 async function init() {
-  progressEl = document.getElementById('progressCircle'); progressEl.style.strokeDasharray = CIRCUMFERENCE; progressEl.style.strokeDashoffset = 0;
-  loadSettings(); document.getElementById('inputWork').value = WORK_SECONDS / 60; document.getElementById('inputBreak').value = BREAK_SECONDS / 60; document.getElementById('inputSets').value = SET_COUNT; setTabLabels();
-  document.getElementById('startBtn').addEventListener('click', toggleTimer); document.getElementById('resetBtn').addEventListener('click', resetTimer); document.getElementById('applyBtn').addEventListener('click', applySettings); document.getElementById('tabWork').addEventListener('click', () => switchMode('work')); document.getElementById('tabBreak').addEventListener('click', () => switchMode('break')); document.getElementById('soundTestBtn').addEventListener('click', toggleTestSound); document.getElementById('notifAllowBtn').addEventListener('click', requestNotificationPermission); document.getElementById('notifLaterBtn').addEventListener('click', () => document.getElementById('permissionBar').classList.add('hidden')); document.getElementById('completionNotice').addEventListener('click', clearEndFeedback); document.getElementById('notificationTestBtn').addEventListener('click', testOsNotification); document.getElementById('diagnosticsRefreshBtn').addEventListener('click', refreshDiagnostics); document.getElementById('diagnosticsCopyBtn').addEventListener('click', copyDiagnostics);
-  await registerSW(); checkNotificationPermission(); const restored = loadState();
-  if (restored && running && !completed) { const changed = reconcileElapsedTime(Date.now()); if (changed && running && !completed) document.getElementById('logText').textContent = '画面OFF中の経過時間を反映しました'; if (running && !completed) { document.getElementById('startBtn').textContent = '一時停止'; startDisplayInterval(); } } else { resetTimer(); }
-  if (completed) document.getElementById('startBtn').textContent = 'もう一度'; updateModeUI(); updateDisplay(); refreshDiagnostics();
+  const container = document.querySelector('.container');
+  try {
+    progressEl = document.getElementById('progressCircle'); progressEl.style.strokeDasharray = CIRCUMFERENCE; progressEl.style.strokeDashoffset = 0;
+    loadSettings(); document.getElementById('inputWork').value = WORK_SECONDS / 60; document.getElementById('inputBreak').value = BREAK_SECONDS / 60; document.getElementById('inputSets').value = SET_COUNT; setTabLabels();
+    document.getElementById('startBtn').addEventListener('click', toggleTimer); document.getElementById('resetBtn').addEventListener('click', resetTimer); document.getElementById('applyBtn').addEventListener('click', applySettings); document.getElementById('tabWork').addEventListener('click', () => switchMode('work')); document.getElementById('tabBreak').addEventListener('click', () => switchMode('break')); document.getElementById('soundTestBtn').addEventListener('click', toggleTestSound); document.getElementById('notifAllowBtn').addEventListener('click', requestNotificationPermission); document.getElementById('notifLaterBtn').addEventListener('click', () => document.getElementById('permissionBar').classList.add('hidden')); document.getElementById('completionNotice').addEventListener('click', clearEndFeedback); document.getElementById('notificationTestBtn').addEventListener('click', testOsNotification); document.getElementById('diagnosticsRefreshBtn').addEventListener('click', refreshDiagnostics); document.getElementById('diagnosticsCopyBtn').addEventListener('click', copyDiagnostics);
+    await registerSW(); checkNotificationPermission(); const restored = loadState();
+    if (restored && running && !completed) { const changed = reconcileElapsedTime(Date.now()); if (changed && running && !completed) document.getElementById('logText').textContent = '画面OFF中の経過時間を反映しました'; if (running && !completed) { document.getElementById('startBtn').textContent = '一時停止'; startDisplayInterval(); } } else { resetTimer(); }
+    if (completed) document.getElementById('startBtn').textContent = 'もう一度'; updateModeUI(); updateDisplay(); refreshDiagnostics();
+  } finally { if (container) container.classList.remove('is-initializing'); }
 }
 document.addEventListener('DOMContentLoaded', init);
