@@ -2,7 +2,7 @@ const STORAGE_KEY = 'pomodoro_state';
 const SETTINGS_KEY = 'pomodoro_settings';
 const DEFAULT_WORK_MIN = 50;
 const DEFAULT_BREAK_MIN = 10;
-const APP_VERSION = '2026-07-27-02';
+const APP_VERSION = '2026-07-27-03';
 const DEFAULT_SET_COUNT = 3;
 let WORK_SECONDS = DEFAULT_WORK_MIN * 60;
 let BREAK_SECONDS = DEFAULT_BREAK_MIN * 60;
@@ -16,6 +16,13 @@ let completed = false;
 let intervalId = null;
 let startTimestamp = null;
 let remainingAtStart = null;
+let phaseEndTimestamp = null;
+let lastReconcileTime = null;
+let lastReconcileElapsedSeconds = 0;
+let lastReconcilePhasesAdvanced = 0;
+let lastReconcileResult = '未実行';
+let reconcileLock = false;
+let lastReconcileRunAt = 0;
 let swRegistration = null;
 let progressEl = null;
 let timerEndedLock = false;
@@ -67,7 +74,7 @@ function applySettings() {
   document.getElementById('startBtn').textContent = '開始'; document.getElementById('logText').textContent = '';
   saveSettings(workMin, breakMin, setCount); setTabLabels(); updateModeUI(); updateDisplay(); saveState();
 }
-function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode, totalSeconds, remaining, running, completedSets, startTimestamp, remainingAtStart, completed })); } catch (error) {} }
+function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ mode, totalSeconds, remaining, running, completedSets, startTimestamp, remainingAtStart, phaseEndTimestamp, completed })); } catch (error) {} }
 function loadState() {
   try {
     const state = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (!state) return false;
@@ -76,7 +83,7 @@ function loadState() {
     const legacySessions = Number.isInteger(state.sessions) ? state.sessions : 0;
     completedSets = Number.isInteger(state.completedSets) ? state.completedSets : legacySessions;
     completedSets = Math.max(0, Math.min(completedSets, SET_COUNT)); completed = state.completed === true || completedSets >= SET_COUNT;
-    startTimestamp = Number.isFinite(state.startTimestamp) ? state.startTimestamp : null; remainingAtStart = Number.isFinite(state.remainingAtStart) ? state.remainingAtStart : null;
+    startTimestamp = Number.isFinite(state.startTimestamp) ? state.startTimestamp : null; remainingAtStart = Number.isFinite(state.remainingAtStart) ? state.remainingAtStart : null; phaseEndTimestamp = Number.isFinite(state.phaseEndTimestamp) ? state.phaseEndTimestamp : null; if (running && !completed && phaseEndTimestamp === null) phaseEndTimestamp = Number.isFinite(startTimestamp) && Number.isFinite(remainingAtStart) ? startTimestamp + remainingAtStart * 1000 : Date.now() + remaining * 1000;
     return true;
   } catch (error) { return false; }
 }
@@ -88,7 +95,7 @@ async function registerSW() {
     await swRegistration.update();
     serviceWorkerReady = true;
     serviceWorkerState = swRegistration.active ? '登録済み' : '待機中';
-    navigator.serviceWorker.addEventListener('message', event => { if (event.data.type === 'TIMER_ENDED' && document.visibilityState === 'visible') onTimerEnd({ osNotified: true, isFinalBreak: event.data.isFinalBreak === true }); });
+    navigator.serviceWorker.addEventListener('message', event => { if (!event.data || event.data.type !== 'TIMER_ENDED') return; if (document.visibilityState !== 'visible' || !running || completed || !Number.isFinite(phaseEndTimestamp) || Date.now() < phaseEndTimestamp) return; handleAppResume(); });
   } catch (error) { serviceWorkerState = 'エラー'; serviceWorkerReady = false; lastOsNotificationError = `${error.name}: ${error.message}`; console.warn('ServiceWorker登録失敗:', error); }
 }
 function scheduleSwNotification(delaySec) { try { const worker = swRegistration && swRegistration.active; if (worker) worker.postMessage({ type: 'SCHEDULE', delay: delaySec * 1000, isWork: mode === 'work', isFinalBreak: mode === 'break' && completedSets === SET_COUNT - 1, setCount: SET_COUNT }); } catch (error) {} }
@@ -104,11 +111,13 @@ async function showOsNotification(kind, isTest = false) {
 }
 async function requestNotificationPermission() { if (!notifSupported) return false; try { const result = await Notification.requestPermission(); document.getElementById('permissionBar').classList.add('hidden'); updateNotificationStatus(); return result === 'granted'; } catch (error) { lastOsNotificationResult = '失敗'; updateNotificationStatus(); return false; } }
 function checkNotificationPermission() { const bar = document.getElementById('permissionBar'); if (notifSupported && Notification.permission === 'default') bar.classList.remove('hidden'); else bar.classList.add('hidden'); updateNotificationStatus(); }
-function recalcRemaining() { if (running && startTimestamp !== null) remaining = Math.max(remainingAtStart - Math.floor((Date.now() - startTimestamp) / 1000), 0); }
+function recalcRemaining() { if (running && Number.isFinite(phaseEndTimestamp)) remaining = Math.max(Math.ceil((phaseEndTimestamp - Date.now()) / 1000), 0); }
 function updateDisplay() { const safeRemaining = Math.max(remaining, 0); const minutes = Math.floor(safeRemaining / 60).toString().padStart(2, '0'); const seconds = (safeRemaining % 60).toString().padStart(2, '0'); document.getElementById('timeDisplay').textContent = `${minutes}:${seconds}`; progressEl.style.strokeDashoffset = CIRCUMFERENCE * (1 - safeRemaining / totalSeconds); document.title = `${minutes}:${seconds} — ${completed ? '全セット完了' : mode === 'work' ? '作業中' : '休憩中'}`; }
 function updateModeUI() { const english = completed ? 'COMPLETE' : mode === 'work' ? 'FOCUS' : 'BREAK'; const japanese = completed ? '全セット完了' : mode === 'work' ? '作業中' : '休憩中'; const shownSet = completed ? SET_COUNT : Math.min(completedSets + 1, SET_COUNT); document.getElementById('modeLabelEn').textContent = english; document.getElementById('modeLabelJa').textContent = japanese; document.getElementById('sessionCount').textContent = `SET ${String(shownSet).padStart(2, '0')} / ${String(SET_COUNT).padStart(2, '0')} · ${english}`; document.getElementById('tabWork').className = 'tab' + (mode === 'work' && !completed ? ' active-work' : ''); document.getElementById('tabBreak').className = 'tab' + (mode === 'break' && !completed ? ' active-break' : ''); }
-function stopTimer({ stopAudio = false } = {}) { clearInterval(intervalId); intervalId = null; cancelSwNotification(); running = false; startTimestamp = null; remainingAtStart = null; if (stopAudio) stopSound(); }
-async function start({ requestPermission = true, unlock = false } = {}) { if (completed) return; clearInterval(intervalId); if (unlock) await unlockAudio(); if (requestPermission && notifSupported && Notification.permission === 'default') requestNotificationPermission(); try { ensureAudioContext(); } catch (error) {} startTimestamp = Date.now(); remainingAtStart = remaining; running = true; document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); saveState(); intervalId = setInterval(tick, 1000); }
+function getPhaseDurationSeconds(targetMode) { return targetMode === 'work' ? WORK_SECONDS : BREAK_SECONDS; }
+function advancePhaseSilently() { if (mode === 'work') { mode = 'break'; totalSeconds = BREAK_SECONDS; remaining = BREAK_SECONDS; return true; } completedSets += 1; if (completedSets >= SET_COUNT) { completedSets = SET_COUNT; completed = true; running = false; phaseEndTimestamp = null; clearInterval(intervalId); intervalId = null; return false; } mode = 'work'; totalSeconds = WORK_SECONDS; remaining = WORK_SECONDS; return true; }
+function stopTimer({ stopAudio = false } = {}) { clearInterval(intervalId); intervalId = null; cancelSwNotification(); running = false; phaseEndTimestamp = null; startTimestamp = null; remainingAtStart = null; if (stopAudio) stopSound(); }
+async function start({ requestPermission = true, unlock = false } = {}) { if (completed) return; clearInterval(intervalId); if (unlock) await unlockAudio(); if (requestPermission && notifSupported && Notification.permission === 'default') requestNotificationPermission(); try { ensureAudioContext(); } catch (error) {} startTimestamp = Date.now(); remainingAtStart = remaining; phaseEndTimestamp = startTimestamp + remaining * 1000; running = true; document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); saveState(); intervalId = setInterval(tick, 1000); }
 function pause() { recalcRemaining(); stopTimer(); document.getElementById('startBtn').textContent = '再開'; updateDisplay(); saveState(); }
 async function toggleTimer() { if (completed) { await restartTimer(); return; } if (running) pause(); else await start({ unlock: true }); }
 function resetTimer() { stopTimer({ stopAudio: true }); clearEndFeedback(); mode = 'work'; completedSets = 0; completed = false; totalSeconds = WORK_SECONDS; remaining = totalSeconds; document.getElementById('startBtn').textContent = '開始'; document.getElementById('logText').textContent = ''; updateModeUI(); updateDisplay(); saveState(); }
@@ -136,7 +145,32 @@ function onTimerEnd({ osNotified = false, isFinalBreak = false } = {}) {
 }
 function autoSwitchMode(nextMode) { mode = nextMode; totalSeconds = nextMode === 'work' ? WORK_SECONDS : BREAK_SECONDS; remaining = totalSeconds; startTimestamp = null; remainingAtStart = null; updateModeUI(); updateDisplay(); saveState(); start({ requestPermission: false, unlock: false }); }
 function switchMode(nextMode) { if (running) pause(); if (completed) { completed = false; completedSets = 0; } mode = nextMode; totalSeconds = nextMode === 'work' ? WORK_SECONDS : BREAK_SECONDS; remaining = totalSeconds; document.getElementById('startBtn').textContent = '開始'; document.getElementById('logText').textContent = ''; updateModeUI(); updateDisplay(); saveState(); }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible' || !running) return; recalcRemaining(); if (remaining <= 0) onTimerEnd(); else { updateDisplay(); clearInterval(intervalId); intervalId = setInterval(tick, 1000); } });
+function reconcileElapsedTime(now = Date.now()) {
+  const originalPhaseEndTimestamp = Number.isFinite(phaseEndTimestamp) ? phaseEndTimestamp : null;
+  lastReconcileTime = now;
+  lastReconcileElapsedSeconds = originalPhaseEndTimestamp !== null && now >= originalPhaseEndTimestamp ? Math.floor((now - originalPhaseEndTimestamp) / 1000) : 0;
+  lastReconcilePhasesAdvanced = 0;
+  if (!running || completed) { lastReconcileResult = '実行不要'; return false; }
+  if (!Number.isFinite(phaseEndTimestamp)) phaseEndTimestamp = now + Math.max(remaining, 0) * 1000;
+  const maxAdvances = SET_COUNT * 2 + 2;
+  while (now >= phaseEndTimestamp && lastReconcilePhasesAdvanced < maxAdvances) {
+    const finishedAt = phaseEndTimestamp;
+    const keepRunning = advancePhaseSilently();
+    lastReconcilePhasesAdvanced += 1;
+    if (!keepRunning) { lastReconcileResult = '全セット完了'; updateModeUI(); updateDisplay(); saveState(); return true; }
+    phaseEndTimestamp = finishedAt + getPhaseDurationSeconds(mode) * 1000;
+  }
+  if (lastReconcilePhasesAdvanced >= maxAdvances && now >= phaseEndTimestamp) { lastReconcileResult = '安全上限到達'; }
+  else { remaining = Math.max(Math.ceil((phaseEndTimestamp - now) / 1000), 0); lastReconcileResult = lastReconcilePhasesAdvanced > 0 ? 'フェーズ補正完了' : '残り時間更新'; }
+  updateModeUI(); updateDisplay(); saveState(); return lastReconcilePhasesAdvanced > 0;
+}
+function startDisplayInterval() { clearInterval(intervalId); intervalId = running && !completed ? setInterval(tick, 1000) : null; }
+
+function handleAppResume() { const now = Date.now(); if (reconcileLock || now - lastReconcileRunAt < 500) return; reconcileLock = true; lastReconcileRunAt = now; try { const changed = reconcileElapsedTime(now); if (changed && running && !completed && remaining > 0 && Number.isFinite(phaseEndTimestamp)) { cancelSwNotification(); scheduleSwNotification(remaining); document.getElementById('logText').textContent = '画面OFF中の経過時間を反映しました'; } clearInterval(intervalId); intervalId = null; if (running && !completed) startDisplayInterval(); updateModeUI(); updateDisplay(); saveState(); } finally { reconcileLock = false; } }
+
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') handleAppResume(); });
+window.addEventListener('pageshow', handleAppResume);
+window.addEventListener('focus', handleAppResume);
 function ensureAudioContext() {
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -200,7 +234,7 @@ async function init() {
   loadSettings(); document.getElementById('inputWork').value = WORK_SECONDS / 60; document.getElementById('inputBreak').value = BREAK_SECONDS / 60; document.getElementById('inputSets').value = SET_COUNT; setTabLabels();
   document.getElementById('startBtn').addEventListener('click', toggleTimer); document.getElementById('resetBtn').addEventListener('click', resetTimer); document.getElementById('applyBtn').addEventListener('click', applySettings); document.getElementById('tabWork').addEventListener('click', () => switchMode('work')); document.getElementById('tabBreak').addEventListener('click', () => switchMode('break')); document.getElementById('soundTestBtn').addEventListener('click', toggleTestSound); document.getElementById('notifAllowBtn').addEventListener('click', requestNotificationPermission); document.getElementById('notifLaterBtn').addEventListener('click', () => document.getElementById('permissionBar').classList.add('hidden')); document.getElementById('completionNotice').addEventListener('click', clearEndFeedback); document.getElementById('notificationTestBtn').addEventListener('click', testOsNotification); document.getElementById('diagnosticsRefreshBtn').addEventListener('click', refreshDiagnostics); document.getElementById('diagnosticsCopyBtn').addEventListener('click', copyDiagnostics);
   await registerSW(); checkNotificationPermission(); const restored = loadState();
-  if (restored && running) { recalcRemaining(); if (remaining <= 0) { running = false; remaining = 0; document.getElementById('logText').textContent = '閉じている間にタイマーが終了しました'; saveState(); } else { document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); intervalId = setInterval(tick, 1000); } }
+  if (restored && running) { const changed = reconcileElapsedTime(Date.now()); if (changed && running && !completed) document.getElementById('logText').textContent = '画面OFF中の経過時間を反映しました'; if (running && !completed) { document.getElementById('startBtn').textContent = '一時停止'; startDisplayInterval(); } }
   if (completed) document.getElementById('startBtn').textContent = 'もう一度'; updateModeUI(); updateDisplay(); refreshDiagnostics();
 }
 document.addEventListener('DOMContentLoaded', init);
