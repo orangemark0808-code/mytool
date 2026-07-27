@@ -2,7 +2,7 @@ const STORAGE_KEY = 'pomodoro_state';
 const SETTINGS_KEY = 'pomodoro_settings';
 const DEFAULT_WORK_MIN = 50;
 const DEFAULT_BREAK_MIN = 10;
-const APP_VERSION = '2026-07-26-05';
+const APP_VERSION = '2026-07-26-06';
 const DEFAULT_SET_COUNT = 3;
 let WORK_SECONDS = DEFAULT_WORK_MIN * 60;
 let BREAK_SECONDS = DEFAULT_BREAK_MIN * 60;
@@ -25,8 +25,9 @@ let soundLoopTimer = null;
 let completionNoticeTimer = null;
 let backgroundFeedbackTimer = null;
 let bannerTimer = null;
-let lastVibrationResult = '未実行';
 let lastSoundResult = '未初期化';
+let lastSoundKind = '未実行';
+let activeOscillators = [];
 let lastOsNotificationResult = '未実行';
 let lastTimerEndKind = '未実行';
 let serviceWorkerState = '未登録';
@@ -35,8 +36,6 @@ let lastOsNotificationError = 'なし';
 let lastAppNotificationKind = '未実行';
 let audioUnlocked = false;
 let lastAudioResumeResult = '未実行';
-let lastVibrationPattern = '未実行';
-let lastVibrationTime = '未実行';
 const CIRCLE_R = 108;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_R;
 const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -150,19 +149,39 @@ function ensureAudioContext() {
     return soundCtx;
   } catch (error) { soundCtx = null; lastSoundResult = 'エラー'; updateNotificationStatus(); return null; }
 }
-function playSound() { if (soundLooping) return; soundLooping = true; lastSoundResult = '利用可能'; updateNotificationStatus(); const context = ensureAudioContext(); if (!context) { soundLooping = false; lastSoundResult = 'エラー'; updateNotificationStatus(); return; } const play = () => { const count = 5, interval = 0.7, duration = 0.5; for (let index = 0; index < count; index += 1) { const oscillator = context.createOscillator(); const gain = context.createGain(); oscillator.connect(gain); gain.connect(context.destination); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(880, context.currentTime + index * interval); gain.gain.setValueAtTime(0.4, context.currentTime + index * interval); gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + index * interval + duration); oscillator.start(context.currentTime + index * interval); oscillator.stop(context.currentTime + index * interval + duration); } soundLoopTimer = setTimeout(stopSound, count * interval * 1000 + 200); }; if (context.state === 'running') play(); else context.resume().then(play).catch(() => { soundLooping = false; }); }
-function stopSound() { soundLooping = false; lastSoundResult = '停止中'; updateNotificationStatus(); clearTimeout(soundLoopTimer); const button = document.getElementById('soundTestBtn'); if (button) button.textContent = '通知音をテスト'; }
-function toggleTestSound() { const button = document.getElementById('soundTestBtn'); if (soundLooping) stopSound(); else { ensureAudioContext(); playSound(); if (button) button.textContent = '音を止める'; } }
-function vibrate(pattern) { lastVibrationPattern = JSON.stringify(pattern); lastVibrationTime = new Date().toISOString(); try { if (!('vibrate' in navigator)) { lastVibrationResult = '非対応'; updateNotificationStatus(); return false; } const result = navigator.vibrate(pattern); lastVibrationResult = result ? '成功' : '失敗'; updateNotificationStatus(); return result; } catch (error) { lastVibrationResult = '失敗'; updateNotificationStatus(); return false; } }
-function clearEndFeedback({ cancelVibration = true } = {}) { clearTimeout(completionNoticeTimer); clearTimeout(backgroundFeedbackTimer); clearTimeout(bannerTimer); document.body.classList.remove('notification-active'); const notice = document.getElementById('completionNotice'); if (notice) notice.classList.remove('show'); const banner = document.getElementById('notifyBanner'); if (banner) banner.classList.remove('show'); if (cancelVibration) vibrate(0); }
+function playSound(kind = 'work') {
+  if (soundLooping) { lastSoundResult = '二重再生抑止'; refreshDiagnostics(); return; }
+  const context = ensureAudioContext();
+  if (!context) { lastSoundResult = 'AudioContextなし'; refreshDiagnostics(); return; }
+  const patterns = {
+    work: [[880,.35],[1046,.35],[1318,.35]],
+    break: [[660,.35],[990,.35],[660,.35],[990,.35]],
+    complete: [[784,.35],[988,.35],[1175,.35],[1568,.8]]
+  };
+  const notes = patterns[kind] || patterns.work;
+  const startNotes = () => {
+    soundLooping = true; lastSoundKind = kind; lastSoundResult = kind === 'work' ? '作業終了音：成功' : kind === 'break' ? '休憩終了音：成功' : '全セット完了音：成功';
+    let offset = 0; activeOscillators = [];
+    notes.forEach(([frequency, duration], index) => {
+      const oscillator = context.createOscillator(); const gain = context.createGain(); const startAt = context.currentTime + offset;
+      oscillator.connect(gain); gain.connect(context.destination); oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(frequency, startAt);
+      gain.gain.setValueAtTime(0.0001, startAt); gain.gain.linearRampToValueAtTime(0.62, startAt + 0.025); gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
+      oscillator.start(startAt); oscillator.stop(startAt + duration + 0.03); activeOscillators.push(oscillator); offset += duration + (kind === 'break' && index === 1 ? 0.32 : 0.18);
+    });
+    clearTimeout(soundLoopTimer); soundLoopTimer = setTimeout(() => { activeOscillators = []; soundLooping = false; lastSoundResult = '停止中'; refreshDiagnostics(); }, Math.ceil((offset + .1) * 1000)); refreshDiagnostics();
+  };
+  if (context.state === 'running') startNotes(); else context.resume().then(startNotes).catch(error => { soundLooping = false; lastSoundResult = 'resume失敗'; lastAudioResumeResult = `${error.name}: ${error.message}`; refreshDiagnostics(); });
+}
+function stopSound() { activeOscillators.forEach(oscillator => { try { oscillator.stop(); } catch (error) {} }); activeOscillators = []; clearTimeout(soundLoopTimer); soundLooping = false; lastSoundResult = '停止中'; refreshDiagnostics(); const button = document.getElementById('soundTestBtn'); if (button) button.textContent = '通知音をテスト'; }
+function toggleTestSound() { if (soundLooping) { stopSound(); return; } playSound(document.getElementById('soundType').value); }function clearEndFeedback() { clearTimeout(completionNoticeTimer); clearTimeout(backgroundFeedbackTimer); clearTimeout(bannerTimer); document.body.classList.remove('notification-active'); const notice = document.getElementById('completionNotice'); if (notice) notice.classList.remove('show'); const banner = document.getElementById('notifyBanner'); if (banner) banner.classList.remove('show'); }
 function presentEndFeedback(kind) { lastAppNotificationKind = kind === 'work' ? '作業' : kind === 'break' ? '休憩' : '全セット完了';
-  clearEndFeedback({ cancelVibration: false });
-  playSound();
+  clearEndFeedback();
+  playSound(kind);
   showNotify();
   const notice = document.getElementById('completionNotice');
-  const messages = kind === 'complete' ? { eyebrow: 'ALL SETS COMPLETE', title: `${SET_COUNT}セット完了しました`, detail: '', vibration: [700, 250, 700, 250, 1000], duration: 8000 } : kind === 'work' ? { eyebrow: 'FOCUS COMPLETE', title: '作業時間が終了しました', detail: '休憩を開始します', vibration: [500, 200, 500, 200, 500], duration: 5000 } : { eyebrow: 'BREAK COMPLETE', title: '休憩時間が終了しました', detail: '次の作業を開始します', vibration: [300, 150, 300], duration: 5000 };
+  const messages = kind === 'complete' ? { eyebrow: 'ALL SETS COMPLETE', title: `${SET_COUNT}セット完了しました`, detail: '', duration: 8000 } : kind === 'work' ? { eyebrow: 'FOCUS COMPLETE', title: '作業時間が終了しました', detail: '休憩を開始します', duration: 5000 } : { eyebrow: 'BREAK COMPLETE', title: '休憩時間が終了しました', detail: '次の作業を開始します', duration: 5000 };
   document.getElementById('completionEyebrow').textContent = messages.eyebrow; document.getElementById('completionTitle').textContent = messages.title; document.getElementById('completionDetail').textContent = messages.detail;
-  notice.classList.add('show'); document.body.classList.add('notification-active'); vibrate(messages.vibration);
+  notice.classList.add('show'); document.body.classList.add('notification-active');
   completionNoticeTimer = setTimeout(() => notice.classList.remove('show'), messages.duration);
   backgroundFeedbackTimer = setTimeout(() => document.body.classList.remove('notification-active'), 2000);
 }
@@ -170,21 +189,19 @@ function showNotify() { const banner = document.getElementById('notifyBanner'); 
 function updateNotificationStatus() {
   const target = document.getElementById('notificationStatus'); if (!target) return;
   const permission = !notifSupported ? '非対応' : Notification.permission === 'granted' ? '許可済み' : Notification.permission === 'denied' ? '拒否' : '未選択';
-  const vibration = 'vibrate' in navigator ? '対応' : '非対応';
-  const deniedHint = notifSupported && Notification.permission === 'denied' ? '<p class="notification-diagnostics__note">通知が拒否されています。Chromeのサイト設定から通知を許可してください。</p>' : '';
-  target.innerHTML = `通知状態<br>通知権限：${permission}<br>Service Worker：${serviceWorkerState}<br>振動：${vibration}<br>振動テスト結果：${lastVibrationResult}<br>音声：${lastSoundResult}<br>最後のOS通知：${lastOsNotificationResult}<br>最後の終了通知：${lastTimerEndKind}${deniedHint}<p class="notification-diagnostics__note">振動要求が成功でも、端末設定により体感できない場合があります。</p>`;
+  const hint = notifSupported && Notification.permission === 'denied' ? '<p class="notification-diagnostics__note">通知が拒否されています。Chromeのサイト設定から通知を許可してください。</p>' : '';
+  target.innerHTML = `通知状態<br>通知権限：${permission}<br>Service Worker：${serviceWorkerState}<br>音声：${lastSoundResult}<br>最後のOS通知：${lastOsNotificationResult}<br>最後のアプリ内通知：${lastAppNotificationKind}<br>最後の終了通知：${lastTimerEndKind}${hint}`;
 }
-function testVibration() { vibrate([300, 150, 300]); refreshDiagnostics(); }
 async function testOsNotification() { if (!notifSupported) { lastOsNotificationResult = '失敗'; updateNotificationStatus(); return; } if (Notification.permission === 'default') await requestNotificationPermission(); if (Notification.permission === 'denied') { lastOsNotificationResult = '失敗'; updateNotificationStatus(); return; } await showOsNotification('test', true); refreshDiagnostics(); }
-async function copyDiagnostics() { const details = { appVersion: APP_VERSION, userAgent: navigator.userAgent, notificationSupported: notifSupported, notificationPermission: notifSupported ? Notification.permission : 'unsupported', serviceWorkerSupported: 'serviceWorker' in navigator, serviceWorkerRegistered: !!swRegistration, serviceWorkerController: !!(navigator.serviceWorker && navigator.serviceWorker.controller), vibrationSupported: 'vibrate' in navigator, lastVibrationResult, audioContextState: soundCtx ? soundCtx.state : 'uninitialized', lastSoundResult, lastOsNotificationResult, lastTimerEndKind, visibilityState: document.visibilityState, displayMode: window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'standalone' : 'browser', currentTime: new Date().toISOString() }; const text = Object.entries(details).map(([key, value]) => `${key}: ${value}`).join('\n'); try { await navigator.clipboard.writeText(text); document.getElementById('logText').textContent = '診断情報をコピーしました'; } catch (error) { document.getElementById('logText').textContent = '診断情報をコピーできませんでした'; } }
+async function copyDiagnostics() { const details = { appVersion: APP_VERSION, userAgent: navigator.userAgent, notificationSupported: notifSupported, notificationPermission: notifSupported ? Notification.permission : 'unsupported', serviceWorkerSupported: 'serviceWorker' in navigator, serviceWorkerRegistered: !!swRegistration, serviceWorkerController: !!(navigator.serviceWorker && navigator.serviceWorker.controller), audioContextState: soundCtx ? soundCtx.state : 'uninitialized', lastSoundResult, lastSoundKind, lastOsNotificationResult, lastTimerEndKind, visibilityState: document.visibilityState, displayMode: window.matchMedia && window.matchMedia('(display-mode: standalone)').matches || navigator.standalone ? 'standalone' : 'browser', currentTime: new Date().toISOString() }; const text = Object.entries(details).map(([key, value]) => `${key}: ${value}`).join('\n'); try { await navigator.clipboard.writeText(text); document.getElementById('logText').textContent = '診断情報をコピーしました'; } catch (error) { document.getElementById('logText').textContent = '診断情報をコピーできませんでした'; } }
 async function unlockAudio() { const context = ensureAudioContext(); if (!context) { audioUnlocked = false; lastAudioResumeResult = 'AudioContextなし'; refreshDiagnostics(); return false; } try { if (context.state === 'suspended') await context.resume(); const oscillator = context.createOscillator(); const gain = context.createGain(); gain.gain.setValueAtTime(0.00001, context.currentTime); oscillator.connect(gain); gain.connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + 0.02); audioUnlocked = context.state === 'running'; lastAudioResumeResult = audioUnlocked ? '成功' : context.state; refreshDiagnostics(); return audioUnlocked; } catch (error) { audioUnlocked = false; lastAudioResumeResult = `${error.name}: ${error.message}`; refreshDiagnostics(); return false; } }
-function buildDiagnostics() { return Object.entries({ appVersion: APP_VERSION, userAgent: navigator.userAgent, platform: navigator.platform || 'unknown', notificationSupported: notifSupported, notificationPermission: notifSupported ? Notification.permission : 'unsupported', serviceWorkerSupported: 'serviceWorker' in navigator, serviceWorkerRegistered: !!swRegistration, serviceWorkerReady, serviceWorkerActive: !!(swRegistration && swRegistration.active), serviceWorkerController: !!(navigator.serviceWorker && navigator.serviceWorker.controller), vibrationSupported: 'vibrate' in navigator, lastVibrationResult, audioContextSupported: !!(window.AudioContext || window.webkitAudioContext), audioContextState: soundCtx ? soundCtx.state : 'uninitialized', audioUnlocked, lastAudioResumeResult, lastSoundResult, lastOsNotificationResult, lastOsNotificationError, lastTimerEndKind, visibilityState: document.visibilityState, displayMode: ((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone) ? 'standalone' : 'browser', currentTime: new Date().toISOString() }).map(([key,value]) => `${key}: ${value}`).join('\n'); }
+function buildDiagnostics() { return Object.entries({ appVersion: APP_VERSION, userAgent: navigator.userAgent, platform: navigator.platform || 'unknown', notificationSupported: notifSupported, notificationPermission: notifSupported ? Notification.permission : 'unsupported', serviceWorkerSupported: 'serviceWorker' in navigator, serviceWorkerRegistered: !!swRegistration, serviceWorkerReady, serviceWorkerActive: !!(swRegistration && swRegistration.active), serviceWorkerController: !!(navigator.serviceWorker && navigator.serviceWorker.controller), audioContextSupported: !!(window.AudioContext || window.webkitAudioContext), audioContextState: soundCtx ? soundCtx.state : 'uninitialized', audioUnlocked, lastAudioResumeResult, lastSoundResult, lastSoundKind, lastOsNotificationResult, lastOsNotificationError, lastTimerEndKind, visibilityState: document.visibilityState, displayMode: ((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone) ? 'standalone' : 'browser', currentTime: new Date().toISOString() }).map(([key,value]) => `${key}: ${value}`).join('\n'); }
 function refreshDiagnostics() { updateNotificationStatus(); const textarea = document.getElementById('diagnosticsText'); if (textarea) textarea.value = buildDiagnostics(); }
 async function copyDiagnostics() { const text = buildDiagnostics(); const textarea = document.getElementById('diagnosticsText'); textarea.value = text; let copied = false; try { await navigator.clipboard.writeText(text); copied = true; } catch (error) { try { textarea.focus(); textarea.select(); copied = document.execCommand('copy'); } catch (fallbackError) {} } textarea.focus(); textarea.select(); document.getElementById('logText').textContent = copied ? '診断情報をコピーしました' : '自動コピーできませんでした。下の診断情報を長押ししてコピーしてください。'; }
 async function init() {
   progressEl = document.getElementById('progressCircle'); progressEl.style.strokeDasharray = CIRCUMFERENCE; progressEl.style.strokeDashoffset = 0;
   loadSettings(); document.getElementById('inputWork').value = WORK_SECONDS / 60; document.getElementById('inputBreak').value = BREAK_SECONDS / 60; document.getElementById('inputSets').value = SET_COUNT; setTabLabels();
-  document.getElementById('startBtn').addEventListener('click', toggleTimer); document.getElementById('resetBtn').addEventListener('click', resetTimer); document.getElementById('applyBtn').addEventListener('click', applySettings); document.getElementById('tabWork').addEventListener('click', () => switchMode('work')); document.getElementById('tabBreak').addEventListener('click', () => switchMode('break')); document.getElementById('soundTestBtn').addEventListener('click', toggleTestSound); document.getElementById('notifAllowBtn').addEventListener('click', requestNotificationPermission); document.getElementById('notifLaterBtn').addEventListener('click', () => document.getElementById('permissionBar').classList.add('hidden')); document.getElementById('completionNotice').addEventListener('click', clearEndFeedback); document.getElementById('vibrationTestBtn').addEventListener('click', testVibration); document.getElementById('notificationTestBtn').addEventListener('click', testOsNotification); document.getElementById('diagnosticsRefreshBtn').addEventListener('click', refreshDiagnostics); document.getElementById('diagnosticsCopyBtn').addEventListener('click', copyDiagnostics);
+  document.getElementById('startBtn').addEventListener('click', toggleTimer); document.getElementById('resetBtn').addEventListener('click', resetTimer); document.getElementById('applyBtn').addEventListener('click', applySettings); document.getElementById('tabWork').addEventListener('click', () => switchMode('work')); document.getElementById('tabBreak').addEventListener('click', () => switchMode('break')); document.getElementById('soundTestBtn').addEventListener('click', toggleTestSound); document.getElementById('notifAllowBtn').addEventListener('click', requestNotificationPermission); document.getElementById('notifLaterBtn').addEventListener('click', () => document.getElementById('permissionBar').classList.add('hidden')); document.getElementById('completionNotice').addEventListener('click', clearEndFeedback); document.getElementById('notificationTestBtn').addEventListener('click', testOsNotification); document.getElementById('diagnosticsRefreshBtn').addEventListener('click', refreshDiagnostics); document.getElementById('diagnosticsCopyBtn').addEventListener('click', copyDiagnostics);
   await registerSW(); checkNotificationPermission(); const restored = loadState();
   if (restored && running) { recalcRemaining(); if (remaining <= 0) { running = false; remaining = 0; document.getElementById('logText').textContent = '閉じている間にタイマーが終了しました'; saveState(); showNotify(); } else { document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); intervalId = setInterval(tick, 1000); } }
   if (completed) document.getElementById('startBtn').textContent = 'もう一度'; updateModeUI(); updateDisplay(); refreshDiagnostics();
