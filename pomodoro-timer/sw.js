@@ -1,4 +1,4 @@
-const CACHE_VERSION = '2026-07-27-04';
+const CACHE_VERSION = '2026-07-27-05';
 let notificationTimer = null;
 function notificationContent(kind, setCount) {
   if (kind === 'complete') return { title: 'ポモドーロタイマー', body: `${setCount}セット完了しました` };
