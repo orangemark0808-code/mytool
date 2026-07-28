@@ -2,7 +2,7 @@ const STORAGE_KEY = 'pomodoro_state';
 const SETTINGS_KEY = 'pomodoro_settings';
 const DEFAULT_WORK_MIN = 50;
 const DEFAULT_BREAK_MIN = 10;
-const APP_VERSION = '2026-07-27-06';
+const APP_VERSION = '2026-07-28-01';
 const DEFAULT_SET_COUNT = 3;
 let WORK_SECONDS = DEFAULT_WORK_MIN * 60;
 let BREAK_SECONDS = DEFAULT_BREAK_MIN * 60;
@@ -42,6 +42,7 @@ let lastOsNotificationError = 'なし';
 let lastAppNotificationKind = '未実行';
 let audioUnlocked = false;
 let lastAudioResumeResult = '未実行';
+let wakeLock = null;
 const CIRCLE_R = 108;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_R;
 const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -116,8 +117,10 @@ function updateDisplay() { const safeRemaining = Math.max(remaining, 0); const m
 function updateModeUI() { const english = completed ? 'COMPLETE' : mode === 'work' ? 'FOCUS' : 'BREAK'; const japanese = completed ? '全セット完了' : mode === 'work' ? '作業中' : '休憩中'; const shownSet = completed ? SET_COUNT : Math.min(completedSets + 1, SET_COUNT); document.getElementById('modeLabelEn').textContent = english; document.getElementById('modeLabelJa').textContent = japanese; document.getElementById('sessionCount').textContent = `SET ${String(shownSet).padStart(2, '0')} / ${String(SET_COUNT).padStart(2, '0')} · ${english}`; document.getElementById('tabWork').className = 'tab' + (mode === 'work' && !completed ? ' active-work' : ''); document.getElementById('tabBreak').className = 'tab' + (mode === 'break' && !completed ? ' active-break' : ''); }
 function getPhaseDurationSeconds(targetMode) { return targetMode === 'work' ? WORK_SECONDS : BREAK_SECONDS; }
 function advancePhaseSilently() { if (mode === 'work') { mode = 'break'; totalSeconds = BREAK_SECONDS; remaining = BREAK_SECONDS; return true; } completedSets += 1; if (completedSets >= SET_COUNT) { completedSets = SET_COUNT; completed = true; running = false; remaining = 0; phaseEndTimestamp = null; clearInterval(intervalId); intervalId = null; return false; } mode = 'work'; totalSeconds = WORK_SECONDS; remaining = WORK_SECONDS; return true; }
-function stopTimer({ stopAudio = false } = {}) { clearInterval(intervalId); intervalId = null; cancelSwNotification(); running = false; phaseEndTimestamp = null; startTimestamp = null; remainingAtStart = null; if (stopAudio) stopSound(); }
-async function start({ requestPermission = true, unlock = false } = {}) { if (completed) return; clearInterval(intervalId); if (unlock) await unlockAudio(); if (requestPermission && notifSupported && Notification.permission === 'default') requestNotificationPermission(); try { ensureAudioContext(); } catch (error) {} startTimestamp = Date.now(); remainingAtStart = remaining; phaseEndTimestamp = startTimestamp + remaining * 1000; running = true; document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); saveState(); intervalId = setInterval(tick, 1000); }
+async function requestWakeLock() { if (!('wakeLock' in navigator)) return; try { wakeLock = await navigator.wakeLock.request('screen'); } catch (error) {} }
+async function releaseWakeLock() { if (!wakeLock) return; try { await wakeLock.release(); } catch (error) {} wakeLock = null; }
+function stopTimer({ stopAudio = false } = {}) { clearInterval(intervalId); intervalId = null; cancelSwNotification(); running = false; phaseEndTimestamp = null; startTimestamp = null; remainingAtStart = null; if (stopAudio) stopSound(); releaseWakeLock(); }
+async function start({ requestPermission = true, unlock = false } = {}) { if (completed) return; clearInterval(intervalId); if (unlock) await unlockAudio(); if (requestPermission && notifSupported && Notification.permission === 'default') requestNotificationPermission(); try { ensureAudioContext(); } catch (error) {} startTimestamp = Date.now(); remainingAtStart = remaining; phaseEndTimestamp = startTimestamp + remaining * 1000; running = true; document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); requestWakeLock(); saveState(); intervalId = setInterval(tick, 1000); }
 function pause() { recalcRemaining(); stopTimer(); document.getElementById('startBtn').textContent = '再開'; updateDisplay(); saveState(); }
 async function toggleTimer() { if (completed) { await restartTimer(); return; } if (running) pause(); else await start({ unlock: true }); }
 function resetTimer() { stopTimer({ stopAudio: true }); clearEndFeedback(); mode = 'work'; completedSets = 0; completed = false; totalSeconds = WORK_SECONDS; remaining = totalSeconds; document.getElementById('startBtn').textContent = '開始'; document.getElementById('logText').textContent = ''; updateModeUI(); updateDisplay(); saveState(); }
@@ -166,7 +169,7 @@ function reconcileElapsedTime(now = Date.now()) {
 }
 function startDisplayInterval() { clearInterval(intervalId); intervalId = running && !completed ? setInterval(tick, 1000) : null; }
 
-function handleAppResume() { const now = Date.now(); if (reconcileLock || now - lastReconcileRunAt < 500) return; reconcileLock = true; lastReconcileRunAt = now; try { const changed = reconcileElapsedTime(now); if (changed && running && !completed && remaining > 0 && Number.isFinite(phaseEndTimestamp)) { cancelSwNotification(); scheduleSwNotification(remaining); document.getElementById('logText').textContent = '画面OFF中の経過時間を反映しました'; } clearInterval(intervalId); intervalId = null; if (running && !completed) startDisplayInterval(); updateModeUI(); updateDisplay(); saveState(); } finally { reconcileLock = false; } }
+function handleAppResume() { const now = Date.now(); if (reconcileLock || now - lastReconcileRunAt < 500) return; reconcileLock = true; lastReconcileRunAt = now; try { const changed = reconcileElapsedTime(now); if (changed && running && !completed && remaining > 0 && Number.isFinite(phaseEndTimestamp)) { cancelSwNotification(); scheduleSwNotification(remaining); document.getElementById('logText').textContent = '画面OFF中の経過時間を反映しました'; } clearInterval(intervalId); intervalId = null; if (running && !completed) startDisplayInterval(); if (document.visibilityState === 'visible' && running && !completed) requestWakeLock(); updateModeUI(); updateDisplay(); saveState(); } finally { reconcileLock = false; } }
 
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') handleAppResume(); });
 window.addEventListener('pageshow', handleAppResume);
