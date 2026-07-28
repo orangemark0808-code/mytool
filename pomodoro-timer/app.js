@@ -2,7 +2,7 @@ const STORAGE_KEY = 'pomodoro_state';
 const SETTINGS_KEY = 'pomodoro_settings';
 const DEFAULT_WORK_MIN = 50;
 const DEFAULT_BREAK_MIN = 10;
-const APP_VERSION = '2026-07-28-02';
+const APP_VERSION = '2026-07-28-03';
 const DEFAULT_SET_COUNT = 3;
 let WORK_SECONDS = DEFAULT_WORK_MIN * 60;
 let BREAK_SECONDS = DEFAULT_BREAK_MIN * 60;
@@ -209,7 +209,9 @@ function playSound(kind = 'work') {
   if (context.state === 'running') startNotes(); else context.resume().then(startNotes).catch(error => { soundLooping = false; lastSoundResult = 'resume失敗'; lastAudioResumeResult = `${error.name}: ${error.message}`; refreshDiagnostics(); });
 }
 function stopSound() { activeOscillators.forEach(oscillator => { try { oscillator.stop(); } catch (error) {} }); activeOscillators = []; clearTimeout(soundLoopTimer); soundLooping = false; lastSoundResult = '停止中'; refreshDiagnostics(); const button = document.getElementById('soundTestBtn'); if (button) button.textContent = '通知音をテスト'; }
-function toggleTestSound() { if (soundLooping) { stopSound(); return; } playSound(document.getElementById('soundType').value); }function clearEndFeedback() { clearTimeout(completionNoticeTimer); clearTimeout(backgroundFeedbackTimer); document.body.classList.remove('notification-active'); const notice = document.getElementById('completionNotice'); if (notice) notice.classList.remove('show'); }
+function toggleTestSound() { if (soundLooping) { stopSound(); return; } playSound(document.getElementById('soundType').value); }
+function toggleNoticeAccordion() { const accordion = document.getElementById('noticeAccordion'); const content = document.getElementById('noticeContent'); const toggle = document.getElementById('noticeToggle'); const isOpen = accordion.classList.toggle('open'); content.classList.toggle('hidden', !isOpen); toggle.setAttribute('aria-expanded', String(isOpen)); }
+function clearEndFeedback() { clearTimeout(completionNoticeTimer); clearTimeout(backgroundFeedbackTimer); document.body.classList.remove('notification-active'); const notice = document.getElementById('completionNotice'); if (notice) notice.classList.remove('show'); }
 function presentEndFeedback(kind) { lastAppNotificationKind = kind === 'work' ? '作業' : kind === 'break' ? '休憩' : '全セット完了';
   clearEndFeedback();
   playSound(kind);
@@ -237,7 +239,7 @@ async function init() {
   try {
     progressEl = document.getElementById('progressCircle'); progressEl.style.strokeDasharray = CIRCUMFERENCE; progressEl.style.strokeDashoffset = 0;
     loadSettings(); document.getElementById('inputWork').value = WORK_SECONDS / 60; document.getElementById('inputBreak').value = BREAK_SECONDS / 60; document.getElementById('inputSets').value = SET_COUNT; setTabLabels();
-    document.getElementById('startBtn').addEventListener('click', toggleTimer); document.getElementById('resetBtn').addEventListener('click', resetTimer); document.getElementById('applyBtn').addEventListener('click', applySettings); document.getElementById('tabWork').addEventListener('click', () => switchMode('work')); document.getElementById('tabBreak').addEventListener('click', () => switchMode('break')); document.getElementById('soundTestBtn').addEventListener('click', toggleTestSound); document.getElementById('notifAllowBtn').addEventListener('click', requestNotificationPermission); document.getElementById('notifLaterBtn').addEventListener('click', () => document.getElementById('permissionBar').classList.add('hidden')); document.getElementById('completionNotice').addEventListener('click', clearEndFeedback); document.getElementById('notificationTestBtn').addEventListener('click', testOsNotification); document.getElementById('diagnosticsRefreshBtn').addEventListener('click', refreshDiagnostics); document.getElementById('diagnosticsCopyBtn').addEventListener('click', copyDiagnostics);
+    document.getElementById('startBtn').addEventListener('click', toggleTimer); document.getElementById('resetBtn').addEventListener('click', resetTimer); document.getElementById('applyBtn').addEventListener('click', applySettings); document.getElementById('tabWork').addEventListener('click', () => switchMode('work')); document.getElementById('tabBreak').addEventListener('click', () => switchMode('break')); document.getElementById('soundTestBtn').addEventListener('click', toggleTestSound); document.getElementById('noticeToggle').addEventListener('click', toggleNoticeAccordion); document.getElementById('notifAllowBtn').addEventListener('click', requestNotificationPermission); document.getElementById('notifLaterBtn').addEventListener('click', () => document.getElementById('permissionBar').classList.add('hidden')); document.getElementById('completionNotice').addEventListener('click', clearEndFeedback); document.getElementById('notificationTestBtn').addEventListener('click', testOsNotification); document.getElementById('diagnosticsRefreshBtn').addEventListener('click', refreshDiagnostics); document.getElementById('diagnosticsCopyBtn').addEventListener('click', copyDiagnostics);
     await registerSW(); checkNotificationPermission(); const restored = loadState();
     if (restored && running && !completed) { const changed = reconcileElapsedTime(Date.now()); if (changed && running && !completed) document.getElementById('logText').textContent = '画面OFF中の経過時間を反映しました'; if (running && !completed) { document.getElementById('startBtn').textContent = '一時停止'; startDisplayInterval(); } } else { resetTimer(); }
     if (completed) document.getElementById('startBtn').textContent = 'もう一度'; updateModeUI(); updateDisplay(); refreshDiagnostics();
