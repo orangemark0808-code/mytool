@@ -2,7 +2,7 @@ const STORAGE_KEY = 'pomodoro_state';
 const SETTINGS_KEY = 'pomodoro_settings';
 const DEFAULT_WORK_MIN = 50;
 const DEFAULT_BREAK_MIN = 10;
-const APP_VERSION = '2026-07-28-03';
+const APP_VERSION = '2026-07-31-04';
 const DEFAULT_SET_COUNT = 3;
 let WORK_SECONDS = DEFAULT_WORK_MIN * 60;
 let BREAK_SECONDS = DEFAULT_BREAK_MIN * 60;
@@ -120,11 +120,11 @@ function advancePhaseSilently() { if (mode === 'work') { mode = 'break'; totalSe
 async function requestWakeLock() { if (!('wakeLock' in navigator)) return; try { wakeLock = await navigator.wakeLock.request('screen'); } catch (error) {} }
 async function releaseWakeLock() { if (!wakeLock) return; try { await wakeLock.release(); } catch (error) {} wakeLock = null; }
 function stopTimer({ stopAudio = false } = {}) { clearInterval(intervalId); intervalId = null; cancelSwNotification(); running = false; phaseEndTimestamp = null; startTimestamp = null; remainingAtStart = null; if (stopAudio) stopSound(); releaseWakeLock(); }
-async function start({ requestPermission = true, unlock = false } = {}) { if (completed) return; clearInterval(intervalId); if (unlock) await unlockAudio(); if (requestPermission && notifSupported && Notification.permission === 'default') requestNotificationPermission(); try { ensureAudioContext(); } catch (error) {} startTimestamp = Date.now(); remainingAtStart = remaining; phaseEndTimestamp = startTimestamp + remaining * 1000; running = true; document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); requestWakeLock(); saveState(); intervalId = setInterval(tick, 1000); }
+async function start({ requestPermission = true, unlock = false, shouldPlayStartSound = false } = {}) { if (completed) return; clearInterval(intervalId); const audioReady = unlock ? await unlockAudio() : false; if (shouldPlayStartSound && audioReady) playStartSound(); if (requestPermission && notifSupported && Notification.permission === 'default') requestNotificationPermission(); try { ensureAudioContext(); } catch (error) {} startTimestamp = Date.now(); remainingAtStart = remaining; phaseEndTimestamp = startTimestamp + remaining * 1000; running = true; document.getElementById('startBtn').textContent = '一時停止'; scheduleSwNotification(remaining); requestWakeLock(); saveState(); intervalId = setInterval(tick, 1000); }
 function pause() { recalcRemaining(); stopTimer(); document.getElementById('startBtn').textContent = '再開'; updateDisplay(); saveState(); }
-async function toggleTimer() { if (completed) { await restartTimer(); return; } if (running) pause(); else await start({ unlock: true }); }
+async function toggleTimer() { if (completed) { await restartTimer(); return; } if (running) pause(); else await start({ unlock: true, shouldPlayStartSound: true }); }
 function resetTimer() { stopTimer({ stopAudio: true }); clearEndFeedback(); mode = 'work'; completedSets = 0; completed = false; totalSeconds = WORK_SECONDS; remaining = totalSeconds; document.getElementById('startBtn').textContent = '開始'; document.getElementById('logText').textContent = ''; updateModeUI(); updateDisplay(); saveState(); }
-async function restartTimer() { resetTimer(); await start({ unlock: true }); }
+async function restartTimer() { resetTimer(); await start({ unlock: true, shouldPlayStartSound: true }); }
 function tick() { recalcRemaining(); updateDisplay(); saveState(); if (remaining <= 0) onTimerEnd(); }
 function onTimerEnd({ osNotified = false, isFinalBreak = false } = {}) {
   if (timerEndedLock || completed) return;
@@ -207,6 +207,18 @@ function playSound(kind = 'work') {
     clearTimeout(soundLoopTimer); soundLoopTimer = setTimeout(() => { activeOscillators = []; soundLooping = false; lastSoundResult = '停止中'; refreshDiagnostics(); }, Math.ceil((offset + .1) * 1000)); refreshDiagnostics();
   };
   if (context.state === 'running') startNotes(); else context.resume().then(startNotes).catch(error => { soundLooping = false; lastSoundResult = 'resume失敗'; lastAudioResumeResult = `${error.name}: ${error.message}`; refreshDiagnostics(); });
+}
+function playStartSound() {
+  if (!soundCtx || soundCtx.state !== 'running') return;
+  try {
+    [[523.25, .09], [659.25, .12]].forEach(([frequency, duration], index) => {
+      const oscillator = soundCtx.createOscillator(); const gain = soundCtx.createGain(); const startAt = soundCtx.currentTime + index * .12;
+      oscillator.connect(gain); gain.connect(soundCtx.destination); oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(frequency, startAt);
+      gain.gain.setValueAtTime(0.0001, startAt); gain.gain.linearRampToValueAtTime(.32, startAt + .01); gain.gain.exponentialRampToValueAtTime(.001, startAt + duration);
+      oscillator.start(startAt); oscillator.stop(startAt + duration + .02);
+    });
+    lastSoundKind = '開始音'; lastSoundResult = '開始音：成功'; refreshDiagnostics();
+  } catch (error) { lastSoundResult = '開始音：失敗'; refreshDiagnostics(); }
 }
 function stopSound() { activeOscillators.forEach(oscillator => { try { oscillator.stop(); } catch (error) {} }); activeOscillators = []; clearTimeout(soundLoopTimer); soundLooping = false; lastSoundResult = '停止中'; refreshDiagnostics(); const button = document.getElementById('soundTestBtn'); if (button) button.textContent = '通知音をテスト'; }
 function toggleTestSound() { if (soundLooping) { stopSound(); return; } playSound(document.getElementById('soundType').value); }
