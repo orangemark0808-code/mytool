@@ -66,6 +66,7 @@ jobs:
           mkdir -p dist/journal-editor
           mkdir -p dist/pomodoro-timer
           cp "index.html" "dist/index.html"
+          cp -R "color-palettes" "dist/color-palettes"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
           cp "PROMPT_STOCK/README.md" "dist/PROMPT_STOCK/README.md"
           cp "Scene_Prompt/index.html" "dist/Scene_Prompt/index.html"
