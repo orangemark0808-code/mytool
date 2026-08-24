@@ -65,6 +65,7 @@ jobs:
           mkdir -p dist/iroiro
           mkdir -p dist/journal-editor
           mkdir -p dist/pomodoro-timer
+          mkdir -p dist/nazoiki
           cp "index.html" "dist/index.html"
           cp -R "color-palettes" "dist/color-palettes"
           cp "PROMPT_STOCK/index.html" "dist/PROMPT_STOCK/index.html"
@@ -93,6 +94,7 @@ jobs:
           cp "pomodoro-timer/index.html" "dist/pomodoro-timer/index.html"
           cp "pomodoro-timer/app.js" "dist/pomodoro-timer/app.js"
           cp "pomodoro-timer/sw.js" "dist/pomodoro-timer/sw.js"
+          cp "nazoiki/index.html" "dist/nazoiki/index.html"
           cat > "dist/firebase-config.js" <<'EOF'
           window.PROMPT_STOCK_FIREBASE_CONFIG = {
             apiKey: "__FIREBASE_API_KEY__",
