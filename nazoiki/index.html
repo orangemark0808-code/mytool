@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>なぞいき｜Instagram投稿カレンダー</title>
+<style>
+  :root {
+    --bg: #FCF3E7;
+    --card-bg: #FFFFFF;
+    --text-main: #4A2412;
+    --text-sub: #8A7362;
+    --accent-green: #6E9B84;
+    --accent-purple: #8F76D6;
+    --accent-coral: #E56F5D;
+    --accent-mustard: #C89B2B;
+    --accent-mint: #8FC8B8;
+    --border-soft: #EFE2D0;
+    --font-jp: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-main);
+    font-family: var(--font-jp);
+    padding: 48px 24px 80px;
+  }
+
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    color: var(--accent-green);
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-size: 40px;
+    font-weight: 800;
+    margin: 0 0 20px;
+    letter-spacing: -0.01em;
+  }
+
+  .intro {
+    font-size: 15px;
+    line-height: 1.9;
+    color: #5C4A3D;
+    max-width: 640px;
+    margin-bottom: 36px;
+  }
+
+  .policy-card {
+    background: var(--card-bg);
+    border-radius: 18px;
+    padding: 28px 32px;
+    margin-bottom: 40px;
+    box-shadow: 0 2px 10px rgba(74,36,18,0.05);
+  }
+
+  .policy-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 18px;
+  }
+
+  .policy-title .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-coral);
+  }
+
+  .policy-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 16px;
+    font-size: 14px;
+    line-height: 1.8;
+    padding: 8px 0;
+  }
+
+  .policy-row + .policy-row { border-top: 1px solid var(--border-soft); }
+
+  .policy-label { color: var(--text-sub); font-weight: 700; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-size: 13px;
+    color: var(--text-sub);
+    margin-bottom: 24px;
+  }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 8px; height: 8px; border-radius: 50%; }
+
+  .week-badge {
+    display: inline-block;
+    background: var(--accent-green);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 999px;
+    margin-right: 10px;
+  }
+  .week-range { font-size: 13px; color: var(--text-sub); }
+  .week-header {
+    display: flex;
+    align-items: center;
+    margin: 40px 0 16px;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 720px) {
+    .row { grid-template-columns: 1fr; }
+  }
+
+  .post-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 24px 26px;
+    box-shadow: 0 2px 10px rgba(74,36,18,0.05);
+    position: relative;
+  }
+
+  .post-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+
+  .post-date { font-size: 14px; color: var(--text-sub); font-weight: 700; }
+
+  .tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .tag.intro   { background: #E4F0EA; color: #3D7A5C; }
+  .tag.mimamori{ background: #EBE5FA; color: #6A52B8; }
+  .tag.seikaku { background: #F7EFD8; color: #A67D1D; }
+  .tag.kankei  { background: #FBE7E3; color: #C24E3B; }
+  .tag.kisetsu { background: #E1F1EC; color: #2E8C68; }
+  .tag.sanka   { background: #F7EAD3; color: #A6791D; }
+
+  .post-title {
+    font-size: 17px;
+    font-weight: 800;
+    margin: 0 0 14px;
+  }
+
+  .meta-row {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.7;
+    margin-bottom: 6px;
+  }
+  .meta-label { color: var(--text-sub); font-weight: 700; }
+
+  .divider {
+    border: none;
+    border-top: 1px dashed var(--border-soft);
+    margin: 14px 0 12px;
+  }
+
+  .reel {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .reel-tag {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    margin-top: 2px;
+  }
+  .reel-tag.high { background: #FBE1DC; color: #C24E3B; }
+  .reel-tag.mid  { background: #F7EFD8; color: #A67D1D; }
+  .reel-tag.low  { background: #EFE9E2; color: #8A7362; }
+
+  .reel-text { font-size: 13px; line-height: 1.7; color: #5C4A3D; }
+  .reel-text b { color: var(--text-main); }
+
+  .next-steps {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-top: 40px;
+    font-size: 13px;
+    line-height: 1.9;
+    color: #5C4A3D;
+    box-shadow: 0 2px 10px rgba(74,36,18,0.05);
+  }
+  .next-steps b { color: var(--text-main); }
+
+  .updated {
+    margin-top: 40px;
+    font-size: 12px;
+    color: var(--text-sub);
+    text-align: right;
+  }
+
+  .edit-note {
+    background: #FBF6EE;
+    border: 1px dashed var(--border-soft);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 12px;
+    color: var(--text-sub);
+    margin-top: 32px;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">NAZOIKI / INSTAGRAM PLAN</div>
+  <h1>なぞいき 投稿カレンダー</h1>
+  <p class="intro">
+    ChatGPT提案の投稿案をもとに確定した、8/24スタート・全8投稿のプラン。「見守りキャラ」としての性格が伝わる構成で、宣伝色は出しません。各投稿にリール適性と動きのアイデアを併記しています。
+  </p>
+
+  <div class="policy-card">
+    <div class="policy-title"><span class="dot"></span>この期間の運用方針</div>
+    <div class="policy-row"><div class="policy-label">頻度</div><div>週2回（月曜・金曜を目安）</div></div>
+    <div class="policy-row"><div class="policy-label">目的</div><div>「なぞいき」というキャラクターと、その少し不審な見守り方を覚えてもらう</div></div>
+    <div class="policy-row"><div class="policy-label">宣伝</div><div>本文では触れない。AIキャラクターである旨も含め、告知はプロフィール欄の範囲に留める（LINEスタンプ側ではAI生成キャラクターとして開示済み）</div></div>
+    <div class="policy-row"><div class="policy-label">判断基準</div><div>保存・コメントなどの反応を見ながら、次フェーズ（告知・AI開示の出し方）を検討する</div></div>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:#3D7A5C"></span>紹介</span>
+    <span><span class="swatch" style="background:#6A52B8"></span>見守り・シュール</span>
+    <span><span class="swatch" style="background:#A67D1D"></span>性格紹介</span>
+    <span><span class="swatch" style="background:#C24E3B"></span>関係性</span>
+    <span><span class="swatch" style="background:#2E8C68"></span>季節ネタ</span>
+    <span><span class="swatch" style="background:#A6791D"></span>参加型</span>
+  </div>
+
+  <!-- WEEK 1 -->
+  <div class="week-header">
+    <span class="week-badge">WEEK 1</span>
+    <span class="week-range">8/24（月）– 8/28（金）</span>
+  </div>
+  <div class="row">
+    <div class="post-card">
+      <div class="post-top">
+        <span class="post-date">8/24 月</span>
+        <span class="tag intro">紹介</span>
+      </div>
+      <h3 class="post-title">① はじめまして、なぞいきです</h3>
+      <div class="meta-row"><div class="meta-label">画像</div><div>最初に作ったなぞいき1人の画像</div></div>
+      <div class="meta-row"><div class="meta-label">テキスト</div><div>なし</div></div>
+      <div class="meta-row"><div class="meta-label">目的</div><div>キャラクターを覚えてもらう</div></div>
+      <hr class="divider">
+      <div class="reel">
+        <span class="reel-tag low">リール適性：低</span>
+        <div class="reel-text">静止画のままで十分伝わる回。動かすなら<b>まばたき→こちらに気づく</b>程度の1〜2秒ループでOK。</div>
+      </div>
+    </div>
+    <div class="post-card">
+      <div class="post-top">
+        <span class="post-date">8/28 金</span>
+        <span class="tag mimamori">見守り</span>
+      </div>
+      <h3 class="post-title">② すでに見守っています</h3>
+      <div class="meta-row"><div class="meta-label">画像</div><div>カーテン・物陰から半分だけのぞく</div></div>
+      <div class="meta-row"><div class="meta-label">テキスト</div><div>なし</div></div>
+      <div class="meta-row"><div class="meta-label">目的</div><div>「少し不審な見守り」を紹介</div></div>
+      <hr class="divider">
+      <div class="reel">
+        <span class="reel-tag high">リール適性：高</span>
+        <div class="reel-text"><b>カーテンがめくれて半分だけ覗く→目が合った瞬間サッと隠れる</b>、2〜3秒のループ。動きだけで「不審さ」が一目で伝わる。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WEEK 2 -->
+  <div class="week-header">
+    <span class="week-badge">WEEK 2</span>
+    <span class="week-range">8/31（月）– 9/4（金）</span>
+  </div>
+  <div class="row">
+    <div class="post-card">
+      <div class="post-top">
+        <span class="post-date">8/31 月</span>
+        <span class="tag seikaku">性格</span>
+      </div>
+      <h3 class="post-title">③ 少し休むと聞いたので</h3>
+      <div class="meta-row"><div class="meta-label">画像</div><div>豪華なソファを本気で用意</div></div>
+      <div class="meta-row"><div class="meta-label">テキスト</div><div>なし</div></div>
+      <div class="meta-row"><div class="meta-label">目的</div><div>過剰な気遣いという性格を見せる</div></div>
+      <hr class="divider">
+      <div class="reel">
+        <span class="reel-tag mid">リール適性：中</span>
+        <div class="reel-text">ソファが運ばれてくる→<b>クッションや毛布を次々足していく</b>早回し。準備しすぎる過剰さがコマ送りで際立つ。</div>
+      </div>
+    </div>
+    <div class="post-card">
+      <div class="post-top">
+        <span class="post-date">9/4 金</span>
+        <span class="tag kankei">関係性</span>
+      </div>
+      <h3 class="post-title">④ 友達との1コマ</h3>
+      <div class="meta-row"><div class="meta-label">画像</div><div>友達＋大げさな水分補給装備</div></div>
+      <div class="meta-row"><div class="meta-label">テキスト</div><div>なし</div></div>
+      <div class="meta-row"><div class="meta-label">目的</div><div>友達との関係を見せる</div></div>
+      <hr class="divider">
+      <div class="reel">
+        <span class="reel-tag mid">リール適性：中</span>
+        <div class="reel-text">水筒・タオル・扇風機などを<b>友達に次々手渡していく</b>コマ送り。渡す物が増えるほど過剰さが伝わる。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WEEK 3 -->
+  <div class="week-header">
+    <span class="week-badge">WEEK 3</span>
+    <span class="week-range">9/7（月）– 9/11（金）</span>
+  </div>
+  <div class="row">
+    <div class="post-card">
+      <div class="post-top">
+        <span class="post-date">9/7 月</span>
+        <span class="tag mimamori">見守り</span>
+      </div>
+      <h3 class="post-title">⑤ 無言で見守っています</h3>
+      <div class="meta-row"><div class="meta-label">画像</div><div>双眼鏡でこちらを観察</div></div>
+      <div class="meta-row"><div class="meta-label">テキスト</div><div>なし</div></div>
+      <div class="meta-row"><div class="meta-label">目的</div><div>なぞいきらしいシュールさ</div></div>
+      <hr class="divider">
+      <div class="reel">
+        <span class="reel-tag high">リール適性：高</span>
+        <div class="reel-text"><b>双眼鏡でズームイン→目が合う→サッと引っ込む</b>、短いループ。無言の圧が動きでより強調される。</div>
+      </div>
+    </div>
+    <div class="post-card">
+      <div class="post-top">
+        <span class="post-date">9/11 金</span>
+        <span class="tag kisetsu">季節</span>
+      </div>
+      <h3 class="post-title">⑥ 季節ネタ</h3>
+      <div class="meta-row"><div class="meta-label">画像</div><div>暑さ対策をやりすぎている</div></div>
+      <div class="meta-row"><div class="meta-label">テキスト</div><div>必要なら短文のみ</div></div>
+      <div class="meta-row"><div class="meta-label">目的</div><div>季節性を入れる</div></div>
+      <hr class="divider">
+      <div class="reel">
+        <span class="reel-tag high">リール適性：高</span>
+        <div class="reel-text">扇風機・保冷剤・氷嚢などを<b>どんどん追加していく</b>早送り。テンポの良い量産ネタはリールと相性が良い。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WEEK 4 -->
+  <div class="week-header">
+    <span class="week-badge">WEEK 4</span>
+    <span class="week-range">9/14（月）– 9/18（金）</span>
+  </div>
+  <div class="row">
+    <div class="post-card">
+      <div class="post-top">
+        <span class="post-date">9/14 月</span>
+        <span class="tag mimamori">見守り</span>
+      </div>
+      <h3 class="post-title">⑦ 隠れているつもり</h3>
+      <div class="meta-row"><div class="meta-label">画像</div><div>観葉植物の後ろからのぞく</div></div>
+      <div class="meta-row"><div class="meta-label">テキスト</div><div>なし</div></div>
+      <div class="meta-row"><div class="meta-label">目的</div><div>定番の「見守り方が少し変」</div></div>
+      <hr class="divider">
+      <div class="reel">
+        <span class="reel-tag high">リール適性：高</span>
+        <div class="reel-text">葉っぱの隙間から<b>そっと覗く→気づかれて葉の間に戻る</b>、葉が少し揺れる演出も添えると自然に動きが出る。</div>
+      </div>
+    </div>
+    <div class="post-card">
+      <div class="post-top">
+        <span class="post-date">9/18 金</span>
+        <span class="tag sanka">参加型</span>
+      </div>
+      <h3 class="post-title">⑧ どっちに見守られたい？</h3>
+      <div class="meta-row"><div class="meta-label">画像</div><div>物陰版＋双眼鏡版の2枚</div></div>
+      <div class="meta-row"><div class="meta-label">テキスト</div><div>選択肢のみ可</div></div>
+      <div class="meta-row"><div class="meta-label">目的</div><div>初めての参加型投稿</div></div>
+      <hr class="divider">
+      <div class="reel">
+        <span class="reel-tag mid">リール適性：中</span>
+        <div class="reel-text">物陰版→双眼鏡版を<b>交互に見せて「Aか、Bか」</b>をテキストで問いかける。比較のため静止画2枚投稿でも成立する。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="next-steps">
+    <b>次のステップ：</b>この8投稿で保存数・コメント数の伸びを確認する。リール適性「高」の②⑤⑥⑦は、静止画とリールのどちらで出すか、あるいは両方出すかを次に判断する。なぞいきがAI生成キャラクターである旨はLINEスタンプ側ですでに開示済みのため、この投稿群では特に触れず、プロフィール欄での開示にとどめる。反応が安定してきたら、告知投稿・AI開示の出し方を次フェーズとして検討する。
+  </div>
+
+  <div class="edit-note">
+    このアーティファクトはCraft「なぞいき｜Instagram投稿カレンダー」の内容をもとに作成しています。今後の変更依頼はこのチャット内でお伝えください。Claudeが直接編集・更新します。
+  </div>
+
+  <div class="updated">最終更新：2026-08-23（投稿曜日を月・金に変更）</div>
+
+</div>
+</body>
+</html>
