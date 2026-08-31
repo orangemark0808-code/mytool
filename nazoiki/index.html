@@ -136,6 +136,15 @@
   .tag-select.kisetsu  { background: #E1F1EC; color: #2E8C68; }
   .tag-select.sanka    { background: #F7EAD3; color: #A6791D; }
 
+  .status-select {
+    font-family: var(--font-jp);
+    font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px dashed var(--border-soft); cursor: pointer;
+    background: #FBF6EE; color: var(--text-sub);
+  }
+  .status-select.done { background: #E4F0EA; color: #3D7A5C; border: none; }
+
   .field-label {
     font-size: 11px; font-weight: 700; color: var(--text-sub);
     margin: 12px 0 4px;
@@ -266,6 +275,7 @@
     intro: "紹介", mimamori: "見守り・シュール", seikaku: "性格紹介",
     kankei: "関係性", kisetsu: "季節ネタ", sanka: "参加型"
   };
+  const STATUS_LABELS = { "": "　", done: "投稿作成済み" };
   const REEL_LABELS = { high: "リール適性：高", mid: "リール適性：中", low: "リール適性：低" };
 
   const statusDot = document.getElementById("statusDot");
@@ -321,6 +331,11 @@
     card.innerHTML = `
       <div class="post-top">
         <input type="date" class="date-input" value="${post.post_date}" data-field="post_date">
+        <select class="status-select ${post.production_status === "done" ? "done" : ""}" data-field="production_status">
+          ${Object.entries(STATUS_LABELS).map(([k, v]) =>
+            `<option value="${k}" ${k === (post.production_status || "") ? "selected" : ""}>${v}</option>`
+          ).join("")}
+        </select>
         <select class="tag-select ${post.tag_key}" data-field="tag_key">
           ${Object.entries(TAG_LABELS).map(([k, v]) =>
             `<option value="${k}" ${k === post.tag_key ? "selected" : ""}>${v}</option>`
@@ -357,6 +372,10 @@
     const tagSelect = card.querySelector('[data-field="tag_key"]');
     tagSelect.addEventListener("change", () => {
       tagSelect.className = "tag-select " + tagSelect.value;
+    });
+    const statusSelect = card.querySelector('[data-field="production_status"]');
+    statusSelect.addEventListener("change", () => {
+      statusSelect.className = "status-select " + (statusSelect.value === "done" ? "done" : "");
     });
     const reelSelect = card.querySelector('[data-field="reel_level"]');
     reelSelect.addEventListener("change", () => {
