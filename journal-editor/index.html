@@ -7,23 +7,25 @@
     <title>Journal Editor</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='serif' font-size='42' font-weight='700' fill='white'%3EJ%3C/text%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,600;1,400&family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=2026-08-31-02" />
-    <link rel="stylesheet" href="layout-overrides.css?v=2026-08-31-02" />
+    <link rel="stylesheet" href="style.css?v=2026-08-31-03" />
+    <link rel="stylesheet" href="layout-overrides.css?v=2026-08-31-03" />
   </head>
   <body>
     <header class="app-header">
-      <div class="brand-meta">
-        <button class="brand" id="homeButton" type="button">Journal Editor</button>
-        <span class="app-version" id="appVersion"></span>
-        <span class="sync-status" id="syncStatus" aria-live="polite">ログインが必要</span>
+      <div class="header-inner">
+        <div class="brand-meta">
+          <button class="brand" id="homeButton" type="button">Journal Editor</button>
+          <span class="app-version" id="appVersion"></span>
+          <span class="sync-status" id="syncStatus" aria-live="polite">ログインが必要</span>
+        </div>
+        <nav class="header-actions hidden" aria-label="メインメニュー">
+          <button class="text-button header-icon-button" id="draftsButton" type="button" aria-label="Journal一覧" title="Journal一覧"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M8 12h8M8 16h8"/></svg></button>
+          <button class="text-button header-icon-button" id="newButton" type="button" aria-label="新しい下書きを作成" title="新しい下書きを作成"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M12 11v6M9 14h6"/></svg></button>
+          <button class="text-button header-icon-button" id="settingsButton" type="button" aria-label="設定" title="設定"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="text-button login-button" id="loginButton" type="button">Googleでログイン</button>
+          <button class="text-button header-icon-button" id="logoutButton" type="button" aria-label="ログアウト" title="ログアウト" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4M9 12h9"/></svg></button>
+        </nav>
       </div>
-      <nav class="header-actions hidden" aria-label="メインメニュー">
-        <button class="text-button header-icon-button" id="draftsButton" type="button" aria-label="Journal一覧" title="Journal一覧"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M8 12h8M8 16h8"/></svg></button>
-        <button class="text-button header-icon-button" id="newButton" type="button" aria-label="新しい下書きを作成" title="新しい下書きを作成"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M12 11v6M9 14h6"/></svg></button>
-        <button class="text-button header-icon-button" id="settingsButton" type="button" aria-label="設定" title="設定"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
-        <button class="text-button login-button" id="loginButton" type="button">Googleでログイン</button>
-        <button class="text-button header-icon-button" id="logoutButton" type="button" aria-label="ログアウト" title="ログアウト" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4M9 12h9"/></svg></button>
-      </nav>
     </header>
 
     <main>
@@ -96,6 +98,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="firebase-config.js"></script>
     <script src="firebase-config.local.js"></script>
-    <script type="module" src="script.js?v=2026-08-31-02"></script>
+    <script type="module" src="script.js?v=2026-08-31-03"></script>
   </body>
 </html>
