@@ -1,5 +1,11 @@
-/* 単独表示では、本文40emと必要最小限のパネル余白を共通で使う。 */
-.workspace.mode-edit,
+/* 入力タブはmainいっぱいまで幅を使い、ヘッダーアイコンメニューの右端と揃える。 */
+.workspace.mode-edit {
+  width: 100%;
+  max-width: 100%;
+  margin-inline: 0;
+}
+
+/* プレビュー単独表示は本文40emの読みやすい幅を維持する。 */
 .workspace.mode-preview {
   width: min(calc(100% - 32px), calc(40em + 48px));
   max-width: calc(40em + 48px);
@@ -18,9 +24,9 @@
 }
 
 .workspace.mode-edit .editor-stack {
-  width: 40em;
+  width: 100%;
   max-width: 100%;
-  margin-inline: auto;
+  margin-inline: 0;
 }
 
 .workspace.mode-preview .preview-content {
@@ -31,8 +37,8 @@
 }
 
 .editor-view.single-mode .toolbar-wrap {
-  width: min(calc(100% - 32px), calc(40em + 48px));
-  margin-inline: auto;
+  width: 100%;
+  margin-inline: 0;
 }
 
 /* 入力補助は本文直前に置き、横方向はこのバーだけをスクロールさせる。 */
