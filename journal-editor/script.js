@@ -1,4 +1,4 @@
-const VERSION = '2026.07.24-04';
+const VERSION = '2026-08-31-01';
 const KEY = 'orangemania-blog-editor-v1', VIEW_KEY = 'orangemania-blog-editor-view-v1', CURRENT_KEY = 'orangemania-blog-editor-current-v1', DELETED_KEY = 'orangemania-blog-editor-deleted-v1', SCHEMA_VERSION = 1;
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
