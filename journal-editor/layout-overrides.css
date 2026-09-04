@@ -343,3 +343,194 @@
   .auth-gate { margin: 32px 0; padding: 24px 20px; }
   .auth-gate h1 { font-size: 20px; }
 }
+
+/* ===== カテゴリ機能（新規追加分・OrangeMania UIガイドライン準拠） ===== */
+
+.toolbar-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.category-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+.category-field .field-label {
+  color: var(--muted);
+  font-family: "DM Mono", "Meiryo", monospace;
+  font-size: 12px;
+}
+
+.category-field select {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-size: 13px;
+  box-shadow: none;
+}
+
+.category-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.draft-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 11px;
+  border-radius: 14px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.search-field { margin-bottom: 18px; }
+
+.search-field input {
+  width: 100%;
+  max-width: 420px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-size: 14px;
+  box-shadow: none;
+}
+
+.search-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.category-panel {
+  max-width: 720px;
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: none;
+}
+
+.category-panel h2 { margin: 0 0 6px; font-size: 18px; }
+.category-panel > p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+
+.category-manage-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.category-manage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.category-manage-row.empty,
+.category-manage-list .empty {
+  color: var(--muted);
+  border-bottom: 0;
+  padding: 16px 4px;
+}
+
+.category-manage-name {
+  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.category-manage-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-manage-actions button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.category-manage-actions button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.category-manage-actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.category-manage-actions button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.category-manage-actions button.delete:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.category-add-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.category-add-form input {
+  flex: 1;
+  min-width: 180px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-size: 14px;
+  box-shadow: none;
+}
+
+.category-add-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+@media (max-width: 700px) {
+  .toolbar-wrap { gap: 6px; }
+  .category-field { padding: 8px 10px; }
+  .category-manage-row { flex-wrap: wrap; }
+}

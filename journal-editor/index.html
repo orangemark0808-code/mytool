@@ -7,8 +7,8 @@
     <title>Journal Editor</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='serif' font-size='42' font-weight='700' fill='white'%3EJ%3C/text%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,600;1,400&family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=2026-08-31-04" />
-    <link rel="stylesheet" href="layout-overrides.css?v=2026-08-31-04" />
+    <link rel="stylesheet" href="style.css?v=2026-09-04-01" />
+    <link rel="stylesheet" href="layout-overrides.css?v=2026-09-04-01" />
   </head>
   <body>
     <header class="app-header">
@@ -70,6 +70,10 @@
                 <button data-action="link" type="button" aria-label="リンク" title="リンク">🔗</button>
                 <button data-action="rule" type="button" aria-label="区切り線" title="区切り線">―</button>
               </div>
+              <div class="category-field">
+                <span class="field-label">カテゴリ</span>
+                <select id="categorySelect" aria-label="カテゴリ"></select>
+              </div>
             </div>
             <div class="editor-stack" id="editorStack">
               <pre class="editor-mirror" id="editorMirror" aria-hidden="true"></pre>
@@ -85,12 +89,22 @@
 
       <section class="list-view hidden" id="listView">
         <div class="view-heading"><div><h1>Journal一覧</h1></div><button class="primary-button" id="listNewButton" type="button">新規作成</button></div>
+        <div class="search-field"><input id="searchInput" type="search" placeholder="タイトル・本文・カテゴリで検索" autocomplete="off" /></div>
         <div class="draft-list" id="draftList"></div>
       </section>
 
       <section class="settings-view hidden" id="settingsView">
         <div class="view-heading"><div><h1>設定</h1><p>編集環境の表示を調整します</p></div></div>
         <div class="settings-form"><label>自動保存<span>入力後に自動保存します。ログイン中はFirestoreにも同期します。</span><input value="有効" disabled /></label><label>保存先<span id="storageDescription">この端末のブラウザ（localStorage）に保存されます。</span><input id="storageLocation" value="localStorage" disabled /></label></div>
+        <section class="category-panel" aria-label="カテゴリ管理">
+          <h2>カテゴリ管理</h2>
+          <p>Journalのカテゴリを追加・削除・並び替えできます。削除すると、そのカテゴリを使用しているJournalは「未分類」になります。</p>
+          <ul class="category-manage-list" id="categoryManageList"></ul>
+          <form class="category-add-form" id="categoryAddForm">
+            <input id="categoryNameInput" type="text" placeholder="新しいカテゴリ名" autocomplete="off" maxlength="30" />
+            <button class="secondary-button" type="submit">追加</button>
+          </form>
+        </section>
         <section class="migration-panel hidden" id="migrationPanel" aria-live="polite"><h2>ローカル下書きを同期</h2><p id="migrationMessage"></p><button class="primary-button" id="migrateLocalButton" type="button">ローカル下書きをFirestoreへコピー</button></section>
         <section class="diagnostic-panel" aria-label="同期診断"><h2>同期診断</h2><p>本文・タイトル・メールアドレスを含まない診断情報をコピーします。</p><button class="secondary-button" id="copyDiagnosticButton" type="button">診断情報をコピー</button></section>
       </section>
@@ -98,6 +112,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="firebase-config.js"></script>
     <script src="firebase-config.local.js"></script>
-    <script type="module" src="script.js?v=2026-08-31-04"></script>
+    <script type="module" src="script.js?v=2026-09-04-01"></script>
   </body>
 </html>
