@@ -88,9 +88,68 @@
   .policy-row + .policy-row { border-top: 1px solid var(--border-soft); }
   .policy-label { color: var(--text-sub); font-weight: 700; }
 
+  .month-section {
+    margin: 0 0 20px;
+  }
+
+  .month-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border: 0;
+    border-radius: 16px;
+    background: var(--card-bg);
+    color: var(--text-main);
+    padding: 18px 22px;
+    font-family: var(--font-jp);
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(74,36,18,0.05);
+    text-align: left;
+  }
+
+  .month-toggle:hover { background: #FFFDF9; }
+
+  .month-title-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .month-title {
+    font-size: 22px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .month-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-sub);
+    white-space: nowrap;
+  }
+
+  .month-arrow {
+    font-size: 16px;
+    color: var(--accent-coral);
+    transition: transform 0.18s ease;
+    flex-shrink: 0;
+  }
+
+  .month-section.open .month-arrow { transform: rotate(90deg); }
+
+  .month-content {
+    display: none;
+    padding: 4px 0 18px;
+  }
+
+  .month-section.open .month-content { display: block; }
+
   .week-header {
     display: flex; align-items: baseline; gap: 12px;
-    margin: 36px 0 14px;
+    margin: 24px 0 14px;
   }
   .week-badge {
     font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
@@ -102,7 +161,14 @@
   .row {
     display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
   }
-  @media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) {
+    .row { grid-template-columns: 1fr; }
+    body { padding: 28px 14px 60px; }
+    h1 { font-size: 32px; }
+    .policy-card { padding: 22px 20px; }
+    .month-toggle { padding: 16px 18px; }
+    .month-title { font-size: 20px; }
+  }
 
   .post-card {
     background: var(--card-bg);
@@ -273,7 +339,7 @@
 
 <script>
   const SUPABASE_URL = "https://vwfzlcgfgffknpmselzy.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3ZnpsY2dmZ2Zma25wbXNlbHp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzE0NjQsImV4cCI6MjA4OTQwNzQ2NH0.Nl3HKWNmTQrmgZixxVWy0Ke7jEpqS4dFFLOEw3jDeqk";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_0LpdSdGbLIcC0P5rkVXgpg_1SN3sR-p";
   const TABLE = "nazoiki_calendar_posts";
 
   const TAG_LABELS = {
@@ -295,12 +361,7 @@
   async function fetchPosts() {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=post_order.asc`,
-      {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
-        }
-      }
+      { headers: { apikey: SUPABASE_PUBLISHABLE_KEY } }
     );
     if (!res.ok) throw new Error("読み込みに失敗しました");
     return res.json();
@@ -312,8 +373,7 @@
       {
         method: "PATCH",
         headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_PUBLISHABLE_KEY,
           "Content-Type": "application/json",
           Prefer: "return=minimal"
         },
@@ -326,6 +386,15 @@
   function formatDateLabel(dateStr) {
     const d = new Date(dateStr + "T00:00:00");
     return `${d.getMonth() + 1}/${d.getDate()}`;
+  }
+
+  function monthKey(dateStr) {
+    return dateStr.slice(0, 7);
+  }
+
+  function monthLabel(key) {
+    const [year, month] = key.split("-");
+    return `${year}年${Number(month)}月`;
   }
 
   function buildCard(post) {
@@ -420,7 +489,6 @@
   function escapeAttr(str) { return escapeHtml(str); }
 
   function groupByWeek(posts) {
-    // 2 posts per week, in post_order sequence
     const weeks = [];
     for (let i = 0; i < posts.length; i += 2) {
       weeks.push(posts.slice(i, i + 2));
@@ -428,25 +496,74 @@
     return weeks;
   }
 
+  function groupByMonth(posts) {
+    const map = new Map();
+    posts.forEach(post => {
+      const key = monthKey(post.post_date);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(post);
+    });
+    return [...map.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, monthPosts]) => ({
+        key,
+        posts: monthPosts.sort((a, b) => a.post_order - b.post_order)
+      }));
+  }
+
+  function buildMonthSection(month, index) {
+    const section = document.createElement("section");
+    section.className = "month-section" + (index < 2 ? " open" : "");
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "month-toggle";
+    toggle.setAttribute("aria-expanded", index < 2 ? "true" : "false");
+    toggle.innerHTML = `
+      <span class="month-title-wrap">
+        <span class="month-title">${monthLabel(month.key)}</span>
+        <span class="month-count">${month.posts.length}件</span>
+      </span>
+      <span class="month-arrow">▶</span>
+    `;
+
+    const content = document.createElement("div");
+    content.className = "month-content";
+
+    const weeks = groupByWeek(month.posts);
+    weeks.forEach((weekPosts, idx) => {
+      const weekHeader = document.createElement("div");
+      weekHeader.className = "week-header";
+      const first = weekPosts[0], last = weekPosts[weekPosts.length - 1];
+      weekHeader.innerHTML = `
+        <span class="week-badge">WEEK ${idx + 1}</span>
+        <span class="week-range">${formatDateLabel(first.post_date)} – ${formatDateLabel(last.post_date)}</span>
+      `;
+      content.appendChild(weekHeader);
+
+      const row = document.createElement("div");
+      row.className = "row";
+      weekPosts.forEach(p => row.appendChild(buildCard(p)));
+      content.appendChild(row);
+    });
+
+    toggle.addEventListener("click", () => {
+      const open = section.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+
+    section.appendChild(toggle);
+    section.appendChild(content);
+    return section;
+  }
+
   async function init() {
     try {
       const posts = await fetchPosts();
       container.innerHTML = "";
-      const weeks = groupByWeek(posts);
-      weeks.forEach((weekPosts, idx) => {
-        const weekHeader = document.createElement("div");
-        weekHeader.className = "week-header";
-        const first = weekPosts[0], last = weekPosts[weekPosts.length - 1];
-        weekHeader.innerHTML = `
-          <span class="week-badge">WEEK ${idx + 1}</span>
-          <span class="week-range">${formatDateLabel(first.post_date)} – ${formatDateLabel(last.post_date)}</span>
-        `;
-        container.appendChild(weekHeader);
-
-        const row = document.createElement("div");
-        row.className = "row";
-        weekPosts.forEach(p => row.appendChild(buildCard(p)));
-        container.appendChild(row);
+      const months = groupByMonth(posts);
+      months.forEach((month, index) => {
+        container.appendChild(buildMonthSection(month, index));
       });
       setStatus("ok", `読み込み完了（${posts.length}件）`);
     } catch (e) {
