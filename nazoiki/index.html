@@ -47,15 +47,20 @@
 .copy-msg.show{opacity:1}
 .copy-msg.err{color:var(--coral)}
 @media(min-width:761px){
-.inline-main{display:grid;grid-template-columns:150px 170px 160px 160px 1fr;column-gap:12px;row-gap:8px;align-items:center}
+.inline-main{display:grid;grid-template-columns:150px 170px 160px 160px minmax(0,1fr);column-gap:12px;row-gap:8px;align-items:center}
 .inline-main>*:nth-child(1){grid-column:1;grid-row:1}
 .inline-main>*:nth-child(2){grid-column:2;grid-row:1}
 .inline-main>*:nth-child(3){grid-column:3;grid-row:1}
 .inline-main>*:nth-child(4){grid-column:4;grid-row:1}
-.inline-main>*:nth-child(5){grid-column:5;grid-row:1;justify-self:end}
+.inline-main>*:nth-child(5){grid-column:5;grid-row:1;width:100%;min-width:0;flex-wrap:nowrap;white-space:nowrap;justify-content:flex-end;overflow-x:auto;gap:6px}
+.inline-main>*:nth-child(5) .copy-btn{padding:4px 8px}
+.inline-main>*:nth-child(5) .save-btn{padding:6px 14px}
+.inline-main>*:nth-child(5) .detail-toggle{padding:4px 10px}
 .inline-main>*:nth-child(6){grid-column:1/-1;grid-row:2}
 .inline-main .date-input,.inline-main .tag-select,.inline-main .status-select,.inline-main .reel-level-select{width:100%;min-width:0}
 .inline-main .date-input,.inline-main .tag-select,.inline-main .reel-level-select,.inline-main .status-select{height:30px;margin:0;align-self:center}
+.save-actions .save-msg{max-width:0;overflow:hidden;white-space:nowrap}
+.save-actions .save-msg.show{max-width:160px}
 }
 .detail-toggle{display:inline-flex;align-items:center;gap:6px;font:800 13px var(--font);color:#6B452E;background:#fff;border:1px solid #B58B5A;border-radius:999px;padding:5px 12px;cursor:pointer;white-space:nowrap}
 .detail-arrow{transition:.18s;font-size:11px}
