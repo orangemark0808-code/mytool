@@ -6,9 +6,9 @@
 <title>なぞいき｜Instagram投稿カレンダー</title>
 <style>
 :root{--bg:#FCF3E7;--card:#fff;--text:#4A2412;--sub:#5C4033;--coral:#E56F5D;--mint:#8FC8B8;--border:#E3D3BF;--font:"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);padding:34px 16px 70px}.wrap{max-width:1200px;margin:auto}
-.hero{background:rgba(255,255,255,.35);border:1px solid #FF7F00;border-radius:24px;padding:28px 30px 22px;box-shadow:0 4px 18px rgba(74,36,18,.05);margin-bottom:26px}.hero-main{display:grid;grid-template-columns:1.4fr .9fr;gap:26px;align-items:center}.eyebrow{font-size:12px;letter-spacing:.14em;font-weight:800;color:#6E9B84;margin-bottom:8px}h1{font-size:23px;line-height:1.15;margin:0 0 12px;font-weight:900;letter-spacing:-.02em}.hero .intro{font-size:17px;line-height:1.8;margin:0 0 14px;max-width:700px}.frequency-badge{display:inline-block;border:1px solid #e9cdbd;border-radius:999px;background:#fff5ef;padding:8px 14px;font-size:15px;font-weight:800}.hero-mascot{display:flex;align-items:flex-end;justify-content:center;gap:10px;min-height:205px}.speech{position:relative;background:#fffdf9;border:3px solid #7A4E38;border-radius:38px;padding:18px 20px;max-width:220px;font-size:16px;line-height:1.55;font-weight:800}.speech:after{content:"";position:absolute;right:-20px;bottom:34px;border-width:12px 0 12px 22px;border-style:solid;border-color:transparent transparent transparent #7A4E38}.speech:before{content:"";position:absolute;right:-14px;bottom:36px;border-width:10px 0 10px 18px;border-style:solid;border-color:transparent transparent transparent #fffdf9;z-index:2}.nazoiki-img{width:145px;height:auto;display:block;filter:drop-shadow(0 5px 3px rgba(74,36,18,.08))}
-.hero-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px;padding-top:18px;border-top:1px solid #e7d8c5}.view-btn{font:800 15px var(--font);color:var(--text);background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 18px;cursor:pointer}.view-btn.active{color:#fff;background:#6B452E;border-color:#6B452E}.month-nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:4px}.month-link{font:800 14px var(--font);color:#315f92;background:transparent;border:0;border-left:1px solid #d9c9b6;padding:6px 12px;cursor:pointer}.status-bar{display:flex;align-items:center;gap:8px;color:var(--sub);font-size:14px;font-weight:700;margin:0 0 18px}.status-dot{width:9px;height:9px;border-radius:50%;background:#C9BBAA}.status-dot.ok{background:#6E9B84}.status-dot.err{background:var(--coral)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);padding:34px 16px 70px}.wrap{max-width:1050px;margin:auto}
+.hero{background:rgba(255,255,255,.35);border:1px solid #FF7F00;border-radius:24px;padding:28px 30px 22px;box-shadow:0 4px 18px rgba(74,36,18,.05);margin-bottom:26px}.hero-main{display:grid;grid-template-columns:1.4fr .9fr;gap:26px;align-items:center}.eyebrow{font-size:12px;letter-spacing:.14em;font-weight:800;color:#6E9B84;margin-bottom:8px}h1{font-size:23px;line-height:1.15;margin:0 0 12px;font-weight:900;letter-spacing:-.02em}.hero .intro{font-size:17px;line-height:1.8;margin:0 0 14px;max-width:700px}.frequency-badge{display:inline-block;border:1px solid #e9cdbd;border-radius:999px;background:#fff5ef;padding:8px 14px;font-size:15px;font-weight:800}.hero-mascot{display:flex;align-items:flex-end;justify-content:center;gap:10px;min-height:0}.speech{position:relative;background:#fffdf9;border:3px solid #7A4E38;border-radius:38px;padding:18px 20px;max-width:220px;font-size:16px;line-height:1.55;font-weight:800}.speech:after{content:"";position:absolute;right:-20px;bottom:34px;border-width:12px 0 12px 22px;border-style:solid;border-color:transparent transparent transparent #7A4E38}.speech:before{content:"";position:absolute;right:-14px;bottom:36px;border-width:10px 0 10px 18px;border-style:solid;border-color:transparent transparent transparent #fffdf9;z-index:2}.nazoiki-img{width:145px;height:auto;display:block;filter:drop-shadow(0 5px 3px rgba(74,36,18,.08))}
+.hero-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px;padding-top:18px;border-top:1px solid #e7d8c5}.view-btn{font:800 15px var(--font);color:var(--text);background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 18px;cursor:pointer}.view-btn.active{color:#fff;background:#6B452E;border-color:#6B452E}.month-nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:4px}.month-nav label{font-size:12px;font-weight:800;color:var(--sub)}.month-select{font:800 14px var(--font);color:var(--text);background:#FFFDF9;border:1px solid var(--border);border-radius:999px;padding:8px 12px;max-width:100%;cursor:pointer}.status-bar{display:flex;align-items:center;gap:8px;color:var(--sub);font-size:14px;font-weight:700;margin:0 0 18px}.status-dot{width:9px;height:9px;border-radius:50%;background:#C9BBAA}.status-dot.ok{background:#6E9B84}.status-dot.err{background:var(--coral)}
 .month-section{margin:0 0 24px;border:1px solid #FF7F00;border-radius:24px;background:#FFFDFC;padding:20px 22px 22px;box-shadow:0 2px 10px rgba(74,36,18,.04)}.month-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;border:0;background:#FBE7E3;padding:12px 16px;border-radius:14px;color:var(--text);font-family:var(--font);cursor:pointer}
 .month-section[data-month$="-01"] .month-toggle{background:#E9ECF7}
 .month-section[data-month$="-02"] .month-toggle{background:#F9E8EE}
@@ -34,14 +34,14 @@
 .month-section[data-month$="-10"] .post-card{border-left-color:#C06B24}
 .month-section[data-month$="-11"] .post-card{border-left-color:#8A6238}
 .month-section[data-month$="-12"] .post-card{border-left-color:#3E7FC0}
-.month-title-wrap{display:flex;align-items:baseline;gap:12px}.month-title{font-size:23px;font-weight:900}.month-count{font-size:14px;font-weight:800;color:var(--sub)}.month-arrow{font-size:17px;color:#6B452E;transition:.18s}.month-section.open .month-arrow{transform:rotate(90deg)}.month-content{display:none;margin-top:16px;padding-top:16px;border-top:1px solid #ecdfc9}.month-section.open .month-content{display:block}.row{display:grid;grid-template-columns:1fr;gap:10px}.post-card{background:#fff;border-radius:0;padding:16px 18px;box-shadow:0 2px 10px rgba(74,36,18,.05);border-left:4px solid #FF7F00}.post-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:12px}.date-field{display:flex;align-items:center;gap:4px;min-width:0}.date-input{font:800 14px var(--font);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 7px;background:#FFFDF9;height:30px;min-width:0}.weekday-label{font:800 12px var(--font);color:var(--sub);white-space:nowrap;flex-shrink:0}.tag-select,.status-select{font:800 11px var(--font);padding:4px 7px;border-radius:999px;height:30px}.tag-select{border:0}.tag-select.intro{background:#E4F0EA;color:#315e48}.tag-select.mimamori{background:#EBE5FA;color:#5944a0}.tag-select.seikaku{background:#F7EFD8;color:#805d0d}.tag-select.kankei{background:#FBE7E3;color:#9d392b}.tag-select.kisetsu{background:#E1F1EC;color:#236d51}.tag-select.sanka{background:#F7EAD3;color:#825d0e}.status-select{border:1px dashed var(--border);background:#FFFDF9;color:var(--sub)}.status-select.done{background:#E4F0EA;color:#315e48;border:0}.status-select.scheduled{background:#EFE9E2;color:#5C4033;border:0}.field-label{font-size:12px;font-weight:900;color:var(--sub);margin:8px 0 3px}.title-input{width:100%;font:900 19px var(--font);color:var(--text);border:1px solid transparent;border-radius:8px;padding:5px 6px;margin-left:-6px;background:transparent}textarea{width:100%;font:500 15px/1.75 var(--font);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 10px;background:#FFFDF9;resize:vertical}.short{min-height:0;padding:6px 9px;line-height:1.6;resize:none;overflow:hidden}.caption{min-height:98px}.title-input:focus,textarea:focus,.date-input:focus{outline:none;border-color:var(--mint);background:#fffaf3}.divider{border:0;border-top:1px dashed var(--border);margin:16px 0 6px}.reel-level-select{font:800 12px var(--font);padding:5px 10px;border-radius:999px;border:0;margin-bottom:0;height:30px}.reel-level-select.high{background:#FBE1DC;color:#9d392b}.reel-level-select.mid{background:#F7EFD8;color:#805d0d}.reel-level-select.low{background:#EFE9E2;color:#5C4033}.card-footer{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px}.save-btn{font:800 14px var(--font);color:#fff;background:#FF7F00;border:0;border-radius:999px;padding:8px 20px;cursor:pointer}.save-btn:disabled{opacity:.5}.loading{text-align:center;padding:50px;color:var(--sub);font-size:15px;font-weight:700}
+.month-title-wrap{display:flex;align-items:baseline;gap:12px}.month-title{font-size:23px;font-weight:900}.month-count{font-size:14px;font-weight:800;color:var(--sub)}.month-arrow{font-size:17px;color:#6B452E;transition:.18s}.month-section.open .month-arrow{transform:rotate(90deg)}.month-content{display:none;margin-top:16px;padding-top:16px;border-top:1px solid #ecdfc9}.month-section.open .month-content{display:block}.row{display:grid;grid-template-columns:1fr;gap:10px}.post-card{background:#fff;border-radius:0;padding:16px 18px;box-shadow:0 2px 10px rgba(74,36,18,.05);border-left:4px solid #FF7F00}.post-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:12px}.date-field{display:flex;align-items:center;gap:4px;min-width:0;border:1px solid var(--border);border-radius:8px;padding:0 7px 0 0;background:#FFFDF9;height:30px}.date-field:focus-within{border-color:var(--mint);background:#fffaf3}.date-input{font:800 14px var(--font);color:var(--text);border:0;border-radius:0;padding:5px 0 5px 7px;background:transparent;height:100%;min-width:0}.weekday-label{font:800 12px var(--font);color:var(--sub);white-space:nowrap;flex-shrink:0}.tag-select,.status-select{font:800 11px var(--font);padding:4px 7px;border-radius:999px;height:30px}.tag-select{border:0}.tag-select.intro{background:#E4F0EA;color:#315e48}.tag-select.mimamori{background:#EBE5FA;color:#5944a0}.tag-select.seikaku{background:#F7EFD8;color:#805d0d}.tag-select.kankei{background:#FBE7E3;color:#9d392b}.tag-select.kisetsu{background:#E1F1EC;color:#236d51}.tag-select.sanka{background:#F7EAD3;color:#825d0e}.status-select{border:1px dashed var(--border);background:#FFFDF9;color:var(--sub)}.status-select.done{background:#E4F0EA;color:#315e48;border:0}.field-label{font-size:12px;font-weight:900;color:var(--sub);margin:8px 0 3px}.title-input{width:100%;font:900 19px var(--font);color:var(--text);border:1px solid transparent;border-radius:8px;padding:5px 6px;margin-left:-6px;background:transparent}textarea{width:100%;font:500 15px/1.75 var(--font);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 10px;background:#FFFDF9;resize:vertical}.short{min-height:88px;max-height:240px;padding:6px 9px;line-height:1.6;resize:vertical;overflow-y:auto}.caption{min-height:98px}.title-input:focus,textarea:focus{outline:none;border-color:var(--mint);background:#fffaf3}.date-input:focus{outline:none}.divider{border:0;border-top:1px dashed var(--border);margin:16px 0 6px}.reel-level-select{font:800 12px var(--font);padding:5px 10px;border-radius:999px;border:0;margin-bottom:0;height:30px}.reel-level-select.high{background:#FBE1DC;color:#9d392b}.reel-level-select.mid{background:#F7EFD8;color:#805d0d}.reel-level-select.low{background:#EFE9E2;color:#5C4033}.card-footer{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px}.save-btn{font:800 14px var(--font);color:#fff;background:#FF7F00;border:0;border-radius:999px;padding:8px 20px;cursor:pointer}.save-btn:disabled{opacity:.5}.loading{text-align:center;padding:50px;color:var(--sub);font-size:15px;font-weight:700}
 .pill{display:inline-flex;align-items:center;font:800 12px var(--font);padding:4px 10px;border-radius:999px;white-space:nowrap;line-height:1}
 .pill.intro{background:#E4F0EA;color:#315e48}.pill.mimamori{background:#EBE5FA;color:#5944a0}.pill.seikaku{background:#F7EFD8;color:#805d0d}.pill.kankei{background:#FBE7E3;color:#9d392b}.pill.kisetsu{background:#E1F1EC;color:#236d51}.pill.sanka{background:#F7EAD3;color:#825d0e}
 .pill.status-done{background:#E4F0EA;color:#315e48}.pill.status-empty{background:#FBF6EE;color:var(--sub);border:1px dashed var(--border)}
 .pill.reel-high{background:#FBE1DC;color:#9d392b}.pill.reel-mid{background:#F7EFD8;color:#805d0d}.pill.reel-low{background:#EFE9E2;color:#5C4033}
 .inline-main{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
 .inline-main .title-input{flex:1 1 100%;overflow-wrap:anywhere}
-.save-actions{margin-left:auto;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.save-actions{margin-left:0;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .copy-btn{display:inline-flex;align-items:center;gap:4px;font:800 12px var(--font);color:#3d6b5c;background:#fff;border:1px solid var(--mint);border-radius:999px;padding:5px 10px;cursor:pointer;white-space:nowrap}
 .toast-container{position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none;max-width:calc(100vw - 32px)}
 .toast{background:#3D7A5C;color:#fff;font:800 13px var(--font);padding:10px 18px;border-radius:999px;box-shadow:0 4px 14px rgba(74,36,18,.18);opacity:0;transform:translateY(8px);transition:opacity .25s ease,transform .25s ease;max-width:100%;word-break:break-word}
@@ -49,19 +49,9 @@
 .toast.err{background:var(--coral)}
 @media(max-width:480px){.toast-container{right:12px;bottom:12px}.toast{font-size:12px;padding:9px 14px}}
 @media(min-width:761px){
-.inline-main{display:grid;grid-template-columns:190px 170px 160px 160px minmax(0,1fr);column-gap:12px;row-gap:8px;align-items:center}
-.inline-main>*:nth-child(1){grid-column:1;grid-row:1}
-.inline-main>*:nth-child(2){grid-column:2;grid-row:1}
-.inline-main>*:nth-child(3){grid-column:3;grid-row:1}
-.inline-main>*:nth-child(4){grid-column:4;grid-row:1}
-.inline-main>*:nth-child(5){grid-column:5;grid-row:1;width:100%;min-width:0;flex-wrap:nowrap;white-space:nowrap;justify-content:flex-end;overflow-x:auto;gap:6px}
-.inline-main>*:nth-child(5) .copy-btn{padding:4px 8px}
-.inline-main>*:nth-child(5) .save-btn{padding:6px 14px}
-.inline-main>*:nth-child(5) .detail-toggle{padding:4px 10px}
-.inline-main>*:nth-child(6){grid-column:1/-1;grid-row:2}
-.inline-main .date-field,.inline-main .tag-select,.inline-main .status-select,.inline-main .reel-level-select{width:100%;min-width:0}
-.inline-main .date-input,.inline-main .tag-select,.inline-main .reel-level-select,.inline-main .status-select{height:30px;margin:0;align-self:center}
-.inline-main .date-field .date-input{flex:1;min-width:0}
+.inline-main .date-field{flex:0 1 180px}
+.inline-main .save-actions{flex:0 1 auto;min-width:0;justify-content:flex-start}
+.inline-main .date-input{flex:1;min-width:0}
 }
 .detail-toggle{display:inline-flex;align-items:center;gap:6px;font:800 13px var(--font);color:#6B452E;background:#fff;border:1px solid #B58B5A;border-radius:999px;padding:5px 12px;cursor:pointer;white-space:nowrap}
 .detail-arrow{transition:.18s;font-size:11px}
@@ -73,19 +63,34 @@
 .detail-panel:not([hidden]){display:grid;grid-template-columns:1fr 1fr;column-gap:16px;row-gap:4px;margin-top:6px;padding-top:6px}
 .detail-panel .field-label{margin:0}
 .detail-panel>*:nth-child(1){grid-column:1;grid-row:1}
-.detail-panel>*:nth-child(2){grid-column:1;grid-row:2;max-height:52px;overflow-y:auto}
+.detail-panel>*:nth-child(2){grid-column:1;grid-row:2;min-height:88px;max-height:240px;overflow-y:auto}
 .detail-panel>*:nth-child(3){grid-column:2;grid-row:1}
-.detail-panel>*:nth-child(4){grid-column:2;grid-row:2;max-height:52px;overflow-y:auto}
+.detail-panel>*:nth-child(4){grid-column:2;grid-row:2;min-height:88px;max-height:240px;overflow-y:auto}
 .detail-panel>*:nth-child(5){grid-column:1;grid-row:3}
-.detail-panel>*:nth-child(6){grid-column:1;grid-row:4;max-height:52px;overflow-y:auto}
+.detail-panel>*:nth-child(6){grid-column:1;grid-row:4;min-height:88px;max-height:240px;overflow-y:auto}
 .detail-panel>*:nth-child(7){grid-column:2;grid-row:3}
-.detail-panel>*:nth-child(8){grid-column:2;grid-row:4;max-height:52px;overflow-y:auto}
+.detail-panel>*:nth-child(8){grid-column:2;grid-row:4;min-height:88px;max-height:240px;overflow-y:auto}
 }
 @media(max-width:760px){.save-actions{order:99;margin-left:0;width:100%}}
-.footer-panel{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;margin-top:32px;padding:24px 28px;background:rgba(255,255,255,.4);border:1px solid #FF7F00;border-radius:22px}.footer-copy{font-size:15px;line-height:1.85;color:var(--text)}.footer-copy b{font-size:18px}.footer-character{display:flex;align-items:center;gap:12px}.footer-character .speech{max-width:250px;font-size:15px}.footer-character .nazoiki-img{width:105px}.edit-note{background:#FBF6EE;border:1px dashed var(--border);border-radius:12px;padding:13px 16px;font-size:13px;color:var(--sub);margin-top:18px;line-height:1.7}
+.footer-panel{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;margin-top:32px;padding:14px 24px;background:rgba(255,255,255,.4);border:1px solid #FF7F00;border-radius:22px}.footer-copy{font-size:15px;line-height:1.85;color:var(--text)}.footer-copy b{font-size:18px}.footer-character{display:flex;align-items:center;gap:10px}.footer-character .speech{max-width:210px;font-size:13px;padding:10px 12px;border-radius:26px}.footer-character .nazoiki-img{width:105px}.edit-note{background:#FBF6EE;border:1px dashed var(--border);border-radius:12px;padding:13px 16px;font-size:13px;color:var(--sub);margin-top:18px;line-height:1.7}
 .header-nazoiki-img{width:210px;max-width:100%;height:auto;display:block;object-fit:contain;filter:drop-shadow(0 5px 3px rgba(74,36,18,.08))}
-.footer-nazoiki-img{width:150px;max-width:100%;height:auto;display:block;object-fit:contain}
-@media(max-width:760px){body{padding:20px 12px 50px}.hero{padding:22px 18px 18px}.hero-main{grid-template-columns:1fr}.hero-mascot{min-height:0;justify-content:flex-end}.speech{font-size:14px;padding:14px 16px}.nazoiki-img{width:110px}h1{font-size:28px}.hero .intro{font-size:15px}.row{grid-template-columns:1fr}.footer-panel{grid-template-columns:1fr}.footer-character{justify-content:flex-end}.month-section{padding:16px 14px 18px;border-radius:20px}.month-title{font-size:20px}.post-top{flex-wrap:wrap}.header-nazoiki-img{width:150px}.footer-nazoiki-img{width:110px}}
+.hero-mascot .speech{max-width:180px;font-size:13px;line-height:1.45;padding:10px 12px;border-radius:26px}
+.footer-nazoiki-img{width:96px;max-width:100%;height:auto;display:block;object-fit:contain}
+@media(max-width:760px){body{padding:20px 12px 50px}.hero{padding:22px 18px 18px}.hero-main{grid-template-columns:1fr}.hero-mascot{min-height:0;justify-content:flex-end}.speech{font-size:14px;padding:14px 16px}.nazoiki-img{width:110px}h1{font-size:28px}.hero .intro{font-size:15px}.row{grid-template-columns:1fr}.footer-panel{grid-template-columns:1fr;gap:12px;padding:14px 16px}.footer-character{justify-content:flex-end}.month-section{padding:16px 14px 18px;border-radius:20px}.month-title{font-size:20px}.post-top{flex-wrap:wrap}.header-nazoiki-img{width:150px}.footer-nazoiki-img{width:76px}}
+.status-select.scheduled{background:#EFE9E2;color:#5C4033;border:0}
+.save-state{font-size:12px;color:var(--sub);font-weight:800}
+.save-state:empty{display:none}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #315f92;outline-offset:3px}
+@media(max-width:760px){
+body{padding-top:12px}.hero{position:relative;padding:16px 14px;margin-bottom:18px}
+.hero-main{gap:0}.hero .eyebrow,.hero h1{max-width:calc(100% - 82px)}
+.hero h1{font-size:22px;line-height:1.3}.hero .intro{font-size:13px;line-height:1.6;margin-bottom:10px}
+.hero .frequency-badge{font-size:13px;padding:6px 10px}
+.hero-mascot{position:absolute;right:12px;top:16px}.hero-mascot .speech{display:none}.header-nazoiki-img{width:76px}
+.hero-controls{margin-top:12px;padding-top:12px;gap:8px}.month-nav{margin-left:0;gap:4px}.month-select{font-size:13px}
+.inline-main .date-input{flex:1;min-width:0}.save-actions{gap:8px}.save-state{flex-basis:100%}
+}
+@media(prefers-reduced-motion:reduce){.toast,.month-arrow,.detail-arrow{transition:none}}
 </style>
 </head>
 <body>
@@ -100,45 +105,198 @@
     </div>
     <div class="hero-mascot">
       <div class="speech">コツコツ投稿して<br>なぞいきを<br>たくさんの人に<br>届けよう…！</div>
-      <img class="header-nazoiki-img" alt="なぞいき" src="assets/header-nazoiki.png"/>
+      <img class="header-nazoiki-img" alt="なぞいき" src="assets/header-nazoiki.png" width="640" height="480" decoding="async"/>
     </div>
   </div>
   <div class="hero-controls">
     <button class="view-btn active" data-view="current">今月</button>
     <button class="view-btn" data-view="next">来月</button>
     <button class="view-btn" data-view="all">すべて</button>
-    <div class="month-nav" id="monthNav"></div>
+    <div class="month-nav"><label for="monthNav">月へ移動</label><select class="month-select" id="monthNav"><option value="">月を選択…</option></select></div>
   </div>
 </header>
-<div class="status-bar"><span class="status-dot" id="statusDot"></span><span id="statusText">読み込み中…</span></div>
+<div class="status-bar" role="status" aria-live="polite"><span class="status-dot" id="statusDot"></span><span id="statusText">読み込み中…</span></div>
 <div id="postsContainer"><div class="loading">投稿データを読み込んでいます…</div></div>
 <footer class="footer-panel">
   <div class="footer-copy"><b>過去の月は折りたたまれています。</b><br>月の見出しをクリックすると、いつでも投稿カードを開いて確認できます。古い投稿も消えずにそのまま参照できます。</div>
-  <div class="footer-character"><div class="speech">過去の投稿も<br>ちゃんと<br>見守っています。</div><img class="footer-nazoiki-img" alt="なぞいき" src="assets/footer-nazoiki.png"/></div>
+  <div class="footer-character"><div class="speech">過去の投稿も<br>ちゃんと<br>見守っています。</div><img class="footer-nazoiki-img" alt="なぞいき" src="assets/footer-nazoiki.png" width="450" height="600" loading="lazy" decoding="async"/></div>
 </footer>
 <div class="edit-note">このページはSupabaseと連携しており、各カードの内容を直接編集して保存できます。スマホ・PCどちらからでも同じ内容を確認できます。</div>
 </div>
-<div id="toastContainer" class="toast-container"><div id="toast" class="toast"></div></div>
+<div id="toastContainer" class="toast-container"><div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true"></div></div>
 <script>
 const SUPABASE_URL="https://vwfzlcgfgffknpmselzy.supabase.co";const SUPABASE_PUBLISHABLE_KEY="sb_publishable_0LpdSdGbLIcC0P5rkVXgpg_1SN3sR-p";const TABLE="nazoiki_calendar_posts";
-const TAG_LABELS={intro:"紹介",mimamori:"見守り・シュール",seikaku:"性格紹介",kankei:"関係性",kisetsu:"季節ネタ",sanka:"参加型"};const STATUS_LABELS={"":"　",done:"作成済み",scheduled:"予約済み"};const REEL_LABELS={high:"リール適性：高",mid:"リール適性：中",low:"リール適性：低"};
-const WEEKDAY_LABELS=["日","月","火","水","木","金","土"];function weekdayLabel(s){const d=new Date(s+"T00:00:00");return`（${WEEKDAY_LABELS[d.getDay()]}）`}
-const statusDot=document.getElementById("statusDot"),statusText=document.getElementById("statusText"),container=document.getElementById("postsContainer"),monthNav=document.getElementById("monthNav"),toastEl=document.getElementById("toast");let allPosts=[],toastTimer=null;
-function showToast(text,isErr){clearTimeout(toastTimer);toastEl.textContent=text;toastEl.className="toast"+(isErr?" err":"");void toastEl.offsetWidth;toastEl.classList.add("show");toastTimer=setTimeout(()=>{toastEl.classList.remove("show")},2500)}
+const TAG_LABELS={intro:"紹介",mimamori:"見守り・シュール",seikaku:"性格紹介",kankei:"関係性",kisetsu:"季節ネタ",sanka:"参加型"};
+const STATUS_LABELS={"":"　",done:"作成済み",scheduled:"予約済み"};
+const REEL_LABELS={high:"リール適性：高",mid:"リール適性：中",low:"リール適性：低"};
+const WEEKDAY_LABELS=["日","月","火","水","木","金","土"];
+const statusDot=document.getElementById("statusDot"),statusText=document.getElementById("statusText"),container=document.getElementById("postsContainer"),monthNav=document.getElementById("monthNav"),toastEl=document.getElementById("toast");
+let allPosts=[],toastTimer=null,activeView="current",loaded=false;
+const cardViews=new Map(),monthOpen=new Map();
+const fieldValue=value=>String(value??"");
+function weekdayLabel(s){
+  if(!s)return "";
+  const d=new Date(s+"T00:00:00");
+  return Number.isNaN(d.getTime())?"":`(${WEEKDAY_LABELS[d.getDay()]})`;
+}
+function viewMonthKey(offset,now=new Date()){
+  const d=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+function showToast(text,isErr){clearTimeout(toastTimer);toastEl.textContent=text;toastEl.className="toast"+(isErr?" err":"");void toastEl.offsetWidth;toastEl.classList.add("show");toastTimer=setTimeout(()=>toastEl.classList.remove("show"),3500)}
 function setStatus(k,t){statusDot.className="status-dot"+(k?" "+k:"");statusText.textContent=t}
-async function fetchPosts(){const r=await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=post_order.asc`,{headers:{apikey:SUPABASE_PUBLISHABLE_KEY}});if(!r.ok)throw new Error();return r.json()}
-async function updatePost(id,fields){const r=await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`,{method:"PATCH",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({...fields,updated_at:new Date().toISOString()})});if(!r.ok)throw new Error()}
-function monthKey(s){return s.slice(0,7)}function monthLabel(k){const[y,m]=k.split("-");return`${y}年${Number(m)}月`}function escapeHtml(s){return(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function buildInlineHTML(p){return`<div class="date-field"><input type="date" class="date-input" value="${p.post_date}" data-field="post_date"><span class="weekday-label">${weekdayLabel(p.post_date)}</span></div><select class="tag-select ${p.tag_key}" data-field="tag_key">${Object.entries(TAG_LABELS).map(([k,v])=>`<option value="${k}" ${k===p.tag_key?"selected":""}>${v}</option>`).join("")}</select><select class="reel-level-select ${p.reel_level}" data-field="reel_level">${Object.entries(REEL_LABELS).map(([k,v])=>`<option value="${k}" ${k===p.reel_level?"selected":""}>${v}</option>`).join("")}</select><select class="status-select ${p.production_status==="done"?"done":p.production_status==="scheduled"?"scheduled":""}" data-field="production_status">${Object.entries(STATUS_LABELS).map(([k,v])=>`<option value="${k}" ${k===(p.production_status||"")?"selected":""}>${v}</option>`).join("")}</select><div class="save-actions"><button type="button" class="copy-btn img-copy-btn">画像依頼COPY</button><button type="button" class="copy-btn reel-copy-btn">リール依頼COPY</button><button type="button" class="save-btn">保存</button><button type="button" class="detail-toggle"><span>詳細</span><span class="detail-arrow">▼</span></button></div><input type="text" class="title-input" value="${escapeHtml(p.title)}" data-field="title">`}
-function autoSizeTextarea(el){el.style.height="auto";el.style.height=el.scrollHeight+"px"}
-function buildDetailHTML(p){return`<div class="field-label">画像</div><textarea class="short" data-field="image_desc">${escapeHtml(p.image_desc)}</textarea><div class="field-label">目的</div><textarea class="short" data-field="purpose">${escapeHtml(p.purpose)}</textarea><div class="field-label">投稿文</div><textarea class="short" data-field="caption_text">${escapeHtml(p.caption_text)}</textarea><div class="field-label">リール案</div><textarea class="short" data-field="reel_text">${escapeHtml(p.reel_text)}</textarea>`}
-function buildCard(p){const c=document.createElement("div");c.className="post-card";c.dataset.id=p.id;const main=document.createElement("div");main.className="inline-main";main.innerHTML=buildInlineHTML(p);const detail=document.createElement("div");detail.className="detail-panel";detail.hidden=true;detail.innerHTML=buildDetailHTML(p);const detailTextareas=detail.querySelectorAll("textarea");detailTextareas.forEach(t=>t.addEventListener("input",()=>autoSizeTextarea(t)));const ts=main.querySelector('[data-field="tag_key"]'),ss=main.querySelector('[data-field="production_status"]'),rs=main.querySelector('[data-field="reel_level"]');ts.onchange=()=>ts.className="tag-select "+ts.value;ss.onchange=()=>ss.className="status-select "+(ss.value==="done"?"done":ss.value==="scheduled"?"scheduled":"");rs.onchange=()=>rs.className="reel-level-select "+rs.value;const b=main.querySelector(".save-btn");b.onclick=async()=>{const f={};c.querySelectorAll("[data-field]").forEach(e=>f[e.dataset.field]=e.value);b.disabled=true;try{await updatePost(p.id,f);Object.assign(p,f);showToast("保存しました")}catch(e){showToast("保存に失敗しました",true)}finally{b.disabled=false}};const dt=main.querySelector(".detail-toggle");dt.onclick=()=>{const open=detail.hidden;detail.hidden=!open;dt.classList.toggle("open",open);if(open)detailTextareas.forEach(autoSizeTextarea)};const getVal=field=>{const el=c.querySelector(`[data-field="${field}"]`);return el?el.value:""};const copyText=async text=>{try{await navigator.clipboard.writeText(text);showToast("コピーしました")}catch(e){showToast("コピーできませんでした",true)}};const getDateVal=()=>getVal("post_date").replace(/-/g,"/");main.querySelector(".img-copy-btn").onclick=()=>copyText(`【画像】\n下記指示で画像を作成してください。\n\n日付：\n${getDateVal()}\n\nタイトル：\n${getVal("title")}\n\n画像：\n${getVal("image_desc")}\n\n目的：\n${getVal("purpose")}\n\n投稿文：\n${getVal("caption_text")}`);main.querySelector(".reel-copy-btn").onclick=()=>copyText(`【リール】\nCodexに渡す指示文をお願いします。\n\n日付：\n${getDateVal()}\n\nタイトル：\n${getVal("title")}\n\n画像：\n${getVal("image_desc")}\n\n目的：\n${getVal("purpose")}\n\nリール案：\n${getVal("reel_text")}`);c.append(main,detail);return c}
-function groupByMonth(ps){const m=new Map;ps.forEach(p=>{const k=monthKey(p.post_date);if(!m.has(k))m.set(k,[]);m.get(k).push(p)});return[...m.entries()].sort(([a],[b])=>b.localeCompare(a)).map(([key,posts])=>({key,posts:posts.sort((a,b)=>a.post_order-b.post_order)}))}
-function buildMonthSection(month,index){const s=document.createElement("section");s.className="month-section"+(index<2?" open":"");s.dataset.month=month.key;const t=document.createElement("button");t.type="button";t.className="month-toggle";t.setAttribute("aria-expanded",index<2?"true":"false");t.innerHTML=`<span class="month-title-wrap"><span class="month-title">${monthLabel(month.key)}</span><span class="month-count">${month.posts.length}件</span></span><span class="month-arrow">▶</span>`;const ct=document.createElement("div");ct.className="month-content";const r=document.createElement("div");r.className="row";month.posts.forEach(p=>r.appendChild(buildCard(p)));ct.appendChild(r);t.onclick=()=>{const o=s.classList.toggle("open");t.setAttribute("aria-expanded",o?"true":"false")};s.append(t,ct);return s}
-function render(posts=allPosts){container.innerHTML="";const months=groupByMonth(posts);months.forEach((m,i)=>container.appendChild(buildMonthSection(m,i)));monthNav.innerHTML="";groupByMonth(allPosts).forEach(m=>{const b=document.createElement("button");b.className="month-link";b.textContent=monthLabel(m.key)+"へ";b.onclick=()=>{showAll();const el=document.querySelector(`[data-month="${m.key}"]`);if(el){el.classList.add("open");el.scrollIntoView({behavior:"smooth",block:"start"})}};monthNav.appendChild(b)})}
-function setActive(btn){document.querySelectorAll('.view-btn').forEach(b=>b.classList.toggle('active',b===btn))}function filterMonth(offset,btn){const d=new Date();d.setMonth(d.getMonth()+offset);const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;const ps=allPosts.filter(p=>monthKey(p.post_date)===key);render(ps);if(!ps.length)container.innerHTML=`<div class="loading">${monthLabel(key)}の投稿予定はまだありません。</div>`;setActive(btn)}function showAll(btn=document.querySelector('[data-view="all"]')){render(allPosts);setActive(btn)}
-document.querySelector('[data-view="current"]').onclick=function(){filterMonth(0,this)};document.querySelector('[data-view="next"]').onclick=function(){filterMonth(1,this)};document.querySelector('[data-view="all"]').onclick=function(){showAll(this)};
-(async()=>{try{allPosts=await fetchPosts();render(allPosts);setStatus("ok",`読み込み完了（${allPosts.length}件）`)}catch(e){container.innerHTML='<div class="loading">読み込みに失敗しました。ページを再読み込みしてください。</div>';setStatus("err","読み込みエラー")}})();
+async function fetchPosts(){
+  const r=await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=post_order.asc`,{headers:{apikey:SUPABASE_PUBLISHABLE_KEY}});
+  if(!r.ok)throw new Error("読み込みに失敗しました");
+  return r.json();
+}
+async function updatePost(post,fields){
+  const params=new URLSearchParams({id:`eq.${post.id}`,select:"*"});
+  const payload={...fields};
+  if(Object.prototype.hasOwnProperty.call(post,"updated_at")){
+    params.set("updated_at",post.updated_at==null?"is.null":`eq.${post.updated_at}`);
+    // Advance the existing revision even for two saves in the same millisecond.
+    payload.updated_at=new Date(Math.max(Date.now(),(Date.parse(post.updated_at)||0)+1)).toISOString();
+  }else{
+    // If no revision column is returned, guard the original values being changed.
+    for(const field of Object.keys(fields)){
+      params.set(field,post[field]==null?"is.null":`eq.${JSON.stringify(fieldValue(post[field]))}`);
+    }
+  }
+  let r;
+  try{
+    r=await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?${params}`,{
+      method:"PATCH",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json",Prefer:"return=representation"},body:JSON.stringify(payload)
+    });
+  }catch(e){throw new Error("通信できませんでした。入力内容は保持しています。")}
+  if(!r.ok)throw new Error("保存に失敗しました。入力内容は保持しています。");
+  let rows;
+  try{rows=await r.json()}catch(e){throw new Error("保存結果を確認できません。入力内容は保持しています。") }
+  if(!Array.isArray(rows)||rows.length!==1||String(rows[0].id)!==String(post.id)){
+    throw new Error("更新を確認できません。他の端末の更新や権限を確認してください。入力内容は保持しています。");
+  }
+  return rows[0];
+}
+function monthKey(s){return fieldValue(s).slice(0,7)}
+function monthLabel(k){const[y,m]=k.split("-");return `${y}年${Number(m)}月`}
+function escapeHtml(s){return fieldValue(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function buildInlineHTML(p){return `<div class="date-field"><input type="date" class="date-input" aria-label="投稿予定日" required value="${escapeHtml(p.post_date)}" data-field="post_date"><span class="weekday-label">${weekdayLabel(p.post_date)}</span></div><select class="tag-select ${escapeHtml(p.tag_key)}" aria-label="カテゴリ" data-field="tag_key">${Object.entries(TAG_LABELS).map(([k,v])=>`<option value="${k}" ${k===p.tag_key?"selected":""}>${v}</option>`).join("")}</select><select class="reel-level-select ${escapeHtml(p.reel_level)}" aria-label="リール適性" data-field="reel_level">${Object.entries(REEL_LABELS).map(([k,v])=>`<option value="${k}" ${k===p.reel_level?"selected":""}>${v}</option>`).join("")}</select><select class="status-select ${p.production_status==="done"?"done":p.production_status==="scheduled"?"scheduled":""}" aria-label="制作状態" data-field="production_status">${Object.entries(STATUS_LABELS).map(([k,v])=>`<option value="${k}" ${k===(p.production_status||"")?"selected":""}>${v}</option>`).join("")}</select><div class="save-actions"><span class="save-state" role="status" aria-live="polite"></span><button type="button" class="copy-btn img-copy-btn">画像依頼COPY</button><button type="button" class="copy-btn reel-copy-btn">リール依頼COPY</button><button type="button" class="save-btn" disabled>保存</button><button type="button" class="detail-toggle" aria-expanded="false"><span>詳細</span><span class="detail-arrow" aria-hidden="true">▼</span></button></div><input type="text" class="title-input" aria-label="タイトル" value="${escapeHtml(p.title)}" data-field="title">`}
+function autoSizeTextarea(el){el.style.height="auto";el.style.height=Math.min(240,Math.max(88,el.scrollHeight))+"px"}
+function buildDetailHTML(p,id){
+  return [["image_desc","画像"],["purpose","目的"],["caption_text","投稿文"],["reel_text","リール案"]].map(([field,label])=>`<label class="field-label" for="${id}-${field}">${label}</label><textarea id="${id}-${field}" class="short" data-field="${field}">${escapeHtml(p[field])}</textarea>`).join("");
+}
+function readFields(card){return Object.fromEntries([...card.querySelectorAll("[data-field]")].map(el=>[el.dataset.field,el.value]))}
+function changedFields(post,values){return Object.fromEntries(Object.entries(values).filter(([field,value])=>value!==fieldValue(post[field])))}
+function buildCard(p){
+  const c=document.createElement("div"),id="post-"+encodeURIComponent(p.id);
+  c.className="post-card";c.dataset.id=p.id;c.setAttribute("role","group");c.setAttribute("aria-label",fieldValue(p.title));
+  const main=document.createElement("div");main.className="inline-main";main.innerHTML=buildInlineHTML(p);
+  const detail=document.createElement("div");detail.className="detail-panel";detail.id=id+"-detail";detail.hidden=true;detail.innerHTML=buildDetailHTML(p,id);
+  c.append(main,detail);
+  const b=main.querySelector(".save-btn"),stateEl=main.querySelector(".save-state"),dt=main.querySelector(".detail-toggle");
+  const state={card:c,post:p,saving:false};
+  const syncPresentation=()=>{
+    const ts=main.querySelector('[data-field="tag_key"]'),ss=main.querySelector('[data-field="production_status"]'),rs=main.querySelector('[data-field="reel_level"]');
+    ts.className="tag-select "+ts.value;
+    ss.className="status-select "+(ss.value==="done"?"done":ss.value==="scheduled"?"scheduled":"");
+    rs.className="reel-level-select "+rs.value;
+    main.querySelector(".weekday-label").textContent=weekdayLabel(main.querySelector('[data-field="post_date"]').value);
+    c.setAttribute("aria-label",main.querySelector('[data-field="title"]').value);
+  };
+  const markDirty=()=>{
+    const dirty=Object.keys(changedFields(p,readFields(c))).length>0;
+    c.dataset.dirty=String(dirty);c.dataset.saving=String(state.saving);
+    b.disabled=state.saving||!dirty;stateEl.textContent=state.saving?"保存中…":dirty?"未保存":"";
+  };
+  for(const event of ["input","change"])c.addEventListener(event,e=>{
+    if(!e.target.matches("[data-field]"))return;
+    if(e.target.tagName==="TEXTAREA")autoSizeTextarea(e.target);
+    syncPresentation();markDirty();
+  });
+  b.onclick=async()=>{
+    const submitted=readFields(c),fields=changedFields(p,submitted);
+    if(!Object.keys(fields).length)return;
+    const date=main.querySelector('[data-field="post_date"]');
+    if(!date.checkValidity()){showToast("投稿予定日を入力してください",true);date.focus();return}
+    state.saving=true;markDirty();
+    try{
+      const saved=await updatePost(p,fields);
+      // Keep any edits made while the request was in flight.
+      for(const el of c.querySelectorAll("[data-field]")){
+        const field=el.dataset.field;
+        if(el.value===submitted[field]&&Object.prototype.hasOwnProperty.call(saved,field))el.value=fieldValue(saved[field]);
+      }
+      Object.assign(p,saved);syncPresentation();renderView();
+      if(!detail.hidden)detail.querySelectorAll("textarea").forEach(autoSizeTextarea);
+      showToast("保存しました");
+    }catch(e){showToast(e.message||"保存に失敗しました。入力内容は保持しています。",true)}
+    finally{state.saving=false;markDirty()}
+  };
+  dt.setAttribute("aria-controls",detail.id);
+  dt.onclick=()=>{
+    const open=detail.hidden;detail.hidden=!open;dt.classList.toggle("open",open);dt.setAttribute("aria-expanded",String(open));
+    if(open)detail.querySelectorAll("textarea").forEach(autoSizeTextarea);
+  };
+  const getVal=field=>c.querySelector(`[data-field="${field}"]`).value;
+  const copyText=async text=>{try{await navigator.clipboard.writeText(text);showToast("コピーしました")}catch(e){showToast("コピーできませんでした",true)}};
+  const getDateVal=()=>getVal("post_date").replace(/-/g,"/");
+  main.querySelector(".img-copy-btn").onclick=()=>copyText(`【画像】\n下記指示で画像を作成してください。\n\n日付：\n${getDateVal()}\n\nタイトル：\n${getVal("title")}\n\n画像：\n${getVal("image_desc")}\n\n目的：\n${getVal("purpose")}\n\n投稿文：\n${getVal("caption_text")}`);
+  main.querySelector(".reel-copy-btn").onclick=()=>copyText(`【リール】\nCodexに渡す指示文をお願いします。\n\n日付：\n${getDateVal()}\n\nタイトル：\n${getVal("title")}\n\n画像：\n${getVal("image_desc")}\n\n目的：\n${getVal("purpose")}\n\nリール案：\n${getVal("reel_text")}`);
+  markDirty();return state;
+}
+function groupByMonth(ps){
+  const m=new Map;ps.forEach(p=>{const k=monthKey(p.post_date);if(!m.has(k))m.set(k,[]);m.get(k).push(p)});
+  return [...m.entries()].sort(([a],[b])=>b.localeCompare(a)).map(([key,posts])=>({key,posts:posts.sort((a,b)=>a.post_order-b.post_order)}));
+}
+function setMonthOpen(section,open){
+  section.classList.toggle("open",open);section.querySelector(".month-toggle").setAttribute("aria-expanded",String(open));monthOpen.set(section.dataset.month,open);
+}
+function buildMonthSection(month,index){
+  const s=document.createElement("section");s.className="month-section";s.dataset.month=month.key;
+  const t=document.createElement("button");t.type="button";t.className="month-toggle";
+  t.innerHTML=`<span class="month-title-wrap"><span class="month-title">${monthLabel(month.key)}</span><span class="month-count">${month.posts.length}件</span></span><span class="month-arrow" aria-hidden="true">▶</span>`;
+  const ct=document.createElement("div");ct.className="month-content";ct.id="month-"+month.key;t.setAttribute("aria-controls",ct.id);
+  const row=document.createElement("div");row.className="row";
+  month.posts.forEach(p=>{
+    const key=String(p.id);if(!cardViews.has(key))cardViews.set(key,buildCard(p));row.appendChild(cardViews.get(key).card);
+  });
+  ct.appendChild(row);s.append(t,ct);setMonthOpen(s,monthOpen.get(month.key)??index<2);
+  t.onclick=()=>setMonthOpen(s,!s.classList.contains("open"));return s;
+}
+function renderView(){
+  if(!loaded)return;
+  const key=activeView==="all"?null:viewMonthKey(activeView==="next"?1:0);
+  const posts=key?allPosts.filter(p=>monthKey(p.post_date)===key):allPosts;
+  const focused=document.activeElement,selection=focused?.tagName==="TEXTAREA"||focused?.type==="text"?[focused.selectionStart,focused.selectionEnd]:null;
+  const fragment=document.createDocumentFragment();groupByMonth(posts).forEach((m,i)=>fragment.appendChild(buildMonthSection(m,i)));
+  if(!posts.length){const empty=document.createElement("div");empty.className="loading";empty.textContent=key?`${monthLabel(key)}の投稿予定はまだありません。`:"投稿予定はまだありません。";fragment.appendChild(empty)}
+  container.replaceChildren(fragment);
+  const selectedMonth=key||monthNav.value;
+  monthNav.replaceChildren();
+  const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="月を選択…";monthNav.appendChild(placeholder);
+  groupByMonth(allPosts).forEach(m=>{
+    const option=document.createElement("option");option.value=m.key;option.textContent=monthLabel(m.key);monthNav.appendChild(option);
+  });
+  monthNav.value=[...monthNav.options].some(option=>option.value===selectedMonth)?selectedMonth:"";
+  setStatus("ok",`表示 ${posts.length}件 / 全${allPosts.length}件`);
+  if(focused?.matches("[data-field]")&&focused.isConnected&&focused.getClientRects().length){focused.focus({preventScroll:true});if(selection)focused.setSelectionRange(...selection)}
+}
+function selectView(view){
+  const changed=activeView!==view;activeView=view;
+  document.querySelectorAll(".view-btn").forEach(b=>{const active=b.dataset.view===view;b.classList.toggle("active",active);b.setAttribute("aria-pressed",String(active))});
+  if(changed)renderView();
+}
+monthNav.onchange=()=>{
+  const targetMonth=monthNav.value;if(!targetMonth)return;
+  selectView("all");monthNav.value=targetMonth;
+  const section=container.querySelector(`[data-month="${targetMonth}"]`);
+  if(section){setMonthOpen(section,true);section.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})}
+};
+document.querySelectorAll(".view-btn").forEach(b=>b.onclick=()=>selectView(b.dataset.view));
+window.addEventListener("beforeunload",e=>{
+  if([...cardViews.values()].some(s=>s.card.dataset.dirty==="true"||s.saving)){e.preventDefault();e.returnValue=""}
+});
+(async()=>{try{allPosts=await fetchPosts();loaded=true;selectView(activeView);renderView()}catch(e){container.innerHTML='<div class="loading">読み込みに失敗しました。ページを再読み込みしてください。</div>';setStatus("err","読み込みエラー")}})();
 </script>
 </body>
 </html>
