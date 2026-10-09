@@ -575,6 +575,8 @@ h1, h2, h3, h4, h5, h6, .draft-title, .legacy-details summary {
 .toolbar-save-status.synced { color: #357344; }
 .category-field select, .category-add-form input, .search-field input { font-size: 16px; }
 .category-manage-actions button, .small-button { min-width: 44px; min-height: 44px; }
+.draft-icon-button { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; }
+.draft-icon-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .list-heading-actions, .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pending-badge { font-family: var(--font-mono); color: var(--muted); font-size: 12px; }
 .note-status-field[hidden] { display: none !important; }
