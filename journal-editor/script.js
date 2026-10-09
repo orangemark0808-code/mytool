@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, defaultCategories, normalizeCategories, mergeCategories, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-01';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-01';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, defaultCategories, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-04';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-04';
 
-const VERSION = '2026-10-09-03';
+const VERSION = '2026-10-09-04';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -14,7 +14,7 @@ const state = {
   unsubscribe: null, unsubscribeCategories: null, firebase: null, firebaseReady: false,
   storageFailed: false, storageReadFailed: false, syncError: false, categoryError: false,
   draftListenerFailed: false, categoryListenerFailed: false, listenerGeneration: 0,
-  legacyImported: false, snapshotCount: 0,
+  legacyImported: false, legacyReviewShown: false, snapshotCount: 0, serverDrafts: [], serverCategories: [],
 };
 
 function currentDraft() { return state.drafts.find((draft) => draft.id === state.currentId); }
@@ -164,7 +164,7 @@ function startRemoteSync() {
     state.drafts = merged.drafts;
     const recovered = merged.recovered.find((item) => item.previousId === state.currentId);
     if (recovered) { state.currentId = recovered.copy.id; titleInput.value = recovered.copy.title; toast('別端末で削除された記事を、復元用の下書きとして残しました'); }
-    if (authoritative) { state.remoteReady = true; state.syncError = false; }
+    if (authoritative) { state.remoteReady = true; state.syncError = false; state.serverDrafts = remote; }
     persistLocal();
     const next = currentDraft();
     if (visible && previous && next && !next.deletedAt && contentKey(previous) !== contentKey(next) && !previous.pendingSync && !recovered) {
@@ -173,7 +173,7 @@ function startRemoteSync() {
       bodyInput.setSelectionRange(Math.min(start, next.body.length), Math.min(end, next.body.length)); bodyInput.scrollTop = scroll;
       renderCategoryOptions(); updatePreview(); recordHistory(); toast('別端末での変更を反映しました');
     }
-    updateDraftTimestamps(); renderList(); refreshSyncStatus();
+    updateDraftTimestamps(); renderList(); refreshSyncStatus(); updateMigrationPanel();
     if (authoritative) pumpSync();
   }, fail('drafts'));
   state.unsubscribeCategories = state.firebase.onSnapshot(categoriesRef(uid), { includeMetadataChanges: true }, (snapshot) => {
@@ -184,9 +184,10 @@ function startRemoteSync() {
       state.categoriesReady = true;
       state.categoryError = false;
       const remote = snapshot.exists() ? normalizeCategories(snapshot.data().records) : [];
+      state.serverCategories = remote;
       state.categoriesDirty = JSON.stringify(mergeCategories(remote, state.categories)) !== JSON.stringify(remote);
     }
-    persistLocal([]); renderCategoryOptions(); renderCategoryManageList(); renderList(); refreshSyncStatus();
+    persistLocal([]); renderCategoryOptions(); renderCategoryManageList(); renderList(); refreshSyncStatus(); updateMigrationPanel();
     if (authoritative) void syncCategories();
   }, fail('categories'));
 }
@@ -200,6 +201,8 @@ async function handleAuth(user) {
   stopSession(); state.user = user; state.currentId = null; state.drafts = []; state.categories = [];
   state.remoteReady = state.categoriesReady = state.syncError = state.categoryError = state.storageFailed = state.storageReadFailed = false;
   state.legacyImported = state.categoriesDirty = state.showTrash = false;
+  state.legacyReviewShown = false;
+  state.serverDrafts = []; state.serverCategories = [];
   state.searchQuery = ''; $('searchInput').value = '';
   titleInput.value = bodyInput.value = ''; resetHistory(); updatePreview();
   $('loginButton').hidden = Boolean(user); $('logoutButton').hidden = !user;
@@ -264,19 +267,46 @@ function deleteCategory(id) {
   persistLocal(affected); changedCategories(); for (const draftId of affected) queueSave(draftId);
 }
 function updateStorageUi() { $('storageDescription').textContent = 'Googleアカウントごとにこの端末へ保存し、Firestoreへ同期します。'; $('storageLocation').value = 'この端末 + Firestore'; }
+function migrationReady() { return Boolean(state.user && state.remoteReady && state.categoriesReady && navigator.onLine && !state.draftListenerFailed && !state.categoryListenerFailed); }
+function legacyPlan() {
+  return planLegacyImport(readArray(LEGACY_KEYS.drafts), readArray(LEGACY_KEYS.categories), state.serverDrafts, state.serverCategories);
+}
 function updateMigrationPanel() {
   try {
     const drafts = readArray(LEGACY_KEYS.drafts), categories = readArray(LEGACY_KEYS.categories);
-    const available = Boolean(state.user && !state.legacyImported && (drafts.length || categories.length));
+    const exists = Boolean(state.user && (drafts.length || categories.length));
+    const ready = migrationReady();
+    const plan = ready ? planLegacyImport(drafts, categories, state.serverDrafts, state.serverCategories) : null;
+    const pending = plan ? plan.newCount + plan.changedCount + plan.categoriesToImport.length > 0 : true;
+    const available = exists && !state.legacyImported && pending;
     $('migrationPanel').classList.toggle('hidden', !available);
     $('legacyNotice').classList.toggle('hidden', !available);
-    $('migrationMessage').textContent = `このブラウザに旧形式の下書き${drafts.length}件とカテゴリ${categories.length}件があります。ご自身のデータか確認してから、現在のGoogleアカウントへ取り込んでください。旧データは消しません。`;
-  } catch { $('migrationPanel').classList.add('hidden'); $('legacyNotice').classList.add('hidden'); toast('旧形式データを読み込めませんでした。元データは保持しています'); }
+    $('legacyDetails').classList.toggle('hidden', !exists);
+    if (available && ready && !state.legacyReviewShown) { $('legacyDetails').open = true; state.legacyReviewShown = true; }
+    $('migrateLocalButton').disabled = !ready;
+    $('legacyDetailsSummary').textContent = `この端末の旧データを確認（記事${drafts.length}件・カテゴリ${categories.length}件）`;
+    const message = !ready
+      ? 'この端末の旧データをクラウドと照合しています。オンラインで同期を確認してから取り込めます。'
+      : state.legacyImported
+        ? 'このブラウザでは取り込み済み、または案内を確認済みです。下の一覧は残してある旧データのタイトルです。'
+        : !pending
+          ? `記事${plan.matchedCount}件とカテゴリはクラウドに同じデータがあります。再取り込みは不要です。旧データはこの端末に保持しています。`
+          : `この端末だけに残る記事${plan.newCount}件、クラウドと内容が異なる記事${plan.changedCount}件、追加のカテゴリ${plan.categoriesToImport.length}件があります。「この端末の旧データを確認」のタイトル一覧を確認してください。内容の異なる記事は別の下書きとして残し、旧データも消しません。`;
+    $('migrationMessage').textContent = message; $('legacyDetailsMessage').textContent = message;
+    $('legacyNoticeMessage').textContent = !ready ? 'この端末の旧データをクラウドと照合しています。' : plan.newCount + plan.changedCount > 0 ? 'この端末の旧データに、未取り込みまたは内容の異なる記事があります。設定でタイトルを確認できます。' : 'この端末に未取り込みの旧カテゴリがあります。設定で件数を確認できます。';
+    const labels = { matched: 'クラウドに同じ内容', new: 'この端末だけの記事', changed: '内容に違い・別記事として保存' };
+    const entries = plan?.entries || drafts.map((raw) => ({ draft: normalizeDraft(raw), kind: null }));
+    $('legacyDraftList').innerHTML = entries.map((entry) => `<li><span>${escapeHtml(entry.draft.title)}</span><small>${state.legacyImported ? '取り込み元の旧データ' : labels[entry.kind] || '照合待ち'}</small></li>`).join('') || '<li>旧形式の記事はありません。</li>';
+  } catch { for (const id of ['migrationPanel', 'legacyNotice', 'legacyDetails']) $(id).classList.add('hidden'); toast('旧形式データを読み込めませんでした。元データは保持しています'); }
 }
 function migrateLocal() {
-  if (!state.user || state.storageReadFailed || !confirm('旧形式の下書き・カテゴリを、現在のGoogleアカウントへ取り込みます。ご自身のデータであることを確認しましたか？旧データは保持されます。')) return;
+  if (!state.user || state.storageReadFailed) return;
+  if (!migrationReady()) return toast('オンラインでクラウドとの照合が終わってから取り込んでください');
   try {
-    const legacyCategories = normalizeCategories(readArray(LEGACY_KEYS.categories));
+    const plan = legacyPlan();
+    if (!plan.newCount && !plan.changedCount && !plan.categoriesToImport.length) { updateMigrationPanel(); return toast('クラウドに同じデータがあります。再取り込みは不要です'); }
+    if (!confirm(`新規記事${plan.newCount}件、内容の異なる記事${plan.changedCount}件、カテゴリ${plan.categoriesToImport.length}件を現在のGoogleアカウントへ取り込みます。ご自身のデータであることを確認しましたか？既存の記事は上書きせず、旧データも保持します。`)) return;
+    const legacyCategories = plan.categoriesToImport;
     // Keep legacy IDs referenced by existing journals. Hide unused duplicate
     // defaults rather than showing two identically named options after upgrade.
     const now = new Date().toISOString();
@@ -286,7 +316,8 @@ function migrateLocal() {
       && legacyCategories.some((legacy) => !legacy.deleted && legacy.name === category.name)
         ? { ...category, deleted: true, updatedAt: now } : category);
     state.categories = mergeCategories(state.categories, legacyCategories);
-    for (const draft of readArray(LEGACY_KEYS.drafts).map((raw) => normalizeDraft(raw))) {
+    for (const entry of plan.entries.filter((item) => item.kind !== 'matched')) {
+      const draft = entry.draft;
       const current = state.drafts.find((item) => item.id === draft.id);
       if (current && current.title === draft.title && current.body === draft.body && current.category === draft.category) continue;
       state.drafts.push(editedDraft(draft, { id: current ? crypto.randomUUID() : draft.id, baseVersion: null, title: current ? `${draft.title}（旧データ）` : draft.title, categoryName: categoryName(draft.category, draft.categoryName) }));
@@ -295,6 +326,12 @@ function migrateLocal() {
     if (!persistLocal()) { state.legacyImported = false; return toast('端末に保存できません。旧データは保持しています'); }
     renderList(); updateMigrationPanel(); retrySync(); toast('旧データを取り込みました');
   } catch { toast('旧データの取り込みに失敗しました。元データは保持しています'); }
+}
+function dismissLegacyNotice() {
+  if (!state.user || !confirm('記事は取り込まず、このブラウザの案内を閉じます。旧データは保持され、設定の「この端末の旧データを確認」からタイトルを確認できます。閉じますか？')) return;
+  state.legacyImported = true;
+  if (!persistLocal([])) state.legacyImported = false;
+  updateMigrationPanel();
 }
 
 function formatDateTime(value) {
@@ -437,6 +474,8 @@ $('settingsButton').addEventListener('click', () => showView('settings'));
 $('legacySettingsButton').addEventListener('click', () => showView('settings'));
 for (const id of ['loginButton', 'gateLoginButton']) $(id).addEventListener('click', signInWithGoogle);
 $('logoutButton').addEventListener('click', logout); $('migrateLocalButton').addEventListener('click', migrateLocal);
+$('dismissLegacyButton').addEventListener('click', dismissLegacyNotice);
+$('reviewLegacyButton').addEventListener('click', () => { state.legacyImported = false; state.legacyReviewShown = false; persistLocal([]); updateMigrationPanel(); });
 $('retrySyncButton').addEventListener('click', retrySync); $('copyDiagnosticButton').addEventListener('click', copyDiagnostic);
 $('trashButton').addEventListener('click', () => { state.showTrash = !state.showTrash; renderList(); });
 $('draftList').addEventListener('click', (event) => {

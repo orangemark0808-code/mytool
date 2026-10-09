@@ -150,6 +150,38 @@ export function mergeCategories(local, remote) {
   return [...merged.values()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
+// Compare only with the signed-in account's confirmed server records. Matching
+// category names can have different IDs on the old PC and phone versions.
+export function planLegacyImport(legacyDrafts, legacyCategories, serverDrafts, serverCategories) {
+  const categories = normalizeCategories(legacyCategories);
+  const known = normalizeCategories(serverCategories);
+  const aliases = new Map(), categoriesToImport = [];
+  for (const category of categories) {
+    const exact = known.find((item) => item.id === category.id);
+    const sameName = known.filter((item) => !item.deleted && item.name === category.name);
+    const current = exact || (sameName.length === 1 ? sameName[0] : null);
+    if (current) aliases.set(category.id, current.id);
+    else if (!category.deleted) categoriesToImport.push(category);
+  }
+  const remote = new Map(serverDrafts.map((draft) => [draft.id, draft]));
+  const entries = legacyDrafts.map((raw) => {
+    const draft = normalizeDraft(raw);
+    const category = aliases.get(draft.category) || draft.category;
+    const current = remote.get(draft.id);
+    const same = current && current.title === draft.title && current.body === draft.body && (current.category || null) === category;
+    return {
+      draft: { ...draft, category, categoryName: known.find((item) => item.id === category)?.name || categories.find((item) => item.id === draft.category)?.name || draft.categoryName },
+      kind: same ? 'matched' : current ? 'changed' : 'new',
+    };
+  });
+  return {
+    entries, categoriesToImport,
+    newCount: entries.filter((entry) => entry.kind === 'new').length,
+    changedCount: entries.filter((entry) => entry.kind === 'changed').length,
+    matchedCount: entries.filter((entry) => entry.kind === 'matched').length,
+  };
+}
+
 export function blockEdit(value, start, end, action) {
   const lineStart = start === 0 ? 0 : value.lastIndexOf('\n', start - 1) + 1;
   const searchEnd = end > start && value[end - 1] === '\n' ? end - 1 : end;

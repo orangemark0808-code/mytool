@@ -140,9 +140,45 @@ test('legacy import keeps source data, preserves ID categories and avoids duplic
   const legacy = JSON.stringify([{ ...h.draft, body: 'old local paragraph', category: 'old-diary' }]);
   h.storage.set(core.LEGACY_KEYS.drafts, legacy);
   h.storage.set(core.LEGACY_KEYS.categories, JSON.stringify([{ id: 'old-diary', name: '日記', order: 0 }]));
+  h.run('state.remoteReady=state.categoriesReady=true;state.serverDrafts=[fixture];state.serverCategories=[];');
   h.run('migrateLocal();');
   assert.equal(h.storage.get(core.LEGACY_KEYS.drafts), legacy);
   assert.equal(h.run('state.drafts.length'), 2);
   assert.equal(h.run("state.drafts.find(d=>d.body==='old local paragraph').category"), 'old-diary');
   assert.equal(h.run("activeCategories().filter(c=>c.name==='日記').length"), 1);
+});
+test('matching cloud data hides the redundant phone notice and keeps legacy source', () => {
+  const h = harness();
+  const old = JSON.stringify([h.draft]); h.storage.set(core.LEGACY_KEYS.drafts, old);
+  h.run('startRemoteSync();'); h.articleSnapshot([h.draft]);
+  h.listeners.get('users/account-a/blogEditorMigrations/editorCategoriesV2').callback({ metadata: { fromCache: false, hasPendingWrites: false }, exists: () => true, data: () => ({ records: [] }) });
+  assert.equal(h.elements.get('legacyNotice').classList.contains('hidden'), true);
+  assert.equal(h.elements.get('migrationPanel').classList.contains('hidden'), true);
+  assert.match(h.elements.get('legacyDetailsMessage').textContent, /再取り込みは不要/);
+  assert.equal(h.storage.get(core.LEGACY_KEYS.drafts), old);
+});
+test('before confirmed cloud snapshots import stays disabled', () => {
+  const h = harness(); h.storage.set(core.LEGACY_KEYS.drafts, JSON.stringify([h.draft]));
+  h.run('startRemoteSync();updateMigrationPanel();'); h.articleSnapshot([h.draft], true);
+  assert.equal(h.elements.get('migrateLocalButton').disabled, true);
+  h.run('migrateLocal();'); assert.equal(h.run('state.legacyImported'), false);
+});
+test('differing old articles are shown by title and import creates a separate copy', () => {
+  const h = harness();
+  h.storage.set(core.LEGACY_KEYS.drafts, JSON.stringify([{ ...h.draft, title: '<img>Old phone title', body: 'phone-only text' }]));
+  h.run('state.remoteReady=state.categoriesReady=true;state.serverDrafts=[fixture];updateMigrationPanel();');
+  assert.match(h.elements.get('migrationMessage').textContent, /内容が異なる記事1件/);
+  assert.match(h.elements.get('legacyDraftList').innerHTML, /&lt;img&gt;Old phone title/);
+  assert.equal(h.elements.get('legacyDetails').open, true);
+  h.run('migrateLocal();');
+  assert.equal(h.run('state.drafts.length'), 2);
+  assert.equal(h.run("state.drafts.find(d=>d.id==='d').body"), 'original');
+  assert.equal(h.run("state.drafts.find(d=>d.id!=='d').body"), 'phone-only text');
+});
+test('closing the notice is local, keeps data, and can be undone by reviewing', () => {
+  const h = harness(); const old = JSON.stringify([h.draft]); h.storage.set(core.LEGACY_KEYS.drafts, old);
+  h.run('dismissLegacyNotice();'); assert.equal(h.run('state.legacyImported'), true);
+  assert.equal(h.storage.get(core.LEGACY_KEYS.drafts), old);
+  h.events.get('reviewLegacyButton:click')(); assert.equal(h.run('state.legacyImported'), false);
+  assert.equal(h.run('state.drafts.length'), 1);
 });

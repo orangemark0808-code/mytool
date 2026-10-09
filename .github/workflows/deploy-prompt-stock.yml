@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Test Journal Editor
-        run: node --test journal-editor/tests/core.test.mjs journal-editor/tests/integration.test.mjs
+        run: node --test journal-editor/tests/core.test.mjs journal-editor/tests/integration.test.mjs journal-editor/tests/publish.test.mjs
 
       - name: Validate Firebase secrets
         shell: bash
@@ -139,6 +139,15 @@ jobs:
           const versioned = html.replace(/((?:src|href)=")(script\.js|style\.css|layout-overrides\.css)\?v=([0-9-]+)"/g, (_, prefix, file, version) => {
             const target = file.replace(/\.(css|js)$/, `.${version}.$1`);
             fs.copyFileSync(path.join(directory, file), path.join(directory, target));
+            if (file === 'script.js') {
+              const script = fs.readFileSync(path.join(directory, target), 'utf8');
+              const modules = script.replace(/(['"])\.\/(editor-core\.mjs|markdown\.mjs)\?v=([0-9-]+)\1/g, (_, quote, module, moduleVersion) => {
+                const name = module.replace(/\.mjs$/, `.${moduleVersion}.mjs`);
+                fs.copyFileSync(path.join(directory, module), path.join(directory, name));
+                return `${quote}./${name}${quote}`;
+              });
+              fs.writeFileSync(path.join(directory, target), modules);
+            }
             return `${prefix}${target}"`;
           });
           fs.writeFileSync(entry, versioned);

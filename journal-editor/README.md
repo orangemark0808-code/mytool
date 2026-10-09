@@ -24,7 +24,9 @@ Googleログイン後、Journalを端末内に保存し、Firestoreへ同期す�
 
 カテゴリの名称・ID・順序・削除状態は、既存のアカウント専用メタデータ領域`users/{uid}/blogEditorMigrations/editorCategoriesV2`へ保存します。`firestore.rules.proposed`の既存matchがこのドキュメントを含みます。実運用ルールは別途確認が必要ですが、この修正で権限を広げることはありません。
 
-旧形式のlocalStorageは削除せず、一覧と設定に取り込み案内を表示します。ご自身のデータであることと現在のログイン先を確認し、明示操作で取り込んでください。すでに異なる内容の同じIDがある場合は別の下書きとして残します。別端末でも旧カテゴリを取り込むと同じカテゴリIDを引き継げます。
+旧形式のlocalStorageは削除しません。サーバーからのJournal・カテゴリの取得を確認して照合し、クラウドに同じ内容がある場合は再取り込みの案内を出しません。旧カテゴリのIDがPCとスマホで異なっても、クラウドに同じ名前のカテゴリが一つだけある場合はそのIDへ対応付けます。
+
+この端末だけの記事や内容の異なる記事が残る場合は、件数とタイトルを設定で確認し、差分だけを明示操作で取り込めます。異なる内容の同じIDがある場合は別の下書きとして残します。設定の「この端末の旧データを確認」には取り込み元の記事数・カテゴリ数・タイトルを表示します。「取り込まず案内を閉じる」はこのブラウザだけに作用し、旧データを保持します。「差分を再確認」で再表示できます。キャッシュやオフラインの未確認データだけでは取り込み済みと判定しません。
 
 設定から全Journal（ごみ箱を含む）とカテゴリのJSONバックアップを保存できます。診断コピーには本文・タイトル・メールアドレス・ユーザーIDを含めません。
 
@@ -33,11 +35,13 @@ Googleログイン後、Journalを端末内に保存し、Firestoreへ同期す�
 新しいパッケージのインストールは不要です。Node.js 20以上で実行できます。
 
 ```powershell
-node --test journal-editor/tests/core.test.mjs journal-editor/tests/integration.test.mjs
+node --test journal-editor/tests/core.test.mjs journal-editor/tests/integration.test.mjs journal-editor/tests/publish.test.mjs
 node journal-editor/tests/preview-server.mjs
 ```
 
 ブラウザで`http://localhost:8765/`を開きます。この確認サーバーは架空の長文を表示し、Firebase設定・認証情報・実際のJournalを読み込みません。公開用成果物には確認サーバーやテストを含めません。
+
+`?scenario=legacy-matched`でクラウドと同じ旧データ、`?scenario=legacy-difference`で内容の異なる旧データの案内を確認できます。旧形式のlocalStorageは書き換えず、確認画面内だけで架空のデータを使用します。
 
 実際のログインを試す場合は、元の案内どおりHTTPサーバー経由で起動してください。`index.html`の直接起動（file://）は対応していません。
 

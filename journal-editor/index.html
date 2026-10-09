@@ -7,8 +7,8 @@
     <title>Journal Editor</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Cpath d='M23 17h20M37 17v25a10 10 0 0 1-20 0' fill='none' stroke='white' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=2026-10-09-03" />
-    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-03" />
+    <link rel="stylesheet" href="style.css?v=2026-10-09-04" />
+    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-04" />
   </head>
   <body>
     <header class="app-header">
@@ -90,7 +90,7 @@
       <section class="list-view hidden" id="listView">
         <div class="view-heading"><div><h1 id="listTitle">Journal一覧</h1></div><div class="list-heading-actions"><button class="secondary-button" id="trashButton" type="button" aria-pressed="false">ごみ箱（0）</button><button class="primary-button" id="listNewButton" type="button">新規作成</button></div></div>
         <div class="search-field"><input id="searchInput" type="search" aria-label="Journalを検索" placeholder="タイトル・本文・カテゴリで検索" autocomplete="off" /></div>
-        <div id="legacyNotice" class="legacy-notice hidden"><span>この端末に旧形式のデータがあります。設定で取り込み先を確認できます。</span><button id="legacySettingsButton" class="secondary-button" type="button">取り込みを確認</button></div>
+        <div id="legacyNotice" class="legacy-notice hidden"><span id="legacyNoticeMessage">この端末の旧データをクラウドと照合しています。</span><button id="legacySettingsButton" class="secondary-button" type="button">取り込みを確認</button></div>
         <div class="draft-list" id="draftList"></div>
       </section>
 
@@ -106,7 +106,8 @@
             <button class="secondary-button" type="submit">追加</button>
           </form>
         </section>
-        <section class="migration-panel hidden" id="migrationPanel" aria-live="polite"><h2>旧形式のデータを取り込む</h2><p id="migrationMessage"></p><button class="primary-button" id="migrateLocalButton" type="button">現在のアカウントへ取り込む</button></section>
+        <section class="migration-panel hidden" id="migrationPanel" aria-live="polite"><h2>旧形式のデータを取り込む</h2><p id="migrationMessage"></p><div class="settings-actions"><button class="primary-button" id="migrateLocalButton" type="button">差分だけ現在のアカウントへ取り込む</button><button class="secondary-button" id="dismissLegacyButton" type="button">取り込まず案内を閉じる</button></div></section>
+        <details id="legacyDetails" class="legacy-details hidden"><summary id="legacyDetailsSummary">この端末の旧データを確認</summary><p id="legacyDetailsMessage"></p><ul id="legacyDraftList"></ul><button id="reviewLegacyButton" class="secondary-button" type="button">差分を再確認</button></details>
         <section class="diagnostic-panel"><h2>保存とバックアップ</h2><p>未同期のJournalを再送できます。バックアップにはごみ箱とカテゴリも含まれます。</p><div class="settings-actions"><button class="secondary-button" id="retrySyncButton" type="button">同期を再試行</button><button class="secondary-button" id="backupButton" type="button">すべてバックアップ（JSON）</button></div></section>
         <section class="diagnostic-panel" aria-label="同期診断"><h2>同期診断</h2><p>本文・タイトル・メールアドレスを含まない診断情報をコピーします。</p><button class="secondary-button" id="copyDiagnosticButton" type="button">診断情報をコピー</button></section>
       </section>
@@ -114,6 +115,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="firebase-config.js"></script>
     <script src="firebase-config.local.js"></script>
-    <script type="module" src="script.js?v=2026-10-09-03"></script>
+    <script type="module" src="script.js?v=2026-10-09-04"></script>
   </body>
 </html>

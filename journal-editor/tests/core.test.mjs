@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { storageKey, normalizeDraft, remoteVersion, editedDraft, reconcileDrafts, writeDraftTransaction, applyWriteResult, defaultCategories, mergeCategories, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
+import { storageKey, normalizeDraft, remoteVersion, editedDraft, reconcileDrafts, writeDraftTransaction, applyWriteResult, defaultCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
 import { markdownToHtml } from '../markdown.mjs';
 
 function remote(body = 'server text', extra = {}) {
@@ -155,4 +155,36 @@ test('raw HTML and attribute quotes cannot execute in the preview', () => {
 test('file and clipboard share one Markdown export including title', () => {
   assert.equal(exportMarkdown('Title', 'Body'), '# Title\n\nBody');
   assert.equal(exportMarkdown(' ', 'Body'), 'Body');
+});
+test('PC-imported articles do not need another import on the phone', () => {
+  const article = remote();
+  const plan = planLegacyImport([article], defaultCategories(), [article], defaultCategories());
+  assert.equal(plan.matchedCount, 1); assert.equal(plan.newCount, 0); assert.equal(plan.changedCount, 0);
+  assert.equal(plan.categoriesToImport.length, 0);
+});
+test('old phone category IDs are reconciled with unique cloud category names', () => {
+  const cloudCategory = { id: 'pc-note', name: 'note用', order: 0 };
+  const phoneCategory = { id: 'phone-note', name: 'note用', order: 0 };
+  const article = remote('text', { category: 'pc-note' });
+  const plan = planLegacyImport([{ ...article, category: 'phone-note' }], [phoneCategory], [article], [cloudCategory]);
+  assert.equal(plan.matchedCount, 1); assert.equal(plan.categoriesToImport.length, 0);
+  assert.equal(plan.entries[0].draft.category, 'pc-note');
+});
+test('phone-only and differing articles remain available without overwriting cloud data', () => {
+  const article = remote('cloud');
+  const plan = planLegacyImport([{ ...article, body: 'phone edit' }, { ...article, id: 'phone-only' }], [], [article], []);
+  assert.equal(plan.newCount, 1); assert.equal(plan.changedCount, 1); assert.equal(plan.matchedCount, 0);
+  assert.equal(article.body, 'cloud');
+});
+test('same content with a different article ID is not silently discarded', () => {
+  const article = remote();
+  assert.equal(planLegacyImport([{ ...article, id: 'other-id' }], [], [article], []).newCount, 1);
+});
+test('ambiguous category names are not merged', () => {
+  const plan = planLegacyImport([], [{ id: 'phone', name: '同名', order: 0 }], [], [{ id: 'pc-a', name: '同名' }, { id: 'pc-b', name: '同名' }]);
+  assert.equal(plan.categoriesToImport.length, 1);
+});
+test('already stored trash content is not re-imported', () => {
+  const article = remote();
+  assert.equal(planLegacyImport([article], [], [{ ...article, deletedAt: '2026-10-09T00:00:00Z' }], []).matchedCount, 1);
 });
