@@ -247,6 +247,62 @@ test('posted search matches only note status, and list shows status badges', () 
   assert.match(html, /Published note/); assert.match(html, /投稿済/);
   assert.ok(!html.includes('Draft note')); assert.ok(!html.includes('Diary'));
 });
+
+test('category and posting filters intersect search and recognize legacy category IDs', () => {
+  const h = harness();
+  h.context.filterArticles = [
+    core.normalizeDraft({ ...h.draft, id: 'posted', title: 'Posted match', category: 'legacy-note', categoryName: 'note用', noteStatus: 'published' }),
+    core.normalizeDraft({ ...h.draft, id: 'unposted', title: 'Unposted match', category: 'legacy-note', categoryName: 'note用' }),
+    core.normalizeDraft({ ...h.draft, id: 'diary', title: 'Diary match', category: 'journal-diary', noteStatus: 'published' }),
+  ];
+  h.run("state.categories.push({id:'legacy-note',name:'note用',order:2});state.drafts=filterArticles;setListCategoryFilter('note');setListNoteFilter('published');state.searchQuery='match';renderList();");
+  assert.match(h.elements.get('draftList').innerHTML, /Posted match/);
+  assert.ok(!h.elements.get('draftList').innerHTML.includes('Unposted match'));
+  assert.ok(!h.elements.get('draftList').innerHTML.includes('Diary match'));
+  h.run("state.searchQuery='absent';renderList();");
+  assert.match(h.elements.get('draftList').innerHTML, /この条件に一致/);
+  h.run("state.searchQuery='';setListCategoryFilter('diary');");
+  assert.equal(h.run('state.noteStatusFilter'), 'all');
+  assert.equal(h.elements.get('listNoteFilters').classList.contains('hidden'), true);
+  assert.match(h.elements.get('draftList').innerHTML, /Diary match/);
+  h.run("setListCategoryFilter('note');setListNoteFilter('unpublished');");
+  assert.match(h.elements.get('draftList').innerHTML, /Unposted match/);
+  assert.ok(!h.elements.get('draftList').innerHTML.includes('Posted match'));
+});
+
+test('trash remains accessible regardless of active note filters and titles cannot open trash articles', () => {
+  const h = harness();
+  h.context.filterArticles = [
+    core.normalizeDraft({ ...h.draft, id: 'active', title: 'Active note', category: 'journal-note' }),
+    core.normalizeDraft({ ...h.draft, id: 'trash', title: 'Trash diary', category: 'journal-diary', deletedAt: '2026-10-09T00:00:00Z' }),
+  ];
+  h.run("state.drafts=filterArticles;setListCategoryFilter('note');setListNoteFilter('published');");
+  h.events.get('trashButton:click')();
+  assert.match(h.elements.get('draftList').innerHTML, /Trash diary/);
+  assert.match(h.elements.get('draftList').innerHTML, /data-restore=/);
+  assert.ok(!h.elements.get('draftList').innerHTML.includes('data-edit='));
+  assert.equal(h.elements.get('listFilters').classList.contains('hidden'), true);
+  assert.equal(h.elements.get('listOrderDescription').textContent, '更新日の新しい順');
+  h.events.get('trashButton:click')();
+  assert.equal(h.run('state.categoryFilter'), 'note');
+  assert.equal(h.run('state.noteStatusFilter'), 'published');
+  assert.equal(h.elements.get('listFilters').classList.contains('hidden'), false);
+  assert.equal(h.elements.get('listOrderDescription').textContent, '作成日の新しい順');
+});
+
+test('title action opens input mode even after preview and leaves only trash in the action area', () => {
+  const h = harness();
+  h.run("state.drafts[0].title='<Sample>';setEditorMode('preview');renderList();");
+  const html = h.elements.get('draftList').innerHTML;
+  assert.match(html, /draft-title-button/);
+  assert.match(html, /&lt;Sample&gt;/);
+  assert.ok(!html.split('<div class="draft-actions">')[1].includes('data-edit='));
+  assert.match(html, /data-delete=/);
+  h.events.get('draftList:click')({ target: { closest: () => ({ dataset: { edit: 'd' } }) } });
+  assert.equal(h.run('state.mode'), 'edit');
+  assert.equal(h.run('state.view'), 'editor');
+  assert.equal(h.run('currentDraft().body'), 'original');
+});
 test('new diary is available even if its former standard category was deleted', () => {
   const h = harness();
   h.run('state.categories=defaultCategories().map(c=>({...c,deleted:true}));newDraft();');

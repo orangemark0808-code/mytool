@@ -1,14 +1,14 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-12';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-12';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-13';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-13';
 
-const VERSION = '2026-10-09-12';
+const VERSION = '2026-10-09-13';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
 const titleInput = $('titleInput'), bodyInput = $('bodyInput'), categorySelect = $('categorySelect'), noteStatusSelect = $('noteStatusSelect');
 const state = {
   drafts: [], categories: [], currentId: null, user: null, view: 'list', mode: 'edit',
-  searchQuery: '', showTrash: false, history: [], historyIndex: -1, composing: false,
+  searchQuery: '', categoryFilter: 'all', noteStatusFilter: 'all', showTrash: false, history: [], historyIndex: -1, composing: false,
   previewDirty: true, saveTimers: new Map(), writes: new Map(), session: 0,
   remoteReady: false, categoriesReady: false, categoriesDirty: false, categoriesWriting: false,
   unsubscribe: null, unsubscribeCategories: null, firebase: null, firebaseReady: false,
@@ -212,7 +212,7 @@ async function handleAuth(user) {
   state.bulkAssigning = false; $('bulkDiaryResult').textContent = ''; $('bulkDiaryConfirmation').classList.add('hidden');
   state.legacyReviewShown = false;
   state.serverDrafts = []; state.serverCategories = [];
-  state.searchQuery = ''; $('searchInput').value = '';
+  state.searchQuery = ''; state.categoryFilter = state.noteStatusFilter = 'all'; $('searchInput').value = '';
   titleInput.value = bodyInput.value = ''; resetHistory(); updatePreview();
   $('loginButton').hidden = Boolean(user); $('logoutButton').hidden = !user;
   $('authGate').classList.toggle('hidden', Boolean(user)); document.querySelector('.header-actions').classList.toggle('hidden', !user);
@@ -476,15 +476,38 @@ function newDraft() {
   state.drafts.unshift(draft); state.currentId = draft.id; titleInput.value = bodyInput.value = '';
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); titleInput.focus();
 }
+function setListCategoryFilter(value) {
+  if (!['all', 'diary', 'note'].includes(value)) return;
+  if (state.categoryFilter !== value) state.noteStatusFilter = 'all';
+  state.categoryFilter = value; renderList();
+}
+function setListNoteFilter(value) {
+  if (state.categoryFilter !== 'note' || !['all', 'unpublished', 'published'].includes(value)) return;
+  state.noteStatusFilter = value; renderList();
+}
+function renderListFilters() {
+  $('listFilters').classList.toggle('hidden', state.showTrash);
+  $('listNoteFilters').classList.toggle('hidden', state.categoryFilter !== 'note');
+  for (const [id, value] of [['filterAll', 'all'], ['filterDiary', 'diary'], ['filterNote', 'note']]) $(id).setAttribute('aria-pressed', String(state.categoryFilter === value));
+  for (const [id, value] of [['filterNoteAll', 'all'], ['filterUnpublished', 'unpublished'], ['filterPublished', 'published']]) $(id).setAttribute('aria-pressed', String(state.noteStatusFilter === value));
+}
+function draftTitleMarkup(draft) {
+  const title = escapeHtml(draft.title);
+  return state.showTrash ? `<span class="draft-title">${title}</span>` : `<button class="draft-title draft-title-button" type="button" data-edit="${escapeHtml(draft.id)}" title="記事を編集">${title}</button>`;
+}
 function renderList() {
   const query = state.searchQuery.trim().toLowerCase();
+  renderListFilters();
   const sortField = state.showTrash ? 'updatedAt' : 'createdAt';
   let drafts = state.drafts.filter((draft) => Boolean(draft.deletedAt) === state.showTrash)
     .sort((a, b) => (Date.parse(b[sortField]) || 0) - (Date.parse(a[sortField]) || 0) || a.id.localeCompare(b.id));
+  if (!state.showTrash && state.categoryFilter !== 'all') drafts = drafts.filter((draft) => categoryBadgeKind(draft) === state.categoryFilter);
+  if (!state.showTrash && state.categoryFilter === 'note' && state.noteStatusFilter !== 'all') drafts = drafts.filter((draft) => draft.noteStatus === state.noteStatusFilter);
   if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
   $('trashButton').textContent = state.showTrash ? 'Journal一覧へ' : `ごみ箱（${state.drafts.filter((draft) => draft.deletedAt).length}）`; $('trashButton').setAttribute('aria-pressed', String(state.showTrash));
   $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';
-  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${draft.id === state.currentId ? 'active' : ''}"><div><div class="draft-title-row"><span class="draft-title">${escapeHtml(draft.title)}</span><span class="category-badge" data-category-kind="${categoryBadgeKind(draft)}">${escapeHtml(categoryName(draft.category, draft.categoryName))}</span>${isNoteDraft(draft, state.categories) ? `<span class="note-status-badge" data-note-status="${draft.noteStatus === 'published' ? 'published' : 'unpublished'}">${noteStatusLabel(draft)}</span>` : ''}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button">復元</button>` : `<button class="small-button draft-icon-button" data-edit="${escapeHtml(draft.id)}" type="button" aria-label="編集" title="編集"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m16 3 5 5-12 12-6 1 1-6zM14 5l5 5"/></svg></button><button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query ? '該当するJournalが見つかりません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+  $('listOrderDescription').textContent = state.showTrash ? '更新日の新しい順' : '作成日の新しい順';
+  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${draft.id === state.currentId ? 'active' : ''}"><div><div class="draft-title-row">${draftTitleMarkup(draft)}<span class="category-badge" data-category-kind="${categoryBadgeKind(draft)}">${escapeHtml(categoryName(draft.category, draft.categoryName))}</span>${isNoteDraft(draft, state.categories) ? `<span class="note-status-badge" data-note-status="${draft.noteStatus === 'published' ? 'published' : 'unpublished'}">${noteStatusLabel(draft)}</span>` : ''}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button">復元</button>` : `<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
 }
 function deleteDraft(id) {
   const draft = state.drafts.find((item) => item.id === id); if (!draft) return;
@@ -564,13 +587,18 @@ $('retrySyncButton').addEventListener('click', retrySync); $('copyDiagnosticButt
 $('trashButton').addEventListener('click', () => { state.showTrash = !state.showTrash; renderList(); });
 $('draftList').addEventListener('click', (event) => {
   const button = event.target.closest('button'); if (!button) return;
-  if (button.dataset.edit) loadDraft(button.dataset.edit); if (button.dataset.restore) restoreDraft(button.dataset.restore);
+  if (button.dataset.edit) { setEditorMode('edit'); loadDraft(button.dataset.edit); } if (button.dataset.restore) restoreDraft(button.dataset.restore);
   if (button.dataset.delete && confirm('このJournalをごみ箱へ移しますか？あとで復元できます。')) deleteDraft(button.dataset.delete);
 });
 for (const [id, mode] of [['editTab', 'edit'], ['previewTab', 'preview'], ['splitTab', 'split']]) $(id).addEventListener('click', () => setEditorMode(mode));
 categorySelect.addEventListener('change', () => { updateNoteStatusControls(); scheduleSave(); });
 noteStatusSelect.addEventListener('change', scheduleSave);
 $('searchInput').addEventListener('input', (event) => { state.searchQuery = event.target.value; renderList(); });
+$('listFilters').addEventListener('click', (event) => {
+  const button = event.target.closest('button'); if (!button) return;
+  if (button.dataset.categoryFilter) setListCategoryFilter(button.dataset.categoryFilter);
+  if (button.dataset.noteFilter) setListNoteFilter(button.dataset.noteFilter);
+});
 $('categoryAddForm').addEventListener('submit', (event) => { event.preventDefault(); addCategory($('categoryNameInput').value); $('categoryNameInput').value = ''; });
 $('categoryManageList').addEventListener('click', (event) => {
   const button = event.target.closest('button'); if (!button) return;
