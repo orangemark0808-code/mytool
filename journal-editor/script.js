@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-11';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-11';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-12';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-12';
 
-const VERSION = '2026-10-09-11';
+const VERSION = '2026-10-09-12';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -478,7 +478,9 @@ function newDraft() {
 }
 function renderList() {
   const query = state.searchQuery.trim().toLowerCase();
-  let drafts = state.drafts.filter((draft) => Boolean(draft.deletedAt) === state.showTrash).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const sortField = state.showTrash ? 'updatedAt' : 'createdAt';
+  let drafts = state.drafts.filter((draft) => Boolean(draft.deletedAt) === state.showTrash)
+    .sort((a, b) => (Date.parse(b[sortField]) || 0) - (Date.parse(a[sortField]) || 0) || a.id.localeCompare(b.id));
   if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
   $('trashButton').textContent = state.showTrash ? 'Journal一覧へ' : `ごみ箱（${state.drafts.filter((draft) => draft.deletedAt).length}）`; $('trashButton').setAttribute('aria-pressed', String(state.showTrash));
   $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';

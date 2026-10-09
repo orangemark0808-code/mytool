@@ -18,7 +18,7 @@ http.createServer(async (request, response) => {
     if (name === 'index.html' && scenario) text = text.replace(/(src="script\.js\?v=[0-9-]+)"/, `$1&scenario=${scenario}"`);
     if (name === 'script.js') {
       const extra = scenario === 'badges'
-        ? `state.drafts=[['diary','日記のサンプル','journal-diary','unpublished'],['note-draft','note用の下書き','journal-note','unpublished'],['note-posted','note用の投稿済記事','journal-note','published']].map(([id,title,category,noteStatus])=>normalizeDraft({...state.drafts[0],id,title,category,noteStatus,body:'タグの色と表示名を確認するための架空の記事です。'},{remote:true}));state.currentId=null;showView('list');`
+        ? `state.drafts=[['diary','日記のサンプル','journal-diary','unpublished','2026-10-03T00:00:00Z','2026-10-09T00:00:00Z'],['note-draft','note用の下書き','journal-note','unpublished','2026-10-08T00:00:00Z','2026-10-08T00:00:00Z'],['note-posted','note用の投稿済記事','journal-note','published','2026-10-06T00:00:00Z','2026-10-06T00:00:00Z']].map(([id,title,category,noteStatus,createdAt,updatedAt])=>normalizeDraft({...state.drafts[0],id,title,category,noteStatus,createdAt,updatedAt,body:'タグの色と並び順を確認するための架空の記事です。'},{remote:true}));state.currentId=null;showView('list');`
         : scenario ? `state.serverDrafts=state.drafts.map(d=>normalizeDraft(d,{remote:true}));state.serverCategories=defaultCategories();readArray=key=>key===LEGACY_KEYS.drafts?[${scenario === 'legacy-matched' ? '{...state.drafts[0]}' : "{...state.drafts[0],title:'スマホに残った旧記事',body:'この端末だけに残った架空の文章です。'}"}]:key===LEGACY_KEYS.categories?defaultCategories():[];showView('settings');updateMigrationPanel();` : '';
       text = text.replace('void setupFirebase();', fixture + extra);
     }
