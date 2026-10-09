@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { storageKey, normalizeDraft, remoteVersion, editedDraft, reconcileDrafts, writeDraftTransaction, applyWriteResult, defaultCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
+import { storageKey, normalizeDraft, remotePayload, remoteVersion, contentKey, editedDraft, reconcileDrafts, writeDraftTransaction, applyWriteResult, defaultCategories, orderedCategories, isNoteDraft, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
 import { markdownToHtml } from '../markdown.mjs';
 
 function remote(body = 'server text', extra = {}) {
@@ -187,4 +187,55 @@ test('ambiguous category names are not merged', () => {
 test('already stored trash content is not re-imported', () => {
   const article = remote();
   assert.equal(planLegacyImport([article], [], [{ ...article, deletedAt: '2026-10-09T00:00:00Z' }], []).matchedCount, 1);
+});
+test('category display pins diary and note while retaining original IDs', () => {
+  const diary = { id: 'old-diary', name: '日記', order: 8 };
+  const note = { id: 'old-note', name: 'note用', order: 0 };
+  const result = orderedCategories([{ id: 'custom', name: '旅行', order: -1 }, note, { id: 'deleted', name: '日記', order: 0, deleted: true }, diary]);
+  assert.deepEqual(result.map((category) => category.id), ['old-diary', 'old-note', 'custom']);
+  assert.equal(result[0], diary);
+});
+test('posting state defaults safely and recognizes migrated note categories', () => {
+  assert.equal(normalizeDraft({ noteStatus: 'invalid' }).noteStatus, 'unpublished');
+  assert.equal(normalizeDraft({ noteStatus: 'published' }).noteStatus, 'published');
+  assert.equal(isNoteDraft({ category: 'legacy-note' }, [{ id: 'legacy-note', name: 'note用' }]), true);
+  assert.equal(isNoteDraft({ category: 'missing-note', categoryName: 'note用' }, []), true);
+  assert.equal(isNoteDraft({ category: null, categoryName: 'note用' }, []), false);
+});
+test('default posting state preserves legacy content baselines', () => {
+  const article = remote();
+  const legacyKey = JSON.stringify([article.title, article.body, article.category || null, article.categoryName || '', article.deletedAt || null]);
+  assert.equal(contentKey(article), legacyKey);
+  assert.notEqual(contentKey({ ...article, noteStatus: 'published' }), legacyKey);
+});
+test('published status is included in the cloud payload and normal transaction', async () => {
+  const article = remote('text', { category: 'old-note', categoryName: 'note用' });
+  const pending = editedDraft(article, { noteStatus: 'published' });
+  const fake = fakeFirestore(article);
+  const result = await writeDraftTransaction(fake.firebase, fake.collection, pending);
+  assert.equal(remotePayload(pending).noteStatus, 'published');
+  assert.equal(result.saved.noteStatus, 'published');
+  assert.equal(fake.data.get('article').noteStatus, 'published');
+});
+test('posting state survives conflict copies and trash restoration', async () => {
+  const article = remote('old', { category: 'journal-note', categoryName: 'note用' });
+  const pending = editedDraft(article, { noteStatus: 'published' });
+  const conflict = fakeFirestore(remote('new server text', { revision: 'v2' }));
+  const result = await writeDraftTransaction(conflict.firebase, conflict.collection, pending);
+  assert.equal(result.kind, 'conflict'); assert.equal(result.saved.noteStatus, 'published');
+  const deletion = editedDraft(result.saved, { deletedAt: '2026-10-09T00:00:00Z' });
+  const deleted = await writeDraftTransaction(conflict.firebase, conflict.collection, deletion);
+  const restored = await writeDraftTransaction(conflict.firebase, conflict.collection, editedDraft(deleted.saved, { deletedAt: null }));
+  assert.equal(restored.saved.noteStatus, 'published');
+});
+test('posting changes made during a save stay pending after old acknowledgement', () => {
+  const sent = editedDraft(remote(), { body: 'sent' });
+  const live = editedDraft(sent, { noteStatus: 'published' });
+  const result = applyWriteResult([live], sent, { kind: 'saved', saved: normalizeDraft(sent, { remote: true }) }, 'article');
+  assert.equal(result.drafts[0].noteStatus, 'published');
+  assert.equal(result.drafts[0].pendingSync, true);
+});
+test('new posting metadata does not re-trigger old-data import notices', () => {
+  const article = remote();
+  assert.equal(planLegacyImport([article], [], [{ ...article, noteStatus: 'published' }], []).matchedCount, 1);
 });

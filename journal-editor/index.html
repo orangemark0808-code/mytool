@@ -7,8 +7,8 @@
     <title>Journal Editor</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Cpath d='M23 17h20M37 17v25a10 10 0 0 1-20 0' fill='none' stroke='white' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=2026-10-09-04" />
-    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-04" />
+    <link rel="stylesheet" href="style.css?v=2026-10-09-05" />
+    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-05" />
   </head>
   <body>
     <header class="app-header">
@@ -40,6 +40,7 @@
         <div class="article-meta">
           <label class="title-field" for="titleInput"><span>タイトル</span><input id="titleInput" placeholder="記録のタイトル" autocomplete="off" /></label>
           <label class="category-field" for="categorySelect"><span class="field-label">カテゴリ</span><select id="categorySelect"></select></label>
+          <label class="category-field note-status-field" id="noteStatusField" for="noteStatusSelect" hidden><span class="field-label">投稿状況</span><select id="noteStatusSelect"><option value="unpublished">未投稿</option><option value="published">投稿済み</option></select></label>
           <div class="draft-timestamps" aria-live="polite"><span id="createdAtDisplay">作成日 —</span><span id="updatedAtDisplay">更新日 —</span></div>
         </div>
         <div class="top-operation-area">
@@ -89,7 +90,7 @@
 
       <section class="list-view hidden" id="listView">
         <div class="view-heading"><div><h1 id="listTitle">Journal一覧</h1></div><div class="list-heading-actions"><button class="secondary-button" id="trashButton" type="button" aria-pressed="false">ごみ箱（0）</button><button class="primary-button" id="listNewButton" type="button">新規作成</button></div></div>
-        <div class="search-field"><input id="searchInput" type="search" aria-label="Journalを検索" placeholder="タイトル・本文・カテゴリで検索" autocomplete="off" /></div>
+        <div class="search-field"><input id="searchInput" type="search" aria-label="Journalを検索" placeholder="タイトル・本文・カテゴリ・投稿状況で検索" autocomplete="off" /></div>
         <div id="legacyNotice" class="legacy-notice hidden"><span id="legacyNoticeMessage">この端末の旧データをクラウドと照合しています。</span><button id="legacySettingsButton" class="secondary-button" type="button">取り込みを確認</button></div>
         <div class="draft-list" id="draftList"></div>
       </section>
@@ -99,7 +100,7 @@
         <div class="settings-form"><label>自動保存<span>入力後に自動保存します。ログイン中はFirestoreにも同期します。</span><input value="有効" disabled /></label><label>保存先<span id="storageDescription">この端末のブラウザ（localStorage）に保存されます。</span><input id="storageLocation" value="localStorage" disabled /></label></div>
         <section class="category-panel" aria-label="カテゴリ管理">
           <h2>カテゴリ管理</h2>
-          <p>Journalのカテゴリを追加・削除・並び替えできます。削除すると、そのカテゴリを使用しているJournalは「未分類」になります。</p>
+          <p>日記・note用を先頭に表示します。追加したカテゴリは並び替えできます。カテゴリを削除すると、そのカテゴリのJournalは「未分類」になります。</p>
           <ul class="category-manage-list" id="categoryManageList"></ul>
           <form class="category-add-form" id="categoryAddForm">
             <input id="categoryNameInput" type="text" placeholder="新しいカテゴリ名" autocomplete="off" maxlength="30" />
@@ -115,6 +116,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="firebase-config.js"></script>
     <script src="firebase-config.local.js"></script>
-    <script type="module" src="script.js?v=2026-10-09-04"></script>
+    <script type="module" src="script.js?v=2026-10-09-05"></script>
   </body>
 </html>

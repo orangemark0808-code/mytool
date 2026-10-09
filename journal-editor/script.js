@@ -1,11 +1,11 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, defaultCategories, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-04';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-04';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-05';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-05';
 
-const VERSION = '2026-10-09-04';
+const VERSION = '2026-10-09-05';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
-const titleInput = $('titleInput'), bodyInput = $('bodyInput'), categorySelect = $('categorySelect');
+const titleInput = $('titleInput'), bodyInput = $('bodyInput'), categorySelect = $('categorySelect'), noteStatusSelect = $('noteStatusSelect');
 const state = {
   drafts: [], categories: [], currentId: null, user: null, view: 'list', mode: 'edit',
   searchQuery: '', showTrash: false, history: [], historyIndex: -1, composing: false,
@@ -18,7 +18,8 @@ const state = {
 };
 
 function currentDraft() { return state.drafts.find((draft) => draft.id === state.currentId); }
-function activeCategories() { return state.categories.filter((category) => !category.deleted).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)); }
+function activeCategories() { return orderedCategories(state.categories); }
+function noteStatusLabel(draft) { return draft.noteStatus === 'published' ? '投稿済み' : '未投稿'; }
 function categoryName(id, fallback = '') {
   if (!id) return '未分類';
   const category = state.categories.find((item) => item.id === id);
@@ -137,8 +138,10 @@ function scheduleSave() {
   let draft = currentDraft();
   if (!draft || draft.deletedAt || !state.user) return;
   const category = categorySelect.value || null;
-  const changes = { title: titleInput.value.trim() || '無題の記事', body: bodyInput.value, category, categoryName: category ? categoryName(category, draft.category === category ? draft.categoryName : '') : '' };
-  if (draft.title === changes.title && draft.body === changes.body && draft.category === changes.category && draft.categoryName === changes.categoryName) return;
+  const categoryLabel = category ? categoryName(category, draft.category === category ? draft.categoryName : '') : '';
+  const noteStatus = categoryLabel === 'note用' ? (noteStatusSelect.value === 'published' ? 'published' : 'unpublished') : draft.noteStatus;
+  const changes = { title: titleInput.value.trim() || '無題の記事', body: bodyInput.value, category, categoryName: categoryLabel, noteStatus };
+  if (draft.title === changes.title && draft.body === changes.body && draft.category === changes.category && draft.categoryName === changes.categoryName && draft.noteStatus === changes.noteStatus) return;
   draft = editedDraft(draft, changes);
   state.drafts = state.drafts.map((item) => item.id === draft.id ? draft : item);
   persistLocal([draft.id]); updateDraftTimestamps(); refreshSyncStatus(); queueSave(draft.id);
@@ -239,13 +242,22 @@ function signInWithGoogle() {
 
 function renderCategoryOptions(selectedId = currentDraft()?.category) {
   const draft = currentDraft(), categories = activeCategories();
-  const options = ['<option value="">未分類</option>', ...categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name)}</option>`)];
+  const options = categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name)}</option>`);
   if (selectedId && !categories.some((category) => category.id === selectedId)) options.push(`<option value="${escapeHtml(selectedId)}">${escapeHtml(categoryName(selectedId, draft?.categoryName))}（確認待ち）</option>`);
+  options.push('<option value="">未分類</option>');
   categorySelect.innerHTML = options.join(''); categorySelect.value = selectedId || '';
+  updateNoteStatusControls();
+}
+function updateNoteStatusControls() {
+  const draft = currentDraft();
+  const selected = { category: categorySelect.value || null, categoryName: draft?.category === categorySelect.value ? draft.categoryName : '' };
+  $('noteStatusField').hidden = !isNoteDraft(selected, state.categories);
+  noteStatusSelect.value = draft?.noteStatus === 'published' ? 'published' : 'unpublished';
 }
 function renderCategoryManageList() {
   const categories = activeCategories();
-  $('categoryManageList').innerHTML = categories.length ? categories.map((category, index) => `<li class="category-manage-row"><span class="category-manage-name">${escapeHtml(category.name)}</span><div class="category-manage-actions"><button type="button" data-move-up="${escapeHtml(category.id)}" ${index === 0 ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を上へ">↑</button><button type="button" data-move-down="${escapeHtml(category.id)}" ${index === categories.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を下へ">↓</button><button type="button" class="delete" data-delete-category="${escapeHtml(category.id)}" aria-label="${escapeHtml(category.name)}を削除">×</button></div></li>`).join('') : '<li class="empty">カテゴリがありません。</li>';
+  const fixed = (category) => category && ['日記', 'note用'].includes(category.name);
+  $('categoryManageList').innerHTML = categories.length ? categories.map((category, index) => `<li class="category-manage-row"><span class="category-manage-name">${escapeHtml(category.name)}</span><div class="category-manage-actions"><button type="button" data-move-up="${escapeHtml(category.id)}" ${fixed(category) || index === 0 || fixed(categories[index - 1]) ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を上へ">↑</button><button type="button" data-move-down="${escapeHtml(category.id)}" ${fixed(category) || index === categories.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を下へ">↓</button><button type="button" class="delete" data-delete-category="${escapeHtml(category.id)}" aria-label="${escapeHtml(category.name)}を削除">×</button></div></li>`).join('') : '<li class="empty">カテゴリがありません。</li>';
 }
 function changedCategories() { state.categoriesDirty = true; persistLocal([]); renderCategoryOptions(); renderCategoryManageList(); renderList(); refreshSyncStatus(); void syncCategories(); }
 function addCategory(name) {
@@ -256,6 +268,7 @@ function addCategory(name) {
 function moveCategory(id, direction) {
   const categories = activeCategories(), index = categories.findIndex((category) => category.id === id), other = index + direction;
   if (index < 0 || other < 0 || other >= categories.length) return;
+  if ([categories[index], categories[other]].some((category) => ['日記', 'note用'].includes(category.name))) return;
   [categories[index], categories[other]] = [categories[other], categories[index]];
   for (const [order, category] of categories.entries()) { category.order = order; category.updatedAt = new Date().toISOString(); }
   changedCategories();
@@ -393,17 +406,28 @@ function loadDraft(id) {
 }
 function newDraft() {
   if (!state.user) return;
-  const now = new Date().toISOString(), draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: '無題の記事', body: '', createdAt: now, updatedAt: now }), {});
+  const now = new Date().toISOString();
+  let categoriesChanged = false;
+  for (const standard of defaultCategories()) {
+    if (activeCategories().some((category) => category.name === standard.name)) continue;
+    const existing = state.categories.find((category) => category.id === standard.id);
+    if (existing && existing.name === standard.name) Object.assign(existing, { deleted: false, updatedAt: now, order: standard.order });
+    else state.categories.push({ ...standard, id: existing ? crypto.randomUUID() : standard.id, updatedAt: now });
+    categoriesChanged = true;
+  }
+  if (categoriesChanged) { state.categoriesDirty = true; void syncCategories(); }
+  const diary = activeCategories().find((category) => category.name === '日記');
+  const draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: '無題の記事', body: '', category: diary.id, categoryName: diary.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
   state.drafts.unshift(draft); state.currentId = draft.id; titleInput.value = bodyInput.value = '';
-  renderCategoryOptions(null); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); titleInput.focus();
+  renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); titleInput.focus();
 }
 function renderList() {
   const query = state.searchQuery.trim().toLowerCase();
   let drafts = state.drafts.filter((draft) => Boolean(draft.deletedAt) === state.showTrash).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName)].some((value) => value.toLowerCase().includes(query)));
+  if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
   $('trashButton').textContent = state.showTrash ? 'Journal一覧へ' : `ごみ箱（${state.drafts.filter((draft) => draft.deletedAt).length}）`; $('trashButton').setAttribute('aria-pressed', String(state.showTrash));
   $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';
-  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${draft.id === state.currentId ? 'active' : ''}"><div><div class="draft-title-row"><span class="draft-title">${escapeHtml(draft.title)}</span><span class="category-badge">${escapeHtml(categoryName(draft.category, draft.categoryName))}</span>${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button">復元</button>` : `<button class="small-button" data-edit="${escapeHtml(draft.id)}" type="button">編集</button><button class="small-button delete" data-delete="${escapeHtml(draft.id)}" type="button">ごみ箱へ</button>`}</div></article>`).join('') : `<div class="empty">${query ? '該当するJournalが見つかりません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${draft.id === state.currentId ? 'active' : ''}"><div><div class="draft-title-row"><span class="draft-title">${escapeHtml(draft.title)}</span><span class="category-badge">${escapeHtml(categoryName(draft.category, draft.categoryName))}</span>${isNoteDraft(draft, state.categories) ? `<span class="note-status-badge">${noteStatusLabel(draft)}</span>` : ''}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button">復元</button>` : `<button class="small-button" data-edit="${escapeHtml(draft.id)}" type="button">編集</button><button class="small-button delete" data-delete="${escapeHtml(draft.id)}" type="button">ごみ箱へ</button>`}</div></article>`).join('') : `<div class="empty">${query ? '該当するJournalが見つかりません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
 }
 function deleteDraft(id) {
   const draft = state.drafts.find((item) => item.id === id); if (!draft) return;
@@ -484,7 +508,8 @@ $('draftList').addEventListener('click', (event) => {
   if (button.dataset.delete && confirm('このJournalをごみ箱へ移しますか？あとで復元できます。')) deleteDraft(button.dataset.delete);
 });
 for (const [id, mode] of [['editTab', 'edit'], ['previewTab', 'preview'], ['splitTab', 'split']]) $(id).addEventListener('click', () => setEditorMode(mode));
-categorySelect.addEventListener('change', scheduleSave);
+categorySelect.addEventListener('change', () => { updateNoteStatusControls(); scheduleSave(); });
+noteStatusSelect.addEventListener('change', scheduleSave);
 $('searchInput').addEventListener('input', (event) => { state.searchQuery = event.target.value; renderList(); });
 $('categoryAddForm').addEventListener('submit', (event) => { event.preventDefault(); addCategory($('categoryNameInput').value); $('categoryNameInput').value = ''; });
 $('categoryManageList').addEventListener('click', (event) => {

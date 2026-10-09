@@ -182,3 +182,75 @@ test('closing the notice is local, keeps data, and can be undone by reviewing', 
   h.events.get('reviewLegacyButton:click')(); assert.equal(h.run('state.legacyImported'), false);
   assert.equal(h.run('state.drafts.length'), 1);
 });
+test('new articles default to existing diary ID and uncategorized is last', () => {
+  const h = harness();
+  h.run("state.categories=[{id:'legacy-note',name:'note用',order:0},{id:'legacy-diary',name:'日記',order:9}];newDraft();");
+  assert.equal(h.run('currentDraft().category'), 'legacy-diary');
+  assert.equal(h.elements.get('categorySelect').value, 'legacy-diary');
+  assert.equal(h.elements.get('noteStatusField').hidden, true);
+  const html = h.elements.get('categorySelect').innerHTML;
+  assert.ok(html.indexOf('日記') < html.indexOf('note用'));
+  assert.ok(html.indexOf('note用') < html.indexOf('未分類'));
+});
+test('selecting note shows unpublished default and stores posted changes', () => {
+  const h = harness(); h.run('newDraft();');
+  h.elements.get('categorySelect').value = 'journal-note'; h.events.get('categorySelect:change')();
+  assert.equal(h.elements.get('noteStatusField').hidden, false);
+  assert.equal(h.elements.get('noteStatusSelect').value, 'unpublished');
+  h.elements.get('noteStatusSelect').value = 'published'; h.events.get('noteStatusSelect:change')();
+  assert.equal(h.run('currentDraft().noteStatus'), 'published');
+  const id = h.run('state.currentId');
+  assert.equal(JSON.parse(h.storage.get(`${core.storageKey('account-a')}:draft:${id}`)).noteStatus, 'published');
+});
+test('hidden posting state is retained when switching away from note and back', () => {
+  const h = harness(); h.run('newDraft();');
+  h.elements.get('categorySelect').value = 'journal-note'; h.events.get('categorySelect:change')();
+  h.elements.get('noteStatusSelect').value = 'published'; h.events.get('noteStatusSelect:change')();
+  h.elements.get('categorySelect').value = ''; h.events.get('categorySelect:change')();
+  assert.equal(h.elements.get('noteStatusField').hidden, true);
+  h.elements.get('categorySelect').value = 'journal-note'; h.events.get('categorySelect:change')();
+  assert.equal(h.elements.get('noteStatusSelect').value, 'published');
+  assert.equal(h.run('currentDraft().noteStatus'), 'published');
+});
+test('existing uncategorized articles are not reclassified on opening', () => {
+  const h = harness();
+  h.context.uncategorized = core.normalizeDraft({ ...h.draft, category: null, categoryName: '' }, { remote: true });
+  h.run("state.drafts=[uncategorized];loadDraft('d');");
+  assert.equal(h.run('currentDraft().category'), null);
+  assert.equal(h.elements.get('categorySelect').value, '');
+});
+test('opening an existing posted note restores its field correctly', () => {
+  const h = harness();
+  h.context.posted = core.normalizeDraft({ ...h.draft, category: 'journal-note', categoryName: 'note用', noteStatus: 'published' }, { remote: true });
+  h.run("state.drafts=[posted];loadDraft('d');");
+  assert.equal(h.elements.get('noteStatusField').hidden, false);
+  assert.equal(h.elements.get('noteStatusSelect').value, 'published');
+  assert.equal(h.run('currentDraft().pendingSync'), false);
+});
+test('posting changes received from another device update the visible selector', () => {
+  const h = harness();
+  const note = core.normalizeDraft({ ...h.draft, category: 'journal-note', categoryName: 'note用' }, { remote: true });
+  h.context.note = note; h.run("state.drafts=[note];loadDraft('d');startRemoteSync();");
+  h.articleSnapshot([{ ...note, noteStatus: 'published', revision: 'v2' }]);
+  assert.equal(h.elements.get('noteStatusSelect').value, 'published');
+  assert.equal(h.run('currentDraft().noteStatus'), 'published');
+});
+test('posted search matches only note status, and list shows status badges', () => {
+  const h = harness();
+  h.context.notes = [
+    core.normalizeDraft({ ...h.draft, id: 'published', title: 'Published note', category: 'journal-note', categoryName: 'note用', noteStatus: 'published' }),
+    core.normalizeDraft({ ...h.draft, id: 'unpublished', title: 'Draft note', category: 'journal-note', categoryName: 'note用' }),
+    core.normalizeDraft({ ...h.draft, id: 'diary', title: 'Diary', category: 'journal-diary', categoryName: '日記', noteStatus: 'published' }),
+  ];
+  h.run("state.drafts=notes;state.searchQuery='投稿済み';renderList();");
+  const html = h.elements.get('draftList').innerHTML;
+  assert.match(html, /Published note/); assert.match(html, /投稿済み/);
+  assert.ok(!html.includes('Draft note')); assert.ok(!html.includes('Diary'));
+});
+test('new diary is available even if its former standard category was deleted', () => {
+  const h = harness();
+  h.run('state.categories=defaultCategories().map(c=>({...c,deleted:true}));newDraft();');
+  assert.equal(h.run('currentDraft().categoryName'), '日記');
+  assert.equal(h.run('activeCategories().length'), 2);
+  assert.equal(h.run("state.drafts.find(d=>d.id==='d').category"), 'unknown-category');
+});

@@ -567,6 +567,8 @@
 .category-manage-actions button, .small-button { min-width: 44px; min-height: 44px; }
 .list-heading-actions, .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pending-badge { font-family: var(--font-mono); color: var(--muted); font-size: 12px; }
+.note-status-field[hidden] { display: none !important; }
+.note-status-badge { display: inline-flex; padding: 3px 10px; border: 1px solid var(--border); border-radius: 14px; color: var(--muted); font-family: var(--font-sans); font-size: 12px; }
 .legacy-notice { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--accent-light); font-size: 14px; }
 .legacy-details { max-width: 720px; margin-top: 18px; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius); }
 .legacy-details summary { cursor: pointer; font-weight: 700; }

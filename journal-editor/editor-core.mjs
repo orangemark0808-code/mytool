@@ -14,7 +14,11 @@ export function validDate(value) {
 }
 
 export function contentKey(draft) {
-  return JSON.stringify([draft.title, draft.body, draft.category || null, draft.categoryName || '', draft.deletedAt || null]);
+  const fields = [draft.title, draft.body, draft.category || null, draft.categoryName || '', draft.deletedAt || null];
+  // Preserve old-version baselines for articles with no posting state. An
+  // explicitly published state participates in conflict detection.
+  if (draft.noteStatus === 'published') fields.push('published');
+  return JSON.stringify(fields);
 }
 
 export function remoteVersion(draft) {
@@ -29,6 +33,7 @@ export function normalizeDraft(raw, { remote = false, id = raw?.id } = {}) {
     body: typeof raw?.body === 'string' ? raw.body : '',
     category: typeof raw?.category === 'string' && raw.category ? raw.category : null,
     categoryName: typeof raw?.categoryName === 'string' ? raw.categoryName : '',
+    noteStatus: raw?.noteStatus === 'published' ? 'published' : 'unpublished',
     createdAt: validDate(raw?.createdAt) || validDate(raw?.updatedAt),
     updatedAt: validDate(raw?.updatedAt) || validDate(raw?.createdAt),
     revision: typeof raw?.revision === 'string' ? raw.revision : '',
@@ -42,8 +47,8 @@ export function normalizeDraft(raw, { remote = false, id = raw?.id } = {}) {
 }
 
 export function remotePayload(draft) {
-  const { id, title, body, category, categoryName, createdAt, updatedAt, revision, deletedAt } = normalizeDraft(draft);
-  return { id, title, body, category, categoryName, createdAt, updatedAt, revision, deletedAt, schemaVersion: SCHEMA_VERSION };
+  const { id, title, body, category, categoryName, noteStatus, createdAt, updatedAt, revision, deletedAt } = normalizeDraft(draft);
+  return { id, title, body, category, categoryName, noteStatus, createdAt, updatedAt, revision, deletedAt, schemaVersion: SCHEMA_VERSION };
 }
 
 export function editedDraft(draft, changes, now = new Date().toISOString()) {
@@ -131,6 +136,16 @@ export function defaultCategories() {
     { id: 'journal-diary', name: '日記', order: 0, updatedAt: '2026-01-01T00:00:00.000Z', deleted: false },
     { id: 'journal-note', name: 'note用', order: 1, updatedAt: '2026-01-01T00:00:00.000Z', deleted: false },
   ];
+}
+
+export function orderedCategories(records) {
+  const priority = (category) => category.name === '日記' ? 0 : category.name === 'note用' ? 1 : 2;
+  return records.filter((category) => !category.deleted).sort((a, b) => priority(a) - priority(b) || a.order - b.order || a.id.localeCompare(b.id));
+}
+
+export function isNoteDraft(draft, categories) {
+  if (!draft?.category) return false;
+  return (categories.find((category) => category.id === draft.category)?.name || draft.categoryName) === 'note用';
 }
 
 export function normalizeCategories(records) {
