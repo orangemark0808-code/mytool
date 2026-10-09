@@ -1,26 +1,49 @@
 # Journal Editor
 
-OrangeMania UIに合わせた、ブラウザで動作するMarkdownエディタです。
+Googleログイン後、Journalを端末内に保存し、Firestoreへ同期するMarkdownエディタです。
 
-## 起動方法
+公開URL: https://orangemark0808-code.github.io/mytool/journal-editor/
 
-`index.html` を直接開かず、ローカルサーバー経由で起動してください。
+## 2026-10-09の改善
+
+- スマホの編集バーを画面下端へ固定。キーボード表示時はVisualViewportに追従します。
+- 改行・段落・取り消し・やり直し・太字を常時表示し、その他の操作を展開できます。
+- カテゴリはタイトル付近へ移動しました。
+- 日本語変換中のEnterには干渉せず、リスト中のEnterは項目を続けます。
+- 箇条書き・引用・見出しは選択した行へ適用します。
+- コピーと.md保存はどちらもタイトルを含む同じMarkdownを出力します。
+- Markdownプレビューは見出し、強調、リンク、リスト、引用、コード、区切り線に対応します。完全なCommonMark互換やnoteの表示再現を保証するものではありません。
+
+## 保存・同期
+
+端末内の下書きとカテゴリはGoogleアカウント別に管理します。入力直後に端末へ保存し、約400ms後に送信します。オフラインの編集は未同期として残し、再接続・再起動時に送信します。
+
+記事の送信はFirestoreトランザクションで基準の版を確認します。別端末の変更と競合した場合は、元の記事を上書きせず「競合コピー」を作成します。送信中の追加入力も未同期として残します。キャッシュ由来の空一覧は削除判定に使いません。
+
+削除は`deletedAt`を設定するごみ箱方式です。本文を保持したまま、ごみ箱から復元できます。以前の版などが物理削除した記事を開いている場合は、新しいIDの復元用下書きを残します。
+
+カテゴリの名称・ID・順序・削除状態は、既存のアカウント専用メタデータ領域`users/{uid}/blogEditorMigrations/editorCategoriesV2`へ保存します。`firestore.rules.proposed`の既存matchがこのドキュメントを含みます。実運用ルールは別途確認が必要ですが、この修正で権限を広げることはありません。
+
+旧形式のlocalStorageは削除せず、一覧と設定に取り込み案内を表示します。ご自身のデータであることと現在のログイン先を確認し、明示操作で取り込んでください。すでに異なる内容の同じIDがある場合は別の下書きとして残します。別端末でも旧カテゴリを取り込むと同じカテゴリIDを引き継げます。
+
+設定から全Journal（ごみ箱を含む）とカテゴリのJSONバックアップを保存できます。診断コピーには本文・タイトル・メールアドレス・ユーザーIDを含めません。
+
+## 開発時の確認
+
+新しいパッケージのインストールは不要です。Node.js 20以上で実行できます。
+
+```powershell
+node --test journal-editor/tests/core.test.mjs journal-editor/tests/integration.test.mjs
+node journal-editor/tests/preview-server.mjs
+```
+
+ブラウザで`http://localhost:8765/`を開きます。この確認サーバーは架空の長文を表示し、Firebase設定・認証情報・実際のJournalを読み込みません。公開用成果物には確認サーバーやテストを含めません。
+
+実際のログインを試す場合は、元の案内どおりHTTPサーバー経由で起動してください。`index.html`の直接起動（file://）は対応していません。
 
 ```powershell
 cd C:\Users\antig\mytool\journal-editor
 python -m http.server 8080
 ```
 
-ブラウザで `http://localhost:8080/` を開いてください。`file://` と `127.0.0.1` は使用しません。
-
-公開URL: https://orangemark0808-code.github.io/mytool/journal-editor/
-
-## 主な機能
-
-- Markdown入力とリアルタイムプレビュー
-- 下書きの自動保存・復元（localStorage）
-- 下書き一覧、新規作成、削除確認
-- Markdownコピー、`.md`ダウンロード
-- note向けの書式付きHTMLコピー（対応ブラウザ）
-
-note編集画面への実機貼り付けは未確認です。
+実機で確認する項目: iPhone Safari・Android Chromeのキーボード開閉、変換確定Enter、長文末尾のカーソル、画面回転、同じ記事の端末間競合、オフライン編集と再接続。ローカルの幅変更だけでは実機キーボードの挙動までは確認できません。

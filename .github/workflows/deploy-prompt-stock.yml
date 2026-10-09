@@ -26,6 +26,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Test Journal Editor
+        run: node --test journal-editor/tests/core.test.mjs journal-editor/tests/integration.test.mjs
+
       - name: Validate Firebase secrets
         shell: bash
         env:
@@ -90,6 +93,8 @@ jobs:
           cp "journal-editor/index.html" "dist/journal-editor/index.html"
           cp "journal-editor/layout-overrides.css" "dist/journal-editor/layout-overrides.css"
           cp "journal-editor/script.js" "dist/journal-editor/script.js"
+          cp "journal-editor/editor-core.mjs" "dist/journal-editor/editor-core.mjs"
+          cp "journal-editor/markdown.mjs" "dist/journal-editor/markdown.mjs"
           cp "journal-editor/style.css" "dist/journal-editor/style.css"
           cp "pomodoro-timer/index.html" "dist/pomodoro-timer/index.html"
           cp "pomodoro-timer/app.js" "dist/pomodoro-timer/app.js"

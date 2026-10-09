@@ -1,84 +1,461 @@
-const VERSION = '2026-09-04-01';
-const KEY = 'orangemania-blog-editor-v1', VIEW_KEY = 'orangemania-blog-editor-view-v1', CURRENT_KEY = 'orangemania-blog-editor-current-v1', DELETED_KEY = 'orangemania-blog-editor-deleted-v1', CATEGORIES_KEY = 'orangemania-blog-editor-categories-v1', SCHEMA_VERSION = 1;
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, defaultCategories, normalizeCategories, mergeCategories, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-01';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-01';
+
+const VERSION = '2026-10-09-01';
+const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
-const state = { drafts: [], categories: [], currentId: null, searchQuery: '', saveTimers: new Map(), history: [], historyIndex: -1, restoring: false, mode: 'edit', app: null, auth: null, db: null, user: null, unsubscribe: null, editingDirty: false, remoteReady: false, firebase: null, firebaseReady: false, authResolved: false, interactiveLogin: false, snapshotCount: 0, diagnostic: { remoteIds: [], localIds: [], mergedIds: [], draftIds: [] } };
-const titleInput = $('titleInput'), bodyInput = $('bodyInput'), preview = $('preview'), workspace = $('workspace'), editorMirror = $('editorMirror'), editorStack = $('editorStack'), categorySelect = $('categorySelect'), searchInput = $('searchInput');
+const titleInput = $('titleInput'), bodyInput = $('bodyInput'), categorySelect = $('categorySelect');
+const state = {
+  drafts: [], categories: [], currentId: null, user: null, view: 'list', mode: 'edit',
+  searchQuery: '', showTrash: false, history: [], historyIndex: -1, composing: false,
+  previewDirty: true, saveTimers: new Map(), writes: new Map(), session: 0,
+  remoteReady: false, categoriesReady: false, categoriesDirty: false, categoriesWriting: false,
+  unsubscribe: null, unsubscribeCategories: null, firebase: null, firebaseReady: false,
+  storageFailed: false, storageReadFailed: false, syncError: false, categoryError: false,
+  draftListenerFailed: false, categoryListenerFailed: false, listenerGeneration: 0,
+  legacyImported: false, snapshotCount: 0,
+};
 
-function escapeHtml(value) { return value.replace(/[&<>\"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
-function markdownToHtml(markdown) { const lines = markdown.replace(/\r/g, '').split('\n'); let html = '', list = null, paragraph = []; const inline = (text) => escapeHtml(text).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'); const flush = () => { if (paragraph.length) { html += `<p>${paragraph.map(inline).join('<br>')}</p>`; paragraph = []; } }; const close = () => { if (list) { html += `</${list}>`; list = null; } }; lines.forEach((line) => { const heading = line.match(/^(#{1,3})\s+(.+)/), quote = line.match(/^>\s?(.*)/), bullet = line.match(/^[-*+]\s+(.+)/), numbered = line.match(/^\d+\.\s+(.+)/); if (heading) { flush(); close(); html += `<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>`; } else if (/^\s*---+\s*$/.test(line)) { flush(); close(); html += '<hr>'; } else if (quote) { flush(); close(); html += `<blockquote>${inline(quote[1])}</blockquote>`; } else if (bullet || numbered) { flush(); const kind = bullet ? 'ul' : 'ol'; if (list !== kind) { close(); html += `<${kind}>`; list = kind; } html += `<li>${inline((bullet || numbered)[1])}</li>`; } else if (!line.trim()) { flush(); close(); } else { close(); paragraph.push(line); } }); flush(); close(); return html; }
-function currentDraft() { return state.drafts.find((d) => d.id === state.currentId); }
-function setStatus(text, error = false) { const el = $('saveStatus'); if (!el) return; el.className = `save-status${error ? ' error' : ''}`; el.innerHTML = `<i></i>${text}`; }
-function setSyncStatus(text, kind = '') { const el = $('syncStatus'); el.textContent = text; el.className = `sync-status ${kind}`; }
-function updateEditorMirror() { editorMirror.innerHTML = escapeHtml(bodyInput.value).replace(/\n/g, '<span class="line-break"></span>\n'); editorStack.style.setProperty('--scrollbar-width', `${bodyInput.offsetWidth - bodyInput.clientWidth}px`); editorMirror.style.transform = `translateY(${-bodyInput.scrollTop}px)`; }
-function updatePreview() { const value = bodyInput.value.trim(); preview.innerHTML = value ? markdownToHtml(value) : '<p class="placeholder">本文を入力すると、ここにプレビューが表示されます。</p>'; $('characterCount').textContent = `${bodyInput.value.length}文字`; updateEditorMirror(); }
-function isConfigured() { return Boolean(config.apiKey && config.projectId && config.appId); }
-function remoteDraftsRef() { return state.firebase.collection(state.db, 'users', state.user.uid, 'blogEditorDrafts'); }
-function migrationRef() { return state.firebase.doc(state.db, 'users', state.user.uid, 'blogEditorMigrations', 'localStorageV1'); }
-function localDrafts() { try { const data = JSON.parse(localStorage.getItem(KEY)) || []; return Array.isArray(data) ? data.map(normalizeDraft) : []; } catch { return []; } }
-function pendingDeletes() { try { const data = JSON.parse(localStorage.getItem(DELETED_KEY)) || []; return new Set(Array.isArray(data) ? data : []); } catch { return new Set(); } }
-function markPendingDelete(id, pending) { const ids = pendingDeletes(); pending ? ids.add(id) : ids.delete(id); localStorage.setItem(DELETED_KEY, JSON.stringify([...ids])); }
-function normalizeDraft(raw) { return { id: String(raw?.id || crypto.randomUUID()), title: typeof raw?.title === 'string' ? raw.title : '無題の記事', body: typeof raw?.body === 'string' ? raw.body : '', category: typeof raw?.category === 'string' && raw.category ? raw.category : null, createdAt: validDate(raw?.createdAt) || validDate(raw?.updatedAt), updatedAt: validDate(raw?.updatedAt) || validDate(raw?.createdAt), schemaVersion: Number(raw?.schemaVersion) || SCHEMA_VERSION, syncedRemote: Boolean(raw?.syncedRemote) }; }
+function currentDraft() { return state.drafts.find((draft) => draft.id === state.currentId); }
+function activeCategories() { return state.categories.filter((category) => !category.deleted).sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)); }
+function categoryName(id, fallback = '') {
+  if (!id) return '未分類';
+  const category = state.categories.find((item) => item.id === id);
+  return category ? category.name : fallback || '未取得のカテゴリ';
+}
+function draftKey(uid, id) { return `${storageKey(uid)}:draft:${encodeURIComponent(id)}`; }
+function readArray(key) {
+  const raw = localStorage.getItem(key);
+  if (!raw) return [];
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) throw new Error('Invalid local journal data');
+  return parsed;
+}
+function loadAccount(uid) {
+  const raw = localStorage.getItem(storageKey(uid));
+  if (!raw) return { drafts: [], categories: defaultCategories(), currentId: null };
+  const saved = JSON.parse(raw);
+  if (!Array.isArray(saved.ids)) throw new Error('Invalid local journal index');
+  return { ...saved, categories: normalizeCategories(saved.categories), drafts: saved.ids.map((id) => {
+    const value = localStorage.getItem(draftKey(uid, id));
+    if (!value) throw new Error('A locally saved journal is missing');
+    return normalizeDraft(JSON.parse(value), { id });
+  }) };
+}
+// Write only the changed article on each keystroke, then its small account index.
+// Old article records and the legacy store are never erased by this migration.
+function persistLocal(changedIds = null) {
+  if (!state.user || state.storageReadFailed) return false;
+  try {
+    const drafts = changedIds ? state.drafts.filter((draft) => changedIds.includes(draft.id)) : state.drafts;
+    for (const draft of drafts) localStorage.setItem(draftKey(state.user.uid, draft.id), JSON.stringify(draft));
+    localStorage.setItem(storageKey(state.user.uid), JSON.stringify({ ids: state.drafts.map((draft) => draft.id), categories: state.categories, currentId: state.currentId, categoriesDirty: state.categoriesDirty, legacyImported: state.legacyImported }));
+    state.storageFailed = false; return true;
+  } catch { state.storageFailed = true; refreshSyncStatus(); return false; }
+}
+function refreshSyncStatus() {
+  let text, kind = '';
+  const pending = state.drafts.some((draft) => draft.pendingSync) || state.categoriesDirty;
+  if (!state.user) text = navigator.onLine ? 'ログインが必要' : 'オフライン';
+  else if (state.storageReadFailed || state.storageFailed) { text = '端末に保存できません・バックアップしてください'; kind = 'error'; }
+  else if (!navigator.onLine) text = pending ? '端末に保存済み・未同期' : 'オフライン・端末に保存済み';
+  else if (state.syncError || state.categoryError) { text = '端末に保存済み・同期エラー'; kind = 'error'; }
+  else if (state.writes.size || state.categoriesWriting) text = '端末に保存済み・同期中';
+  else if (pending) text = '端末に保存済み・未同期';
+  else if (!state.remoteReady || !state.categoriesReady) text = '同期を確認中';
+  else { text = 'クラウド同期済み'; kind = 'synced'; }
+  for (const id of ['syncStatus', 'editorSyncStatus']) { if ($(id).textContent !== text) $(id).textContent = text; $(id).className = `${id === 'syncStatus' ? 'sync-status' : 'toolbar-save-status'} ${kind}`; }
+}
+function remoteDraftsRef(uid = state.user.uid) { return state.firebase.collection(state.db, 'users', uid, 'blogEditorDrafts'); }
+// Existing account-owned metadata collection: no extra security permissions.
+function categoriesRef(uid = state.user.uid) { return state.firebase.doc(state.db, 'users', uid, 'blogEditorMigrations', 'editorCategoriesV2'); }
+function queueSave(id, delay = 400) {
+  clearTimeout(state.saveTimers.get(id));
+  state.saveTimers.set(id, setTimeout(() => { state.saveTimers.delete(id); void saveDraftById(id); }, delay));
+}
+async function saveDraftById(id) {
+  if (!state.user || !state.firebaseReady || !state.remoteReady || !navigator.onLine || state.storageReadFailed || state.writes.has(id)) return;
+  const draft = state.drafts.find((item) => item.id === id);
+  if (!draft?.pendingSync || !persistLocal([id])) return;
+  const sent = { ...draft }, uid = state.user.uid, session = state.session;
+  state.writes.set(id, sent.revision); refreshSyncStatus();
+  try {
+    const result = await writeDraftTransaction(state.firebase, remoteDraftsRef(uid), sent);
+    if (session !== state.session || state.user?.uid !== uid) return;
+    const applied = applyWriteResult(state.drafts, sent, result, state.currentId);
+    state.drafts = applied.drafts; state.currentId = applied.activeId; state.syncError = false;
+    if (result.kind === 'conflict') {
+      if (state.currentId === result.saved.id) titleInput.value = currentDraft().title;
+      toast('別端末と競合したため、あなたの文章を別の下書きに保存しました');
+    }
+    persistLocal(); updateDraftTimestamps(); renderList();
+  } catch (error) {
+    if (session === state.session) { state.syncError = true; console.error('Journal sync failed:', error.code || error.name); }
+  } finally {
+    if (session === state.session) {
+      state.writes.delete(id); refreshSyncStatus();
+      if (!state.syncError) for (const item of state.drafts.filter((entry) => entry.pendingSync)) queueSave(item.id);
+    }
+  }
+}
+async function syncCategories() {
+  if (!state.user || !state.firebaseReady || !state.categoriesReady || !state.categoriesDirty || state.categoriesWriting || !navigator.onLine || state.storageReadFailed || !persistLocal([])) return;
+  const uid = state.user.uid, session = state.session, sent = JSON.stringify(state.categories), records = normalizeCategories(state.categories);
+  state.categoriesWriting = true; refreshSyncStatus();
+  try {
+    const saved = await state.firebase.runTransaction(state.db, async (transaction) => {
+      const ref = categoriesRef(uid), snapshot = await transaction.get(ref);
+      const merged = mergeCategories(records, snapshot.exists() ? snapshot.data().records : []);
+      transaction.set(ref, { records: merged, schemaVersion: SCHEMA_VERSION, kind: 'editorCategories' }); return merged;
+    });
+    if (session !== state.session) return;
+    const unchanged = JSON.stringify(state.categories) === sent;
+    state.categories = mergeCategories(state.categories, saved);
+    state.categoriesDirty = !unchanged && JSON.stringify(state.categories) !== JSON.stringify(saved);
+    state.categoryError = false; persistLocal([]); renderCategoryOptions(); renderCategoryManageList(); renderList();
+  } catch (error) {
+    if (session === state.session) { state.categoryError = true; console.error('Category sync failed:', error.code || error.name); }
+  } finally {
+    if (session === state.session) { state.categoriesWriting = false; refreshSyncStatus(); if (state.categoriesDirty && !state.categoryError) void syncCategories(); }
+  }
+}
+function retrySync() {
+  if (!state.user) return refreshSyncStatus();
+  state.syncError = state.categoryError = false;
+  if (state.draftListenerFailed || state.categoryListenerFailed) {
+    state.unsubscribe?.(); state.unsubscribeCategories?.(); startRemoteSync();
+  }
+  pumpSync();
+}
+function pumpSync() {
+  if (!persistLocal()) return;
+  for (const draft of state.drafts.filter((item) => item.pendingSync)) queueSave(draft.id, 0);
+  void syncCategories(); refreshSyncStatus();
+}
+function scheduleSave() {
+  let draft = currentDraft();
+  if (!draft || draft.deletedAt || !state.user) return;
+  const category = categorySelect.value || null;
+  const changes = { title: titleInput.value.trim() || '無題の記事', body: bodyInput.value, category, categoryName: category ? categoryName(category, draft.category === category ? draft.categoryName : '') : '' };
+  if (draft.title === changes.title && draft.body === changes.body && draft.category === changes.category && draft.categoryName === changes.categoryName) return;
+  draft = editedDraft(draft, changes);
+  state.drafts = state.drafts.map((item) => item.id === draft.id ? draft : item);
+  persistLocal([draft.id]); updateDraftTimestamps(); refreshSyncStatus(); queueSave(draft.id);
+}
+function startRemoteSync() {
+  const uid = state.user.uid, session = state.session, generation = ++state.listenerGeneration;
+  state.remoteReady = state.categoriesReady = false;
+  state.draftListenerFailed = state.categoryListenerFailed = false;
+  const valid = () => session === state.session && generation === state.listenerGeneration;
+  const fail = (kind) => (error) => {
+    if (!valid()) return;
+    if (kind === 'drafts') { state.syncError = state.draftListenerFailed = true; state.remoteReady = false; }
+    else { state.categoryError = state.categoryListenerFailed = true; state.categoriesReady = false; }
+    refreshSyncStatus(); console.error('Journal listener failed:', error.code || error.name);
+  };
+  state.unsubscribe = state.firebase.onSnapshot(remoteDraftsRef(uid), { includeMetadataChanges: true }, (snapshot) => {
+    if (!valid()) return;
+    state.snapshotCount++;
+    const authoritative = !snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites;
+    const remote = snapshot.docs.map((item) => normalizeDraft(item.data(), { remote: true, id: item.id }));
+    const previous = currentDraft(), visible = state.view === 'editor';
+    const merged = reconcileDrafts(state.drafts, remote, { authoritative, activeId: visible ? state.currentId : null, writingIds: new Set(state.writes.keys()) });
+    state.drafts = merged.drafts;
+    const recovered = merged.recovered.find((item) => item.previousId === state.currentId);
+    if (recovered) { state.currentId = recovered.copy.id; titleInput.value = recovered.copy.title; toast('別端末で削除された記事を、復元用の下書きとして残しました'); }
+    if (authoritative) { state.remoteReady = true; state.syncError = false; }
+    persistLocal();
+    const next = currentDraft();
+    if (visible && previous && next && !next.deletedAt && contentKey(previous) !== contentKey(next) && !previous.pendingSync && !recovered) {
+      const start = bodyInput.selectionStart, end = bodyInput.selectionEnd, scroll = bodyInput.scrollTop;
+      titleInput.value = next.title === '無題の記事' ? '' : next.title; bodyInput.value = next.body;
+      bodyInput.setSelectionRange(Math.min(start, next.body.length), Math.min(end, next.body.length)); bodyInput.scrollTop = scroll;
+      renderCategoryOptions(); updatePreview(); recordHistory(); toast('別端末での変更を反映しました');
+    }
+    updateDraftTimestamps(); renderList(); refreshSyncStatus();
+    if (authoritative) pumpSync();
+  }, fail('drafts'));
+  state.unsubscribeCategories = state.firebase.onSnapshot(categoriesRef(uid), { includeMetadataChanges: true }, (snapshot) => {
+    if (!valid()) return;
+    const authoritative = !snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites;
+    if (snapshot.exists()) state.categories = mergeCategories(state.categories, snapshot.data().records);
+    if (authoritative) {
+      state.categoriesReady = true;
+      state.categoryError = false;
+      const remote = snapshot.exists() ? normalizeCategories(snapshot.data().records) : [];
+      state.categoriesDirty = JSON.stringify(mergeCategories(remote, state.categories)) !== JSON.stringify(remote);
+    }
+    persistLocal([]); renderCategoryOptions(); renderCategoryManageList(); renderList(); refreshSyncStatus();
+    if (authoritative) void syncCategories();
+  }, fail('categories'));
+}
+function stopSession() {
+  state.unsubscribe?.(); state.unsubscribeCategories?.(); state.unsubscribe = state.unsubscribeCategories = null;
+  for (const timer of state.saveTimers.values()) clearTimeout(timer);
+  state.saveTimers.clear(); state.writes.clear(); state.session++; state.categoriesWriting = false;
+}
+async function handleAuth(user) {
+  if (state.user) persistLocal();
+  stopSession(); state.user = user; state.currentId = null; state.drafts = []; state.categories = [];
+  state.remoteReady = state.categoriesReady = state.syncError = state.categoryError = state.storageFailed = state.storageReadFailed = false;
+  state.legacyImported = state.categoriesDirty = state.showTrash = false;
+  state.searchQuery = ''; $('searchInput').value = '';
+  titleInput.value = bodyInput.value = ''; resetHistory(); updatePreview();
+  $('loginButton').hidden = Boolean(user); $('logoutButton').hidden = !user;
+  $('authGate').classList.toggle('hidden', Boolean(user)); document.querySelector('.header-actions').classList.toggle('hidden', !user);
+  if (!user) {
+    for (const view of ['editor', 'list', 'settings']) $(`${view}View`).classList.add('hidden');
+    titleInput.value = bodyInput.value = ''; resetHistory(); updatePreview(); updateToolbarVisibility(); refreshSyncStatus(); return;
+  }
+  try {
+    const account = loadAccount(user.uid); state.drafts = account.drafts; state.categories = account.categories;
+    state.currentId = account.currentId || null; state.categoriesDirty = account.categoriesDirty || false; state.legacyImported = account.legacyImported || false;
+  } catch { state.storageReadFailed = true; state.categories = defaultCategories(); toast('端末の保存データを読み込めませんでした。元データは保持しています'); }
+  updateStorageUi(); showView('list'); updateMigrationPanel(); refreshSyncStatus(); startRemoteSync();
+}
+async function logout() {
+  scheduleSave();
+  if (!persistLocal() && !confirm('端末への保存に失敗しています。.md保存でバックアップするまでログアウトを中止することをおすすめします。ログアウトしますか？')) return;
+  try { await state.firebase.signOut(state.auth); } catch { toast('ログアウトできませんでした'); }
+}
+async function setupFirebase() {
+  $('loginButton').disabled = $('gateLoginButton').disabled = true;
+  if (!(config.apiKey && config.projectId && config.appId)) return;
+  try {
+    const [app, auth, firestore] = await Promise.all([import('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js'), import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js'), import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js')]);
+    state.firebase = { ...app, ...auth, ...firestore }; state.app = state.firebase.initializeApp(config);
+    state.auth = state.firebase.getAuth(state.app); state.db = state.firebase.getFirestore(state.app); state.firebaseReady = true;
+    $('loginButton').disabled = $('gateLoginButton').disabled = false; state.firebase.onAuthStateChanged(state.auth, handleAuth);
+  } catch (error) { toast('ログインの準備に失敗しました。通信状態を確認してください'); console.error('Firebase initialization failed:', error.code || error.name); }
+}
+function signInWithGoogle() {
+  if (!state.firebaseReady) return;
+  state.firebase.signInWithPopup(state.auth, new state.firebase.GoogleAuthProvider()).catch((error) => { toast('Googleログインを完了できませんでした'); console.error('Google login failed:', error.code || error.name); });
+}
 
-// カテゴリ管理: localStorageのみで保持し、Firestore同期は行わない（draft側のcategoryフィールドで参照するのみ）。
-function defaultCategories() { return [{ id: crypto.randomUUID(), name: '日記', order: 0 }, { id: crypto.randomUUID(), name: 'note用', order: 1 }]; }
-function persistCategories(list = state.categories) { try { localStorage.setItem(CATEGORIES_KEY, JSON.stringify(list)); return true; } catch { return false; } }
-function loadCategories() { try { const data = JSON.parse(localStorage.getItem(CATEGORIES_KEY)); if (Array.isArray(data) && data.length) { return data.map((c, i) => ({ id: String(c?.id || crypto.randomUUID()), name: typeof c?.name === 'string' && c.name.trim() ? c.name.trim() : '無題のカテゴリ', order: Number.isFinite(c?.order) ? c.order : i })).sort((a, b) => a.order - b.order); } } catch {} const initial = defaultCategories(); persistCategories(initial); return initial; }
-function categoryName(id) { if (!id) return '未分類'; return state.categories.find((c) => c.id === id)?.name || '未分類'; }
-function renderCategoryOptions(select, selectedId) { if (!select) return; select.innerHTML = ['<option value="">未分類</option>'].concat(state.categories.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`)).join(''); select.value = selectedId && state.categories.some((c) => c.id === selectedId) ? selectedId : ''; }
-function refreshCategorySelectIfEditing() { if (state.currentId) renderCategoryOptions(categorySelect, currentDraft()?.category); }
-function categoryIcon(name) { const paths = { 'chevron-up': '<path d="m18 15-6-6-6 6"/>', 'chevron-down': '<path d="m6 9 6 6 6-6"/>', 'trash': '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/>' }; return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ''}</svg>`; }
-function renderCategoryManageList() { const list = $('categoryManageList'); if (!list) return; if (!state.categories.length) { list.innerHTML = '<li class="empty">カテゴリがありません。</li>'; return; } list.innerHTML = state.categories.map((c, i) => `<li class="category-manage-row" data-id="${c.id}"><span class="category-manage-name">${escapeHtml(c.name)}</span><div class="category-manage-actions"><button type="button" data-move-up="${c.id}" ${i === 0 ? 'disabled' : ''} aria-label="上へ" title="上へ">${categoryIcon('chevron-up')}</button><button type="button" data-move-down="${c.id}" ${i === state.categories.length - 1 ? 'disabled' : ''} aria-label="下へ" title="下へ">${categoryIcon('chevron-down')}</button><button type="button" class="delete" data-delete-category="${c.id}" aria-label="削除" title="削除">${categoryIcon('trash')}</button></div></li>`).join(''); }
-function addCategory(name) { const trimmed = name.trim(); if (!trimmed) return; state.categories.push({ id: crypto.randomUUID(), name: trimmed, order: state.categories.length }); persistCategories(); renderCategoryManageList(); refreshCategorySelectIfEditing(); }
-function moveCategory(id, direction) { const idx = state.categories.findIndex((c) => c.id === id), swapWith = idx + direction; if (idx === -1 || swapWith < 0 || swapWith >= state.categories.length) return; [state.categories[idx], state.categories[swapWith]] = [state.categories[swapWith], state.categories[idx]]; state.categories.forEach((c, i) => { c.order = i; }); persistCategories(); renderCategoryManageList(); refreshCategorySelectIfEditing(); }
-async function deleteCategory(id) { const affected = state.drafts.filter((d) => d.category === id); state.categories = state.categories.filter((c) => c.id !== id).map((c, i) => ({ ...c, order: i })); persistCategories(); affected.forEach((d) => { d.category = null; }); persistLocal(); renderCategoryManageList(); renderList(); refreshCategorySelectIfEditing(); if (state.user && state.firebaseReady && affected.length) { try { await Promise.allSettled(affected.map((d) => saveRemote(d))); } catch (error) { console.error(error); } } }
-function validDate(value) { return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? value : ''; }
-function formatDateTime(value) { const date = new Date(value); if (Number.isNaN(date.getTime())) return '—'; const pad = (number) => String(number).padStart(2, '0'); return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`; }
-function updateDraftTimestamps(draft = currentDraft()) { $('createdAtDisplay').textContent = `作成日 ${formatDateTime(draft?.createdAt)}`; $('updatedAtDisplay').textContent = `更新日 ${formatDateTime(draft?.updatedAt)}`; }
-function compareDraftTime(a, b) { const at = Date.parse(a?.updatedAt || ''), bt = Date.parse(b?.updatedAt || ''); return Number.isNaN(at) || Number.isNaN(bt) ? 0 : at - bt; }
-function persistLocal() { try { localStorage.setItem(KEY, JSON.stringify(state.drafts)); localStorage.setItem(CURRENT_KEY, state.currentId || ''); return true; } catch { return false; } }
-async function saveRemote(draft) { await state.firebase.setDoc(state.firebase.doc(remoteDraftsRef(), draft.id), { ...draft, schemaVersion: SCHEMA_VERSION }, { merge: true }); }
-async function saveDraftById(draftId) { state.saveTimers.delete(draftId); const draft = state.drafts.find((item) => item.id === draftId); if (!draft) return; if (!persistLocal()) { setSyncStatus('同期エラー', 'error'); setStatus('保存できませんでした', true); return; } setStatus('保存しました'); if (!navigator.onLine) { setSyncStatus('オフライン'); return; } if (!state.user || !state.firebaseReady) { setSyncStatus('ローカル保存済み'); return; } setSyncStatus('同期中'); try { await saveRemote(draft); draft.syncedRemote = true; persistLocal(); if (state.currentId === draftId) state.editingDirty = false; setSyncStatus('同期済み', 'synced'); } catch (error) { setSyncStatus('同期エラー', 'error'); console.error(error); } }
-function scheduleSave() { const draftId = state.currentId, draft = state.drafts.find((item) => item.id === draftId); if (!draft) return; draft.title = titleInput.value.trim() || '無題の記事'; draft.body = bodyInput.value; draft.category = categorySelect.value || null; draft.updatedAt = new Date().toISOString(); draft.schemaVersion = SCHEMA_VERSION; updateDraftTimestamps(draft); if (!persistLocal()) { setSyncStatus('同期エラー', 'error'); setStatus('保存できませんでした', true); return; } state.editingDirty = true; setSyncStatus(navigator.onLine ? 'ローカル保存済み' : 'オフライン'); clearTimeout(state.saveTimers.get(draftId)); state.saveTimers.set(draftId, setTimeout(() => saveDraftById(draftId), 400)); }
-async function flushPendingSaves() { const pendingIds = [...state.saveTimers.keys()]; const writes = pendingIds.map((draftId) => { clearTimeout(state.saveTimers.get(draftId)); state.saveTimers.delete(draftId); return saveDraftById(draftId); }); await Promise.allSettled(writes); }
+function renderCategoryOptions(selectedId = currentDraft()?.category) {
+  const draft = currentDraft(), categories = activeCategories();
+  const options = ['<option value="">未分類</option>', ...categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name)}</option>`)];
+  if (selectedId && !categories.some((category) => category.id === selectedId)) options.push(`<option value="${escapeHtml(selectedId)}">${escapeHtml(categoryName(selectedId, draft?.categoryName))}（確認待ち）</option>`);
+  categorySelect.innerHTML = options.join(''); categorySelect.value = selectedId || '';
+}
+function renderCategoryManageList() {
+  const categories = activeCategories();
+  $('categoryManageList').innerHTML = categories.length ? categories.map((category, index) => `<li class="category-manage-row"><span class="category-manage-name">${escapeHtml(category.name)}</span><div class="category-manage-actions"><button type="button" data-move-up="${escapeHtml(category.id)}" ${index === 0 ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を上へ">↑</button><button type="button" data-move-down="${escapeHtml(category.id)}" ${index === categories.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を下へ">↓</button><button type="button" class="delete" data-delete-category="${escapeHtml(category.id)}" aria-label="${escapeHtml(category.name)}を削除">×</button></div></li>`).join('') : '<li class="empty">カテゴリがありません。</li>';
+}
+function changedCategories() { state.categoriesDirty = true; persistLocal([]); renderCategoryOptions(); renderCategoryManageList(); renderList(); refreshSyncStatus(); void syncCategories(); }
+function addCategory(name) {
+  const trimmed = name.trim().slice(0, 30); if (!trimmed) return;
+  if (activeCategories().some((category) => category.name === trimmed)) return toast('同じ名前のカテゴリがあります');
+  state.categories.push({ id: crypto.randomUUID(), name: trimmed, order: activeCategories().length, updatedAt: new Date().toISOString(), deleted: false }); changedCategories();
+}
+function moveCategory(id, direction) {
+  const categories = activeCategories(), index = categories.findIndex((category) => category.id === id), other = index + direction;
+  if (index < 0 || other < 0 || other >= categories.length) return;
+  [categories[index], categories[other]] = [categories[other], categories[index]];
+  for (const [order, category] of categories.entries()) { category.order = order; category.updatedAt = new Date().toISOString(); }
+  changedCategories();
+}
+function deleteCategory(id) {
+  const category = state.categories.find((item) => item.id === id); if (!category) return;
+  category.deleted = true; category.updatedAt = new Date().toISOString(); const affected = [];
+  state.drafts = state.drafts.map((draft) => { if (draft.category !== id) return draft; affected.push(draft.id); return editedDraft(draft, { category: null, categoryName: '' }); });
+  persistLocal(affected); changedCategories(); for (const draftId of affected) queueSave(draftId);
+}
+function updateStorageUi() { $('storageDescription').textContent = 'Googleアカウントごとにこの端末へ保存し、Firestoreへ同期します。'; $('storageLocation').value = 'この端末 + Firestore'; }
+function updateMigrationPanel() {
+  try {
+    const drafts = readArray(LEGACY_KEYS.drafts), categories = readArray(LEGACY_KEYS.categories);
+    const available = Boolean(state.user && !state.legacyImported && (drafts.length || categories.length));
+    $('migrationPanel').classList.toggle('hidden', !available);
+    $('legacyNotice').classList.toggle('hidden', !available);
+    $('migrationMessage').textContent = `このブラウザに旧形式の下書き${drafts.length}件とカテゴリ${categories.length}件があります。ご自身のデータか確認してから、現在のGoogleアカウントへ取り込んでください。旧データは消しません。`;
+  } catch { $('migrationPanel').classList.add('hidden'); $('legacyNotice').classList.add('hidden'); toast('旧形式データを読み込めませんでした。元データは保持しています'); }
+}
+function migrateLocal() {
+  if (!state.user || state.storageReadFailed || !confirm('旧形式の下書き・カテゴリを、現在のGoogleアカウントへ取り込みます。ご自身のデータであることを確認しましたか？旧データは保持されます。')) return;
+  try {
+    const legacyCategories = normalizeCategories(readArray(LEGACY_KEYS.categories));
+    // Keep legacy IDs referenced by existing journals. Hide unused duplicate
+    // defaults rather than showing two identically named options after upgrade.
+    const now = new Date().toISOString();
+    state.categories = state.categories.map((category) =>
+      ['journal-diary', 'journal-note'].includes(category.id)
+      && !state.drafts.some((draft) => draft.category === category.id)
+      && legacyCategories.some((legacy) => !legacy.deleted && legacy.name === category.name)
+        ? { ...category, deleted: true, updatedAt: now } : category);
+    state.categories = mergeCategories(state.categories, legacyCategories);
+    for (const draft of readArray(LEGACY_KEYS.drafts).map((raw) => normalizeDraft(raw))) {
+      const current = state.drafts.find((item) => item.id === draft.id);
+      if (current && current.title === draft.title && current.body === draft.body && current.category === draft.category) continue;
+      state.drafts.push(editedDraft(draft, { id: current ? crypto.randomUUID() : draft.id, baseVersion: null, title: current ? `${draft.title}（旧データ）` : draft.title, categoryName: categoryName(draft.category, draft.categoryName) }));
+    }
+    state.legacyImported = true; state.categoriesDirty = true;
+    if (!persistLocal()) { state.legacyImported = false; return toast('端末に保存できません。旧データは保持しています'); }
+    renderList(); updateMigrationPanel(); retrySync(); toast('旧データを取り込みました');
+  } catch { toast('旧データの取り込みに失敗しました。元データは保持しています'); }
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date);
+}
+function updateDraftTimestamps(draft = currentDraft()) {
+  for (const [id, text] of [['createdAtDisplay', `作成日 ${formatDateTime(draft?.createdAt)}`], ['updatedAtDisplay', `更新日 ${formatDateTime(draft?.updatedAt)}`]]) {
+    if ($(id).textContent !== text) $(id).textContent = text;
+  }
+}
+function updatePreview() { $('characterCount').textContent = `${Array.from(bodyInput.value).length}文字`; state.previewDirty = true; if (state.mode !== 'edit' && state.view === 'editor') renderPreview(); }
+function renderPreview() { if (!state.previewDirty) return; $('preview').innerHTML = bodyInput.value.trim() ? markdownToHtml(bodyInput.value) : '<p class="placeholder">本文を入力すると、ここにプレビューが表示されます。</p>'; state.previewDirty = false; }
 function snapshot() { return { value: bodyInput.value, start: bodyInput.selectionStart, end: bodyInput.selectionEnd, scrollTop: bodyInput.scrollTop }; }
 function updateHistoryButtons() { $('undoButton').disabled = state.historyIndex <= 0; $('redoButton').disabled = state.historyIndex >= state.history.length - 1; }
 function resetHistory() { state.history = [snapshot()]; state.historyIndex = 0; updateHistoryButtons(); }
-function recordHistory() { if (state.restoring) return; const next = snapshot(), current = state.history[state.historyIndex]; if (current && current.value === next.value && current.start === next.start && current.end === next.end) return; state.history.splice(state.historyIndex + 1); state.history.push(next); if (state.history.length > 100) state.history.shift(); state.historyIndex = state.history.length - 1; updateHistoryButtons(); }
-function restoreHistory(index) { const item = state.history[index]; if (!item) return; state.restoring = true; bodyInput.value = item.value; bodyInput.setSelectionRange(item.start, item.end); bodyInput.scrollTop = item.scrollTop; state.historyIndex = index; state.restoring = false; updatePreview(); scheduleSave(); updateHistoryButtons(); bodyInput.focus(); }
-function undo() { if (state.historyIndex > 0) restoreHistory(state.historyIndex - 1); } function redo() { if (state.historyIndex < state.history.length - 1) restoreHistory(state.historyIndex + 1); }
-function applyEdit(replacement, start = bodyInput.selectionStart, end = bodyInput.selectionEnd) { bodyInput.setRangeText(replacement, start, end, 'end'); bodyInput.focus(); updatePreview(); recordHistory(); scheduleSave(); }
-function insertText(before, after = '', fallback = '') { const start = bodyInput.selectionStart, end = bodyInput.selectionEnd, selected = bodyInput.value.slice(start, end) || fallback; applyEdit(before + selected + after, start, end); }
-function toolbar(action) { if (action === 'undo') return undo(); if (action === 'redo') return redo(); if (action === 'linebreak') return applyEdit('  \n'); if (action === 'paragraph') return applyEdit('\n\n'); if (action === 'heading' || action === 'subheading') { const start = bodyInput.selectionStart, lineStart = bodyInput.value.lastIndexOf('\n', start - 1) + 1, endAt = bodyInput.value.indexOf('\n', start), lineEnd = endAt === -1 ? bodyInput.value.length : endAt, content = bodyInput.value.slice(lineStart, lineEnd).replace(/^\s*#{1,}\s*/, '').trimStart(); return applyEdit(`${'#'.repeat(action === 'heading' ? 2 : 3)} ${content}`, lineStart, lineEnd); } const map = { bold: ['**','**','太字'], bullet: ['- ','','項目'], number: ['1. ','','項目'], quote: ['> ','','引用文'], link: ['[','](https://example.com)','リンク文字'], rule: ['\n---\n',''] }; if (map[action]) insertText(...map[action]); }
-function setEditorMode(mode, persist = true) { if (window.matchMedia('(max-width: 700px)').matches && mode === 'split') mode = 'edit'; state.mode = mode; workspace.className = `workspace mode-${mode}`; $('editorView').classList.toggle('single-mode', mode !== 'split'); [['editTab','edit'], ['previewTab','preview'], ['splitTab','split']].forEach(([id, value]) => { $(id).classList.toggle('active', value === mode); $(id).setAttribute('aria-selected', String(value === mode)); }); if (persist) localStorage.setItem(VIEW_KEY, mode); }
-function loadDraft(id, { remote = false } = {}) { if (!state.user) return; const draft = state.drafts.find((d) => d.id === id); if (!draft) return; if (state.editingDirty && id === state.currentId && remote) { setSyncStatus('ローカル保存済み'); return; } state.currentId = id; persistLocal(); titleInput.value = draft.title === '無題の記事' ? '' : draft.title; bodyInput.value = draft.body; renderCategoryOptions(categorySelect, draft.category); state.editingDirty = false; updatePreview(); updateDraftTimestamps(draft); resetHistory(); showView('editor'); bodyInput.focus(); }
-function newDraft() { if (!state.user) return; const now = new Date().toISOString(), draft = { id: crypto.randomUUID(), title: '無題の記事', body: '', category: null, createdAt: now, updatedAt: now, schemaVersion: SCHEMA_VERSION }; state.drafts.unshift(draft); state.currentId = draft.id; titleInput.value = ''; bodyInput.value = ''; renderCategoryOptions(categorySelect, null); updatePreview(); updateDraftTimestamps(draft); resetHistory(); void saveDraftById(draft.id); showView('editor'); titleInput.focus(); }
-function renderList() { const list = $('draftList'), query = state.searchQuery.trim().toLowerCase(); let drafts = [...state.drafts].sort((a,b) => compareDraftTime(b, a)); state.diagnostic.draftIds = drafts.map((draft) => draft.id); if (query) drafts = drafts.filter((d) => d.title.toLowerCase().includes(query) || d.body.toLowerCase().includes(query) || categoryName(d.category).toLowerCase().includes(query)); if (!drafts.length) { list.innerHTML = `<div class="empty">${query ? '該当するJournalが見つかりません。' : '下書きはまだありません。'}</div>`; return; } list.innerHTML = drafts.map((d) => `<article class="draft-row ${d.id === state.currentId ? 'active':''}"><div><div class="draft-title-row"><span class="draft-title">${escapeHtml(d.title)}</span><span class="category-badge">${escapeHtml(categoryName(d.category))}</span></div><div class="draft-excerpt">${escapeHtml(d.body.replace(/\n/g,' ').trim().slice(0,90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(d.createdAt)}</span><span>更新 ${formatDateTime(d.updatedAt)}</span></div></div><div class="draft-actions"><button class="small-button" data-edit="${d.id}" type="button">編集</button><button class="small-button delete" data-delete="${d.id}" type="button">削除</button></div></article>`).join(''); }
-function clearDisplayedJournal() { state.drafts = []; state.currentId = null; state.editingDirty = false; titleInput.value = ''; bodyInput.value = ''; updatePreview(); updateDraftTimestamps(null); resetHistory(); $('draftList').innerHTML = ''; $('migrationPanel').classList.add('hidden'); }
-function setAuthenticatedUi(authenticated, initialView = 'editor') { $('authGate').classList.toggle('hidden', authenticated); document.querySelector('.header-actions').classList.toggle('hidden', !authenticated); if (!authenticated) { ['editor','list','settings'].forEach((view) => $(`${view}View`).classList.add('hidden')); clearDisplayedJournal(); return; } showView(initialView); }
-function showView(name) { if (!state.user) return setAuthenticatedUi(false); if (!['editor', 'list', 'settings'].includes(name)) return; ['editor','list','settings'].forEach((v) => $(`${v}View`).classList.toggle('hidden', v !== name)); document.querySelectorAll('.text-button').forEach((b) => b.classList.remove('active')); if (name === 'list') { $('draftsButton').classList.add('active'); renderList(); } if (name === 'settings') { $('settingsButton').classList.add('active'); renderCategoryManageList(); } }
-async function copyMarkdown() { const title = titleInput.value.trim(), markdown = title ? `# ${title}\n\n${bodyInput.value}` : bodyInput.value; await navigator.clipboard.writeText(markdown); toast('Markdownをコピーしました'); }
-function copyPlainTextFallback(value) { const source = document.createElement('textarea'); source.value = value; source.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;'; document.body.append(source); source.select(); try { return document.execCommand('copy'); } finally { source.remove(); } }
-function download() { const blob = new Blob([bodyInput.value],{type:'text/markdown;charset=utf-8'}), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = `${(titleInput.value || 'untitled').replace(/[\\/:*?"<>|]/g,'_')}.md`; a.click(); URL.revokeObjectURL(url); }
-let toastTimer; function toast(message) { const el = $('toast'); el.textContent = message; el.classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('visible'), 2200); }
+function recordHistory() {
+  const next = snapshot(); if (state.history[state.historyIndex]?.value === next.value) return;
+  state.history.splice(state.historyIndex + 1); state.history.push(next); if (state.history.length > 100) state.history.shift();
+  state.historyIndex = state.history.length - 1; updateHistoryButtons();
+}
+function restoreHistory(index) {
+  const item = state.history[index]; if (!item) return;
+  bodyInput.value = item.value; bodyInput.setSelectionRange(item.start, item.end); bodyInput.scrollTop = item.scrollTop;
+  state.historyIndex = index; updatePreview(); scheduleSave(); updateHistoryButtons(); bodyInput.focus({ preventScroll: true });
+}
+function applyEdit(text, start = bodyInput.selectionStart, end = bodyInput.selectionEnd) { bodyInput.setRangeText(text, start, end, 'end'); bodyInput.focus({ preventScroll: true }); updatePreview(); recordHistory(); scheduleSave(); }
+function toolbar(action) {
+  if (state.composing) return;
+  if (action === 'undo') { if (state.historyIndex > 0) restoreHistory(state.historyIndex - 1); return; }
+  if (action === 'redo') { if (state.historyIndex < state.history.length - 1) restoreHistory(state.historyIndex + 1); return; }
+  const start = bodyInput.selectionStart, end = bodyInput.selectionEnd;
+  if (action === 'linebreak' || action === 'paragraph') return applyEdit(action === 'linebreak' ? '  \n' : '\n\n');
+  if (['heading', 'subheading', 'bullet', 'number', 'quote'].includes(action)) { const edit = blockEdit(bodyInput.value, start, end, action); return applyEdit(edit.text, edit.start, edit.end); }
+  if (action === 'rule') return applyEdit('\n\n---\n\n');
+  const selected = bodyInput.value.slice(start, end);
+  if (action === 'bold') applyEdit(`**${selected || '太字'}**`, start, end);
+  if (action === 'link') { applyEdit(`[${selected || 'リンク文字'}](https://example.com)`, start, end); const urlStart = start + (selected || 'リンク文字').length + 3; bodyInput.setSelectionRange(urlStart, urlStart + 'https://example.com'.length); }
+}
+function setEditorMode(mode, persist = true) {
+  if (!['edit', 'preview', 'split'].includes(mode)) mode = 'edit';
+  if (window.matchMedia('(max-width: 700px)').matches && mode === 'split') mode = 'edit';
+  state.mode = mode; $('workspace').className = `workspace mode-${mode}`; $('editorView').classList.toggle('single-mode', mode !== 'split');
+  for (const [id, value] of [['editTab', 'edit'], ['previewTab', 'preview'], ['splitTab', 'split']]) { $(id).classList.toggle('active', value === mode); $(id).setAttribute('aria-selected', String(value === mode)); }
+  if (mode !== 'edit') renderPreview(); if (persist) { try { localStorage.setItem(VIEW_KEY, mode); } catch {} }
+  closeMore(); updateToolbarVisibility();
+}
+function showView(view) {
+  if (!state.user) return;
+  state.view = view; for (const name of ['editor', 'list', 'settings']) $(`${name}View`).classList.toggle('hidden', name !== view);
+  $('draftsButton').classList.toggle('active', view === 'list'); $('settingsButton').classList.toggle('active', view === 'settings');
+  if (view === 'list') renderList(); if (view === 'settings') { renderCategoryManageList(); updateMigrationPanel(); }
+  closeMore(); updateToolbarVisibility();
+}
+function loadDraft(id) {
+  const draft = state.drafts.find((item) => item.id === id && !item.deletedAt); if (!draft) return;
+  state.currentId = id; titleInput.value = draft.title === '無題の記事' ? '' : draft.title; bodyInput.value = draft.body;
+  renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([]); showView('editor'); bodyInput.focus({ preventScroll: true });
+}
+function newDraft() {
+  if (!state.user) return;
+  const now = new Date().toISOString(), draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: '無題の記事', body: '', createdAt: now, updatedAt: now }), {});
+  state.drafts.unshift(draft); state.currentId = draft.id; titleInput.value = bodyInput.value = '';
+  renderCategoryOptions(null); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); titleInput.focus();
+}
+function renderList() {
+  const query = state.searchQuery.trim().toLowerCase();
+  let drafts = state.drafts.filter((draft) => Boolean(draft.deletedAt) === state.showTrash).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName)].some((value) => value.toLowerCase().includes(query)));
+  $('trashButton').textContent = state.showTrash ? 'Journal一覧へ' : `ごみ箱（${state.drafts.filter((draft) => draft.deletedAt).length}）`; $('trashButton').setAttribute('aria-pressed', String(state.showTrash));
+  $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';
+  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${draft.id === state.currentId ? 'active' : ''}"><div><div class="draft-title-row"><span class="draft-title">${escapeHtml(draft.title)}</span><span class="category-badge">${escapeHtml(categoryName(draft.category, draft.categoryName))}</span>${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button">復元</button>` : `<button class="small-button" data-edit="${escapeHtml(draft.id)}" type="button">編集</button><button class="small-button delete" data-delete="${escapeHtml(draft.id)}" type="button">ごみ箱へ</button>`}</div></article>`).join('') : `<div class="empty">${query ? '該当するJournalが見つかりません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+}
+function deleteDraft(id) {
+  const draft = state.drafts.find((item) => item.id === id); if (!draft) return;
+  const now = new Date().toISOString(); state.drafts = state.drafts.map((item) => item.id === id ? editedDraft(item, { deletedAt: now }, now) : item);
+  if (state.currentId === id) state.currentId = null;
+  persistLocal([id]); refreshSyncStatus(); queueSave(id); renderList(); toast('ごみ箱へ移しました。ごみ箱から復元できます');
+}
+function restoreDraft(id) { state.drafts = state.drafts.map((draft) => draft.id === id ? editedDraft(draft, { deletedAt: null }) : draft); persistLocal([id]); queueSave(id); refreshSyncStatus(); renderList(); toast('Journalを復元しました'); }
 
-// 一時的な同期診断: IDと状態だけをコピーし、本文・タイトル・メールアドレスは扱わない。
-function diagnosticBrowserName() { const ua = navigator.userAgent; if (ua.includes('Firefox/')) return 'Firefox'; if (ua.includes('Edg/')) return 'Microsoft Edge'; if (ua.includes('Chrome/')) return 'Chrome'; if (ua.includes('Safari/')) return 'Safari'; return '不明'; }
-function diagnosticList(ids) { return ids.length ? ids.map((id) => `- ${id}`).join('\n') : '- （なし）'; }
-function diagnosticText() { const data = state.diagnostic, deleted = [...pendingDeletes()]; return `【Journal Editor 同期診断】\n\nブラウザ: ${diagnosticBrowserName()}\nprojectId: ${config.projectId || '未設定'}\nuid: ${state.user?.uid || '未ログイン'}\n同期状態: ${$('syncStatus').textContent}\ncurrentId: ${state.currentId || '（なし）'}\n\nremoteIds:\n${diagnosticList(data.remoteIds)}\n\nlocalIds:\n${diagnosticList(data.localIds)}\n\nmergedIds:\n${diagnosticList(data.mergedIds)}\n\ndraftIds:\n${diagnosticList(data.draftIds)}\n\ndeletedIds:\n${diagnosticList(deleted)}\n\nsnapshotCount: ${state.snapshotCount}`; }
-async function copyDiagnostic() { const text = diagnosticText(); try { if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text); else if (!copyPlainTextFallback(text)) throw new Error('Clipboard API is unavailable'); toast('診断情報をコピーしました'); } catch (error) { toast('診断情報をコピーできませんでした'); console.error('診断情報のコピーに失敗しました', error); } }
-
-function updateStorageUi() { const loggedIn = Boolean(state.user); $('storageDescription').textContent = loggedIn ? 'この端末へ保存後、Firestoreにも同期します。' : 'この端末のブラウザ（localStorage）に保存されます。'; $('storageLocation').value = loggedIn ? 'localStorage + Firestore' : 'localStorage'; }
-async function updateMigrationPanel() { const panel = $('migrationPanel'); if (!state.user) return panel.classList.add('hidden'); const local = localDrafts(); const marker = await state.firebase.getDoc(migrationRef()); if (!local.length || marker.exists()) return panel.classList.add('hidden'); $('migrationMessage').textContent = `この端末のlocalStorageに${local.length}件の下書きがあります。確認後にFirestoreへコピーできます。ローカルデータは削除しません。`; panel.classList.remove('hidden'); }
-async function migrateLocal() { if (!state.user) return; const local = localDrafts(); if (!local.length) return; $('migrateLocalButton').disabled = true; setSyncStatus('同期中'); try { for (const draft of local) { const target = state.firebase.doc(remoteDraftsRef(), draft.id), remote = await state.firebase.getDoc(target); if (!remote.exists() || compareDraftTime(draft, normalizeDraft(remote.data())) > 0) await state.firebase.setDoc(target, draft, { merge: true }); } local.forEach((draft) => { const item = state.drafts.find((entry) => entry.id === draft.id); if (item) item.syncedRemote = true; }); persistLocal(); await state.firebase.setDoc(migrationRef(), { completedAt: new Date().toISOString(), source: KEY, count: local.length, schemaVersion: SCHEMA_VERSION }); $('migrationPanel').classList.add('hidden'); setSyncStatus('同期済み', 'synced'); toast(`${local.length}件をFirestoreへコピーしました`); } catch (error) { setSyncStatus('同期エラー', 'error'); toast('移行できませんでした（ローカル下書きは保持されています）'); console.error(error); } finally { $('migrateLocalButton').disabled = false; } }
-function mergeDrafts(remoteDrafts) { const deleted = pendingDeletes(), local = localDrafts(), remoteIds = new Set(remoteDrafts.map((draft) => draft.id)); const survivingLocal = local.filter((draft) => { if (!draft.syncedRemote || remoteIds.has(draft.id)) return true; if (draft.id === state.currentId && state.editingDirty) return true; return false; }); const merged = new Map(survivingLocal.map((draft) => [draft.id, draft])); remoteDrafts.forEach((remote) => { if (deleted.has(remote.id)) return; const current = merged.get(remote.id); if (!current || compareDraftTime(remote, current) >= 0) merged.set(remote.id, { ...remote, syncedRemote: true }); }); const next = [...merged.values()]; state.diagnostic.localIds = local.map((draft) => draft.id); state.diagnostic.remoteIds = remoteDrafts.map((draft) => draft.id); state.diagnostic.mergedIds = next.map((draft) => draft.id); return next; }
-function startRemoteSync() { state.unsubscribe?.(); const activeUid = state.user.uid; state.remoteReady = false; state.unsubscribe = state.firebase.onSnapshot(state.firebase.query(remoteDraftsRef(), state.firebase.orderBy('updatedAt', 'desc')), (snapshot) => { if (state.user?.uid !== activeUid) return; state.snapshotCount += 1; const remote = snapshot.docs.map((item) => normalizeDraft(item.data())); state.diagnostic.remoteIds = remote.map((draft) => draft.id); const next = mergeDrafts(remote); const currentRemote = next.find((draft) => draft.id === state.currentId); const isEditorView = !$('editorView').classList.contains('hidden'); state.drafts = next; state.remoteReady = true; persistLocal(); if (isEditorView && currentRemote && !state.editingDirty) loadDraft(currentRemote.id, { remote: true }); else if (isEditorView && !state.currentId && next.length) loadDraft(next[0].id, { remote: true }); renderList(); setSyncStatus('同期済み', 'synced'); }, (error) => { setSyncStatus(navigator.onLine ? '同期エラー' : 'オフライン', 'error'); console.error(error); }); }
-async function handleAuth(user) { await flushPendingSaves(); state.unsubscribe?.(); state.unsubscribe = null; const isInteractiveLogin = state.interactiveLogin; const isInitialLoad = !state.authResolved && !isInteractiveLogin; state.authResolved = true; state.user = user; state.editingDirty = false; $('loginButton').hidden = Boolean(user); $('logoutButton').hidden = !user; updateStorageUi(); if (!user) { state.remoteReady = false; setAuthenticatedUi(false); setSyncStatus(navigator.onLine ? 'ログインが必要' : 'オフライン'); return; } if (isInitialLoad) { state.drafts = localDrafts(); try { state.currentId = localStorage.getItem(CURRENT_KEY) || null; } catch {} } setAuthenticatedUi(true, 'list'); setSyncStatus('同期中'); startRemoteSync(); try { await updateMigrationPanel(); } catch (error) { setSyncStatus('同期エラー', 'error'); console.error(error); } finally { if (isInteractiveLogin) state.interactiveLogin = false; } }
-async function logout() { await flushPendingSaves(); state.unsubscribe?.(); state.unsubscribe = null; state.interactiveLogin = false; state.user = null; setAuthenticatedUi(false); try { await state.firebase.signOut(state.auth); } catch (error) { setSyncStatus('同期エラー', 'error'); console.error(error); } }
-async function setupFirebase() { $('loginButton').disabled = true; $('gateLoginButton').disabled = true; if (!isConfigured()) { setSyncStatus(navigator.onLine ? 'ログインが必要' : 'オフライン'); return; } try { const [app, auth, firestore] = await Promise.all([import('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js'), import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js'), import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js')]); state.firebase = { ...app, ...auth, ...firestore }; state.app = state.firebase.initializeApp(config); state.auth = state.firebase.getAuth(state.app); state.db = state.firebase.getFirestore(state.app); state.firebaseReady = true; $('loginButton').disabled = false; $('gateLoginButton').disabled = false; state.firebase.onAuthStateChanged(state.auth, handleAuth); } catch (error) { setSyncStatus(navigator.onLine ? 'ログインが必要' : 'オフライン'); console.error('Firebaseを利用できません。ログインできません。', error); } }
-function signInWithGoogle() { if (!state.firebaseReady || !state.auth) { setSyncStatus('同期エラー', 'error'); console.error('Firebase Authの初期化前にログインが要求されました'); return; } state.interactiveLogin = true; const provider = new state.firebase.GoogleAuthProvider(); state.firebase.signInWithPopup(state.auth, provider).catch((error) => { state.interactiveLogin = false; setSyncStatus('同期エラー', 'error'); console.error('Googleログインに失敗しました', error); }); }
-function init() { document.body.dataset.appVersion = VERSION; $('appVersion').textContent = `v${VERSION}`; state.categories = loadCategories(); try { state.mode = localStorage.getItem(VIEW_KEY) || 'edit'; } catch {} setEditorMode(state.mode, false); setAuthenticatedUi(false); setupFirebase(); }
-
-titleInput.addEventListener('input', scheduleSave); bodyInput.addEventListener('input', () => { updatePreview(); recordHistory(); scheduleSave(); }); bodyInput.addEventListener('scroll', updateEditorMirror); bodyInput.addEventListener('keydown', (event) => { const modifier = event.ctrlKey || event.metaKey; if (modifier && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); return; } if (event.ctrlKey && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return; } if (event.key === 'Enter') { event.preventDefault(); event.shiftKey ? applyEdit('  \n') : applyEdit('\n\n'); } });
-document.querySelector('.toolbar').addEventListener('click',(e) => { if (e.target.dataset.action) toolbar(e.target.dataset.action); }); $('markdownCopyButton').addEventListener('click',() => copyMarkdown().catch(() => toast('コピーできませんでした'))); $('downloadButton').addEventListener('click',download); $('newButton').addEventListener('click',newDraft); $('listNewButton').addEventListener('click',newDraft); $('homeButton').addEventListener('click',() => showView('list')); $('draftsButton').addEventListener('click',() => showView('list')); $('settingsButton').addEventListener('click',() => showView('settings')); $('loginButton').addEventListener('click',signInWithGoogle); $('gateLoginButton').addEventListener('click',signInWithGoogle); $('logoutButton').addEventListener('click',logout); $('migrateLocalButton').addEventListener('click',migrateLocal); $('copyDiagnosticButton').addEventListener('click',copyDiagnostic); $('draftList').addEventListener('click',async (e) => { const {edit,delete:del} = e.target.dataset; if (edit) loadDraft(edit); if (del && confirm('この下書きを削除しますか？')) { const wasCurrent = state.currentId === del; state.drafts = state.drafts.filter((draft) => draft.id !== del); if (wasCurrent) { state.currentId = null; state.editingDirty = false; } persistLocal(); showView('list'); if (!state.user || !state.firebaseReady) { setSyncStatus(navigator.onLine ? 'ローカル保存済み' : 'オフライン'); return; } markPendingDelete(del, true); setSyncStatus('同期中'); try { await state.firebase.deleteDoc(state.firebase.doc(remoteDraftsRef(), del)); markPendingDelete(del, false); setSyncStatus('同期済み', 'synced'); } catch (error) { setSyncStatus('同期エラー', 'error'); toast('Firestoreから削除できませんでした（この端末では削除済みです）'); console.error(error); } } }); [['editTab','edit'], ['previewTab','preview'], ['splitTab','split']].forEach(([id, mode]) => $(id).addEventListener('click', () => setEditorMode(mode))); categorySelect.addEventListener('change', scheduleSave); searchInput.addEventListener('input', (e) => { state.searchQuery = e.target.value; renderList(); }); $('categoryAddForm').addEventListener('submit', (e) => { e.preventDefault(); const input = $('categoryNameInput'); addCategory(input.value); input.value = ''; }); $('categoryManageList').addEventListener('click', (e) => { const button = e.target.closest('button'); if (!button) return; const { moveUp, moveDown, deleteCategory: delId } = button.dataset; if (moveUp) moveCategory(moveUp, -1); if (moveDown) moveCategory(moveDown, 1); if (delId && confirm('このカテゴリを削除しますか？使用中のJournalは「未分類」になります。')) void deleteCategory(delId); }); window.addEventListener('online', () => { if (!state.user) setSyncStatus('ログインが必要'); }); window.addEventListener('offline', () => setSyncStatus('オフライン')); window.addEventListener('pagehide', () => { void flushPendingSaves(); }); window.addEventListener('resize', () => { if (window.matchMedia('(max-width: 700px)').matches && state.mode === 'split') setEditorMode('edit'); updateEditorMirror(); });
+async function copyMarkdown() {
+  const value = exportMarkdown(titleInput.value, bodyInput.value);
+  if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value); else if (!copyPlainTextFallback(value)) throw new Error('Clipboard unavailable');
+  toast('Markdownをコピーしました');
+}
+function copyPlainTextFallback(value) {
+  const start = bodyInput.selectionStart, end = bodyInput.selectionEnd, active = document.activeElement;
+  const source = document.createElement('textarea'); source.value = value; source.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;'; document.body.append(source); source.select();
+  try { return document.execCommand('copy'); } finally { source.remove(); active?.focus({ preventScroll: true }); bodyInput.setSelectionRange(start, end); }
+}
+function downloadFile(text, filename, type) {
+  const url = URL.createObjectURL(new Blob([text], { type })), link = document.createElement('a'); link.href = url; link.download = filename;
+  document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function download() { downloadFile(exportMarkdown(titleInput.value, bodyInput.value), `${(titleInput.value || 'untitled').replace(/[\\/:*?"<>|]/g, '_')}.md`, 'text/markdown;charset=utf-8'); }
+function backup() { downloadFile(JSON.stringify({ schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), categories: state.categories, drafts: state.drafts }, null, 2), 'journal-backup.json', 'application/json;charset=utf-8'); toast('Journalとカテゴリのバックアップを保存しました'); }
+let toastTimer;
+function toast(message) { $('toast').textContent = message; $('toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.remove('visible'), 4500); }
+async function copyDiagnostic() {
+  const text = JSON.stringify({ version: VERSION, online: navigator.onLine, status: $('syncStatus').textContent, serverSnapshotReceived: state.remoteReady, pendingDraftCount: state.drafts.filter((draft) => draft.pendingSync).length, snapshotCount: state.snapshotCount }, null, 2);
+  try { if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text); else if (!copyPlainTextFallback(text)) throw new Error(); toast('診断情報をコピーしました'); } catch { toast('診断情報をコピーできませんでした'); }
+}
+function closeMore() { $('toolbarMore').classList.remove('expanded'); $('moreButton').setAttribute('aria-expanded', 'false'); updateToolbarViewport(); }
+function updateToolbarVisibility() { document.body.classList.toggle('editor-active', Boolean(state.user && state.view === 'editor' && state.mode !== 'preview')); updateToolbarViewport(); }
+function updateToolbarViewport() {
+  const viewport = window.visualViewport, gap = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
+  document.documentElement.style.setProperty('--keyboard-gap', `${gap}px`);
+  document.documentElement.style.setProperty('--keyboard-safe-area', gap > 100 ? '0px' : 'env(safe-area-inset-bottom, 0px)');
+  document.documentElement.style.setProperty('--mobile-bar-height', `${document.querySelector('.toolbar-wrap').offsetHeight || 78}px`);
+}
+function onBodyKeydown(event) {
+  if (event.isComposing || state.composing || event.keyCode === 229) return;
+  const modifier = event.ctrlKey || event.metaKey;
+  if (modifier && event.key.toLowerCase() === 'z') { event.preventDefault(); toolbar(event.shiftKey ? 'redo' : 'undo'); return; }
+  if (modifier && event.key.toLowerCase() === 'y') { event.preventDefault(); toolbar('redo'); return; }
+  if (event.key === 'Enter') { event.preventDefault(); const edit = enterEdit(bodyInput.value, bodyInput.selectionStart, bodyInput.selectionEnd, event.shiftKey); applyEdit(edit.text, edit.start, edit.end); }
+}
+function init() {
+  document.body.dataset.appVersion = VERSION; $('appVersion').textContent = `v${VERSION}`;
+  try { state.mode = localStorage.getItem(VIEW_KEY) || 'edit'; } catch {}
+  setEditorMode(state.mode, false); resetHistory(); updateToolbarVisibility(); refreshSyncStatus(); void setupFirebase();
+}
+titleInput.addEventListener('input', scheduleSave);
+bodyInput.addEventListener('input', () => { updatePreview(); if (!state.composing) recordHistory(); scheduleSave(); });
+bodyInput.addEventListener('compositionstart', () => { state.composing = true; });
+bodyInput.addEventListener('compositionend', () => { state.composing = false; recordHistory(); scheduleSave(); });
+bodyInput.addEventListener('keydown', onBodyKeydown);
+const toolbarWrap = document.querySelector('.toolbar-wrap');
+toolbarWrap.addEventListener('pointerdown', (event) => { if (event.target.closest('button') && document.activeElement === bodyInput) event.preventDefault(); });
+toolbarWrap.addEventListener('click', (event) => { const action = event.target.closest('[data-action]')?.dataset.action; if (action) { toolbar(action); closeMore(); } });
+$('moreButton').addEventListener('click', () => { const expanded = $('toolbarMore').classList.toggle('expanded'); $('moreButton').setAttribute('aria-expanded', String(expanded)); updateToolbarViewport(); });
+document.addEventListener('click', (event) => { if (!event.target.closest('.toolbar-wrap')) closeMore(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMore(); });
+$('markdownCopyButton').addEventListener('click', () => copyMarkdown().catch(() => toast('コピーできませんでした。.md保存も利用できます')));
+$('downloadButton').addEventListener('click', download); $('backupButton').addEventListener('click', backup);
+for (const id of ['newButton', 'listNewButton']) $(id).addEventListener('click', newDraft);
+for (const id of ['homeButton', 'draftsButton']) $(id).addEventListener('click', () => showView('list'));
+$('settingsButton').addEventListener('click', () => showView('settings'));
+$('legacySettingsButton').addEventListener('click', () => showView('settings'));
+for (const id of ['loginButton', 'gateLoginButton']) $(id).addEventListener('click', signInWithGoogle);
+$('logoutButton').addEventListener('click', logout); $('migrateLocalButton').addEventListener('click', migrateLocal);
+$('retrySyncButton').addEventListener('click', retrySync); $('copyDiagnosticButton').addEventListener('click', copyDiagnostic);
+$('trashButton').addEventListener('click', () => { state.showTrash = !state.showTrash; renderList(); });
+$('draftList').addEventListener('click', (event) => {
+  const button = event.target.closest('button'); if (!button) return;
+  if (button.dataset.edit) loadDraft(button.dataset.edit); if (button.dataset.restore) restoreDraft(button.dataset.restore);
+  if (button.dataset.delete && confirm('このJournalをごみ箱へ移しますか？あとで復元できます。')) deleteDraft(button.dataset.delete);
+});
+for (const [id, mode] of [['editTab', 'edit'], ['previewTab', 'preview'], ['splitTab', 'split']]) $(id).addEventListener('click', () => setEditorMode(mode));
+categorySelect.addEventListener('change', scheduleSave);
+$('searchInput').addEventListener('input', (event) => { state.searchQuery = event.target.value; renderList(); });
+$('categoryAddForm').addEventListener('submit', (event) => { event.preventDefault(); addCategory($('categoryNameInput').value); $('categoryNameInput').value = ''; });
+$('categoryManageList').addEventListener('click', (event) => {
+  const button = event.target.closest('button'); if (!button) return;
+  if (button.dataset.moveUp) moveCategory(button.dataset.moveUp, -1); if (button.dataset.moveDown) moveCategory(button.dataset.moveDown, 1);
+  if (button.dataset.deleteCategory && confirm('カテゴリを削除しますか？このカテゴリのJournalは未分類になります。')) deleteCategory(button.dataset.deleteCategory);
+});
+window.addEventListener('online', retrySync); window.addEventListener('offline', refreshSyncStatus);
+window.addEventListener('pagehide', () => { if (state.user) persistLocal(); });
+window.addEventListener('resize', () => { if (window.matchMedia('(max-width: 700px)').matches && state.mode === 'split') setEditorMode('edit'); updateToolbarViewport(); });
+window.visualViewport?.addEventListener('resize', updateToolbarViewport); window.visualViewport?.addEventListener('scroll', updateToolbarViewport);
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(updateToolbarViewport).observe(toolbarWrap);
 init();
