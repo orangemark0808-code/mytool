@@ -70,10 +70,16 @@
   font-weight: 700;
 }
 
+/* Journal Editor本文はユーザー指定の書体を優先する（2026-10-09）。 */
+:root { --font-body: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif; }
+
+.preview-content { font-family: var(--font-body); }
+.preview-content :is(h1, h2, h3, h4, h5, h6) { font-family: var(--font-sans); }
+
 /* textarea と改行記号レイヤーは、同じ文字組み・幅計算で重ねる。 */
 .editor-stack {
   --editor-padding: 22px;
-  --editor-font-family: var(--font-sans);
+  --editor-font-family: var(--font-body);
   --editor-font-size: 16px;
   --editor-font-weight: 400;
   --editor-line-height: 1.8;
