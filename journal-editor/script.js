@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-07';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-07';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-08';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-08';
 
-const VERSION = '2026-10-09-07';
+const VERSION = '2026-10-09-08';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
