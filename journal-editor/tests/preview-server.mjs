@@ -10,14 +10,16 @@ const fixture = `state.user={uid:'local-fixture'};state.categories=defaultCatego
 http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url, 'http://localhost');
   const name = requestUrl.pathname.slice(1) || 'index.html';
-  const scenario = ['legacy-matched', 'legacy-difference'].includes(requestUrl.searchParams.get('scenario')) ? requestUrl.searchParams.get('scenario') : null;
+  const scenario = ['legacy-matched', 'legacy-difference', 'badges'].includes(requestUrl.searchParams.get('scenario')) ? requestUrl.searchParams.get('scenario') : null;
   if (!files.has(name)) { response.writeHead(404); response.end('Not found'); return; }
   try {
     let text = await readFile(join(root, name), 'utf8');
     if (name === 'index.html') text = text.replace(/\s*<script src="firebase-config(?:\.local)?\.js"><\/script>/g, '');
     if (name === 'index.html' && scenario) text = text.replace(/(src="script\.js\?v=[0-9-]+)"/, `$1&scenario=${scenario}"`);
     if (name === 'script.js') {
-      const extra = scenario ? `state.serverDrafts=state.drafts.map(d=>normalizeDraft(d,{remote:true}));state.serverCategories=defaultCategories();readArray=key=>key===LEGACY_KEYS.drafts?[${scenario === 'legacy-matched' ? '{...state.drafts[0]}' : "{...state.drafts[0],title:'スマホに残った旧記事',body:'この端末だけに残った架空の文章です。'}"}]:key===LEGACY_KEYS.categories?defaultCategories():[];showView('settings');updateMigrationPanel();` : '';
+      const extra = scenario === 'badges'
+        ? `state.drafts=[['diary','日記のサンプル','journal-diary','unpublished'],['note-draft','note用の下書き','journal-note','unpublished'],['note-posted','note用の投稿済記事','journal-note','published']].map(([id,title,category,noteStatus])=>normalizeDraft({...state.drafts[0],id,title,category,noteStatus,body:'タグの色と表示名を確認するための架空の記事です。'},{remote:true}));state.currentId=null;showView('list');`
+        : scenario ? `state.serverDrafts=state.drafts.map(d=>normalizeDraft(d,{remote:true}));state.serverCategories=defaultCategories();readArray=key=>key===LEGACY_KEYS.drafts?[${scenario === 'legacy-matched' ? '{...state.drafts[0]}' : "{...state.drafts[0],title:'スマホに残った旧記事',body:'この端末だけに残った架空の文章です。'}"}]:key===LEGACY_KEYS.categories?defaultCategories():[];showView('settings');updateMigrationPanel();` : '';
       text = text.replace('void setupFirebase();', fixture + extra);
     }
     response.writeHead(200, { 'Content-Type': name.endsWith('.css') ? 'text/css' : name.endsWith('.html') ? 'text/html' : 'text/javascript', 'Cache-Control': 'no-store' });

@@ -420,6 +420,8 @@ h1, h2, h3, h4, h5, h6, .draft-title, .legacy-details summary {
   white-space: nowrap;
   box-shadow: none;
 }
+.category-badge[data-category-kind="diary"] { background: #fff0e3; color: #99480a; }
+.category-badge[data-category-kind="note"] { background: #e8f3ec; color: #24583b; }
 
 .search-field { margin-bottom: 18px; }
 
@@ -581,6 +583,8 @@ h1, h2, h3, h4, h5, h6, .draft-title, .legacy-details summary {
 .pending-badge { font-family: var(--font-mono); color: var(--muted); font-size: 12px; }
 .note-status-field[hidden] { display: none !important; }
 .note-status-badge { display: inline-flex; padding: 3px 10px; border: 1px solid var(--border); border-radius: 14px; color: var(--muted); font-family: var(--font-sans); font-size: 12px; }
+.note-status-badge[data-note-status="unpublished"] { background: #eaf2fc; color: #24538a; border-color: #ccdaf0; }
+.note-status-badge[data-note-status="published"] { background: #eceef0; color: #555b61; border-color: #d3d7db; }
 /* 入力案内も本文と同じ濃さで表示する。ブラウザ標準の半透明化を避ける。 */
 input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 .legacy-notice { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--accent-light); font-size: 14px; }

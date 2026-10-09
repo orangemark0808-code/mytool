@@ -242,9 +242,9 @@ test('posted search matches only note status, and list shows status badges', () 
     core.normalizeDraft({ ...h.draft, id: 'unpublished', title: 'Draft note', category: 'journal-note', categoryName: 'note用' }),
     core.normalizeDraft({ ...h.draft, id: 'diary', title: 'Diary', category: 'journal-diary', categoryName: '日記', noteStatus: 'published' }),
   ];
-  h.run("state.drafts=notes;state.searchQuery='投稿済み';renderList();");
+  h.run("state.drafts=notes;state.searchQuery='投稿済';renderList();");
   const html = h.elements.get('draftList').innerHTML;
-  assert.match(html, /Published note/); assert.match(html, /投稿済み/);
+  assert.match(html, /Published note/); assert.match(html, /投稿済/);
   assert.ok(!html.includes('Draft note')); assert.ok(!html.includes('Diary'));
 });
 test('new diary is available even if its former standard category was deleted', () => {
