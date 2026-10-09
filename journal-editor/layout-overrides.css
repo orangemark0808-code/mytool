@@ -73,7 +73,7 @@
 /* textarea と改行記号レイヤーは、同じ文字組み・幅計算で重ねる。 */
 .editor-stack {
   --editor-padding: 22px;
-  --editor-font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  --editor-font-family: var(--font-sans);
   --editor-font-size: 16px;
   --editor-font-weight: 400;
   --editor-line-height: 1.8;
@@ -197,7 +197,7 @@
 }
 
 .sync-status {
-  font-family: "DM Mono", "Meiryo", monospace;
+  font-family: var(--font-mono);
   color: var(--muted);
   font-size: 11px;
   white-space: nowrap;
@@ -225,14 +225,14 @@
 
 .app-version {
   color: var(--muted);
-  font-family: "DM Mono", "Meiryo", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   white-space: nowrap;
 }
 
 .brand {
   color: var(--text);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+  font-family: var(--font-sans);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -260,12 +260,12 @@
   gap: 4px 12px;
   padding-bottom: 2px;
   color: var(--muted);
-  font-family: "DM Mono", "Meiryo", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   white-space: nowrap;
 }
 
-.draft-dates { display: flex; flex-wrap: wrap; gap: 3px 12px; color: var(--muted); font-size: 13px; }
+.draft-dates { font-family: var(--font-mono); display: flex; flex-wrap: wrap; gap: 3px 12px; color: var(--muted); font-size: 13px; }
 
 .header-icon-button {
   display: inline-grid;
@@ -325,9 +325,9 @@
 .list-view .view-heading { align-items: center; padding-bottom: 14px; margin-bottom: 6px; }
 .list-view .view-heading h1 { margin-bottom: 3px; font-family: inherit; font-size: 18px; line-height: 1.35; }
 
-/* OrangeMania heading stack; limit this correction to the Settings title. */
+/* OrangeMania heading typography. */
 .settings-view .view-heading h1 {
-  font-family: "Nunito", "Zen Maru Gothic", "Noto Sans JP", sans-serif;
+  font-family: var(--font-sans);
   font-weight: 700;
 }
 
@@ -370,7 +370,7 @@
 
 .category-field .field-label {
   color: var(--muted);
-  font-family: "DM Mono", "Meiryo", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -380,7 +380,7 @@
   border-radius: 14px;
   background: var(--surface);
   color: var(--text);
-  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-family: var(--font-sans);
   font-size: 13px;
   box-shadow: none;
 }
@@ -404,7 +404,7 @@
   border-radius: 14px;
   background: var(--accent-light);
   color: var(--accent);
-  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -421,7 +421,7 @@
   border-radius: 14px;
   background: var(--surface);
   color: var(--text);
-  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-family: var(--font-sans);
   font-size: 14px;
   box-shadow: none;
 }
@@ -467,7 +467,7 @@
 }
 
 .category-manage-name {
-  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-family: var(--font-sans);
   font-size: 14px;
   font-weight: 600;
 }
@@ -525,7 +525,7 @@
   border-radius: 14px;
   background: var(--surface);
   color: var(--text);
-  font-family: "Nunito", "Yu Gothic UI", "Meiryo", sans-serif;
+  font-family: var(--font-sans);
   font-size: 14px;
   box-shadow: none;
 }
@@ -560,16 +560,16 @@
 .toolbar-more { display: contents; }
 .mobile-command { display: none; }
 #moreButton { display: none; }
-.toolbar-save-status { padding: 0 14px 9px; color: var(--muted); font-size: 11px; }
+.toolbar-save-status { font-family: var(--font-mono); padding: 0 14px 9px; color: var(--muted); font-size: 11px; }
 .toolbar-save-status.error { color: var(--danger); }
 .toolbar-save-status.synced { color: #357344; }
 .category-field select, .category-add-form input, .search-field input { font-size: 16px; }
 .category-manage-actions button, .small-button { min-width: 44px; min-height: 44px; }
 .list-heading-actions, .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.pending-badge { color: var(--muted); font-size: 12px; }
+.pending-badge { font-family: var(--font-mono); color: var(--muted); font-size: 12px; }
 .legacy-notice { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--accent-light); font-size: 14px; }
-.preview-content pre { overflow-x: auto; white-space: pre; background: var(--surface-subtle); padding: 14px; border-radius: 8px; }
-.preview-content code { font-family: monospace; font-size: .9em; }
+.preview-content pre { font-family: var(--font-mono); overflow-x: auto; white-space: pre; background: var(--surface-subtle); padding: 14px; border-radius: 8px; }
+.preview-content code { font-family: var(--font-mono); font-size: .9em; }
 button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 @media (max-width: 700px) {
