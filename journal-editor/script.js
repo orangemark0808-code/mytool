@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-06';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-06';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-07';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-07';
 
-const VERSION = '2026-10-09-06';
+const VERSION = '2026-10-09-07';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -205,7 +205,7 @@ async function handleAuth(user) {
   stopSession(); state.user = user; state.currentId = null; state.drafts = []; state.categories = [];
   state.remoteReady = state.categoriesReady = state.syncError = state.categoryError = state.storageFailed = state.storageReadFailed = false;
   state.legacyImported = state.categoriesDirty = state.showTrash = false;
-  state.bulkAssigning = false; $('bulkDiaryResult').textContent = '';
+  state.bulkAssigning = false; $('bulkDiaryResult').textContent = ''; $('bulkDiaryConfirmation').classList.add('hidden');
   state.legacyReviewShown = false;
   state.serverDrafts = []; state.serverCategories = [];
   state.searchQuery = ''; $('searchInput').value = '';
@@ -287,14 +287,22 @@ function updateBulkCategoryControls() {
   $('bulkDiaryButton').textContent = `未分類${count}件を日記へ変更`;
   const ready = migrationReady() && !state.categoriesDirty && !state.categoriesWriting && !state.writes.size && !state.drafts.some((draft) => draft.pendingSync);
   $('bulkDiaryButton').disabled = state.bulkAssigning || !ready || !count;
+  $('bulkDiaryConfirmButton').disabled = $('bulkDiaryButton').disabled;
+  if (!count) $('bulkDiaryConfirmation').classList.add('hidden');
   $('bulkDiaryCount').textContent = state.bulkAssigning ? 'カテゴリを変更しています…' : `ごみ箱を除く未分類の記事：${count}件。本文・タイトル・投稿状況は保持します。`;
 }
+function requestBulkDiaryConversion() {
+  if ($('bulkDiaryButton').disabled) return;
+  $('bulkDiaryConfirmation').classList.remove('hidden');
+  $('bulkDiaryConfirmationMessage').textContent = `未分類の記事${uncategorizedDrafts().length}件を日記へ変更します。本文・タイトル・投稿状況は保持し、ごみ箱の記事は変更しません。`;
+  $('bulkDiaryConfirmButton').focus();
+}
 async function convertUncategorizedToDiary() {
-  if (state.bulkAssigning || !state.user || $('bulkDiaryButton').disabled) return;
+  if (state.bulkAssigning || !state.user || $('bulkDiaryButton').disabled || $('bulkDiaryConfirmation').classList.contains('hidden')) return;
   const targets = uncategorizedDrafts().map((draft) => draft.id);
   const diary = activeCategories().find((category) => category.name === '日記');
   if (!diary) return toast('日記カテゴリを追加してから変更してください');
-  if (!confirm(`未分類の記事${targets.length}件を日記へ変更します。本文・タイトル・投稿状況は保持し、ごみ箱の記事は変更しません。変更しますか？`)) return;
+  $('bulkDiaryConfirmation').classList.add('hidden');
   const session = state.session, uid = state.user.uid;
   let changed = 0, skipped = 0, failed = 0;
   state.bulkAssigning = true; updateBulkCategoryControls();
@@ -435,6 +443,7 @@ function setEditorMode(mode, persist = true) {
 }
 function showView(view) {
   if (!state.user || state.bulkAssigning) return;
+  $('bulkDiaryConfirmation').classList.add('hidden');
   state.view = view; for (const name of ['editor', 'list', 'settings']) $(`${name}View`).classList.toggle('hidden', name !== view);
   $('draftsButton').classList.toggle('active', view === 'list'); $('settingsButton').classList.toggle('active', view === 'settings');
   if (view === 'list') renderList(); if (view === 'settings') { renderCategoryManageList(); updateMigrationPanel(); }
@@ -537,7 +546,9 @@ $('downloadButton').addEventListener('click', download); $('backupButton').addEv
 for (const id of ['newButton', 'listNewButton']) $(id).addEventListener('click', newDraft);
 for (const id of ['homeButton', 'draftsButton']) $(id).addEventListener('click', () => showView('list'));
 $('settingsButton').addEventListener('click', () => showView('settings'));
-$('bulkDiaryButton').addEventListener('click', convertUncategorizedToDiary);
+$('bulkDiaryButton').addEventListener('click', requestBulkDiaryConversion);
+$('bulkDiaryConfirmButton').addEventListener('click', convertUncategorizedToDiary);
+$('bulkDiaryCancelButton').addEventListener('click', () => { $('bulkDiaryConfirmation').classList.add('hidden'); $('bulkDiaryButton').focus(); });
 $('legacySettingsButton').addEventListener('click', () => showView('settings'));
 for (const id of ['loginButton', 'gateLoginButton']) $(id).addEventListener('click', signInWithGoogle);
 $('logoutButton').addEventListener('click', logout); $('migrateLocalButton').addEventListener('click', migrateLocal);

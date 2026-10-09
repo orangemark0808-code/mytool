@@ -17,7 +17,7 @@ function harness() {
     if (!elements.has(id)) elements.set(id, { value: '', textContent: '', innerHTML: '', selectionStart: 0, selectionEnd: 0, scrollTop: 0, offsetHeight: 78, classList: classList(), style: { setProperty() {} }, setAttribute() {}, focus() {}, setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }, setRangeText(text, start, end) { this.value = this.value.slice(0, start) + text + this.value.slice(end); this.selectionStart = this.selectionEnd = start + text.length; }, addEventListener(name, fn) { events.set(`${id}:${name}`, fn); } });
     return elements.get(id);
   }
-  for (const id of ['editorView', 'listView', 'settingsView']) element(id).classList.add('hidden');
+  for (const id of ['editorView', 'listView', 'settingsView', 'bulkDiaryConfirmation']) element(id).classList.add('hidden');
   const document = { getElementById: element, querySelector: element, documentElement: element('root'), body: { dataset: {}, classList: classList() }, addEventListener(name, fn) { events.set(`document:${name}`, fn); } };
   const window = { innerHeight: 844, matchMedia: () => ({ matches: false }), addEventListener(name, fn) { events.set(`window:${name}`, fn); } };
   const firebase = {
@@ -274,6 +274,15 @@ test('bulk diary operation reports changes and preserves other classifications',
   h.context.testFirebase.doc = (source,...parts) => source.firestore ? {id:parts[0]} : {path:parts.join('/')};
   h.run('state.drafts=[bulkArticle];state.firebaseReady=state.remoteReady=state.categoriesReady=true;updateBulkCategoryControls();');
   await h.run('convertUncategorizedToDiary();');
+  assert.equal(article.category,null);
+  h.events.get('bulkDiaryButton:click')();
+  assert.equal(article.category,null);
+  assert.equal(h.elements.get('bulkDiaryConfirmation').classList.contains('hidden'),false);
+  h.events.get('bulkDiaryCancelButton:click')();
+  await h.events.get('bulkDiaryConfirmButton:click')();
+  assert.equal(article.category,null);
+  h.events.get('bulkDiaryButton:click')();
+  await h.events.get('bulkDiaryConfirmButton:click')();
   assert.equal(h.run('currentDraft().category'),'journal-diary');
   assert.equal(h.run('currentDraft().body'),'original');
   assert.match(h.elements.get('bulkDiaryResult').textContent,/1件を日記へ変更/);

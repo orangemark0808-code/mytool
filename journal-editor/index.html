@@ -7,8 +7,8 @@
     <title>Journal Editor</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Cpath d='M23 17h20M37 17v25a10 10 0 0 1-20 0' fill='none' stroke='white' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=2026-10-09-06" />
-    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-06" />
+    <link rel="stylesheet" href="style.css?v=2026-10-09-07" />
+    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-07" />
   </head>
   <body>
     <header class="app-header">
@@ -107,7 +107,7 @@
             <button class="secondary-button" type="submit">追加</button>
           </form>
         </section>
-        <section class="diagnostic-panel" aria-label="未分類を日記へ変更"><h2>未分類を日記へ変更</h2><p id="bulkDiaryCount">未分類の記事を確認しています。</p><button class="secondary-button" id="bulkDiaryButton" type="button" disabled>未分類を日記へ変更</button><p id="bulkDiaryResult" role="status" aria-live="polite"></p></section>
+        <section class="diagnostic-panel" aria-label="未分類を日記へ変更"><h2>未分類を日記へ変更</h2><p id="bulkDiaryCount">未分類の記事を確認しています。</p><button class="secondary-button" id="bulkDiaryButton" type="button" disabled>未分類を日記へ変更</button><div id="bulkDiaryConfirmation" class="hidden" role="group" aria-label="カテゴリ変更の確認"><p id="bulkDiaryConfirmationMessage"></p><button class="primary-button" id="bulkDiaryConfirmButton" type="button">日記へ変更する</button><button class="secondary-button" id="bulkDiaryCancelButton" type="button">キャンセル</button></div><p id="bulkDiaryResult" role="status" aria-live="polite"></p></section>
         <section class="migration-panel hidden" id="migrationPanel" aria-live="polite"><h2>旧形式のデータを取り込む</h2><p id="migrationMessage"></p><div class="settings-actions"><button class="primary-button" id="migrateLocalButton" type="button">差分だけ現在のアカウントへ取り込む</button><button class="secondary-button" id="dismissLegacyButton" type="button">取り込まず案内を閉じる</button></div></section>
         <details id="legacyDetails" class="legacy-details hidden"><summary id="legacyDetailsSummary">この端末の旧データを確認</summary><p id="legacyDetailsMessage"></p><ul id="legacyDraftList"></ul><button id="reviewLegacyButton" class="secondary-button" type="button">差分を再確認</button></details>
         <section class="diagnostic-panel"><h2>保存とバックアップ</h2><p>未同期のJournalを再送できます。バックアップにはごみ箱とカテゴリも含まれます。</p><div class="settings-actions"><button class="secondary-button" id="retrySyncButton" type="button">同期を再試行</button><button class="secondary-button" id="backupButton" type="button">すべてバックアップ（JSON）</button></div></section>
@@ -117,6 +117,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="firebase-config.js"></script>
     <script src="firebase-config.local.js"></script>
-    <script type="module" src="script.js?v=2026-10-09-06"></script>
+    <script type="module" src="script.js?v=2026-10-09-07"></script>
   </body>
 </html>
