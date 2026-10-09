@@ -114,6 +114,25 @@ export async function writeDraftTransaction(firebase, collectionRef, draft) {
   });
 }
 
+// Metadata-only conversion: preserve the latest server title/body/status even
+// when another device edits an article during the bulk operation.
+export async function assignUncategorizedToDiary(firebase, collectionRef, categoryRef, id, diary) {
+  const revision = crypto.randomUUID();
+  return firebase.runTransaction(collectionRef.firestore, async (transaction) => {
+    const categories = await transaction.get(categoryRef);
+    const validDiary = categories.exists() && normalizeCategories(categories.data().records).some((category) => category.id === diary.id && category.name === '日記' && !category.deleted);
+    if (!validDiary) throw new Error('Diary category is not available');
+    const ref = firebase.doc(collectionRef, id), snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) return { updated: false };
+    const current = normalizeDraft(snapshot.data(), { remote: true, id: snapshot.id || id });
+    if (current.category || current.deletedAt) return { updated: false };
+    const updatedAt = new Date(Math.max(Date.now(), Date.parse(current.updatedAt) || 0)).toISOString();
+    const changes = { category: diary.id, categoryName: '日記', revision, updatedAt };
+    transaction.update(ref, changes);
+    return { updated: true, draft: normalizeDraft({ ...current, ...changes }, { remote: true }) };
+  });
+}
+
 export function applyWriteResult(drafts, sent, result, activeId) {
   const live = drafts.find((draft) => draft.id === sent.id);
   if (!live) return { drafts, activeId };

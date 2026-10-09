@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { storageKey, normalizeDraft, remotePayload, remoteVersion, contentKey, editedDraft, reconcileDrafts, writeDraftTransaction, applyWriteResult, defaultCategories, orderedCategories, isNoteDraft, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
+import { storageKey, normalizeDraft, remotePayload, remoteVersion, contentKey, editedDraft, reconcileDrafts, writeDraftTransaction, assignUncategorizedToDiary, applyWriteResult, defaultCategories, orderedCategories, isNoteDraft, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
 import { markdownToHtml } from '../markdown.mjs';
 
 function remote(body = 'server text', extra = {}) {
@@ -238,4 +238,39 @@ test('posting changes made during a save stay pending after old acknowledgement'
 test('new posting metadata does not re-trigger old-data import notices', () => {
   const article = remote();
   assert.equal(planLegacyImport([article], [], [{ ...article, noteStatus: 'published' }], []).matchedCount, 1);
+});
+test('bulk diary assignment updates metadata only and preserves exact server content', async () => {
+  const article = { ...remote('latest\r\nserver text'), title: ' Exact title ', noteStatus: 'published', extra: 'preserved' };
+  const updates = [];
+  const firebase = {
+    doc: (_collection, id) => ({ id }),
+    runTransaction: async (_db, callback) => callback({
+      get: async (ref) => ref.id === 'categories' ? { exists: () => true, data: () => ({ records: defaultCategories() }) } : { id: 'article', exists: () => true, data: () => article },
+      update: (_ref, value) => { updates.push(value); Object.assign(article, value); },
+    }),
+  };
+  const result = await assignUncategorizedToDiary(firebase, { firestore: {} }, { id: 'categories' }, 'article', defaultCategories()[0]);
+  assert.equal(result.updated, true);
+  assert.deepEqual(Object.keys(updates[0]).sort(), ['category', 'categoryName', 'revision', 'updatedAt']);
+  assert.equal(article.body, 'latest\r\nserver text'); assert.equal(article.title, ' Exact title ');
+  assert.equal(article.noteStatus, 'published'); assert.equal(article.extra, 'preserved');
+  assert.equal(article.category, 'journal-diary');
+});
+test('bulk diary assignment skips deleted and already categorized articles', async () => {
+  for (const article of [remote('text', { category: 'journal-note' }), remote('text', { deletedAt: '2026-10-09T00:00:00Z' })]) {
+    let updated = false;
+    const firebase = {
+      doc: (_collection, id) => ({ id }),
+      runTransaction: async (_db, callback) => callback({
+        get: async (ref) => ref.id === 'categories' ? { exists: () => true, data: () => ({ records: defaultCategories() }) } : { id: 'article', exists: () => true, data: () => article },
+        update: () => { updated = true; },
+      }),
+    };
+    const result = await assignUncategorizedToDiary(firebase, { firestore: {} }, { id: 'categories' }, 'article', defaultCategories()[0]);
+    assert.equal(result.updated, false); assert.equal(updated, false);
+  }
+});
+test('bulk diary assignment refuses a deleted target category', async () => {
+  const firebase = { doc: (_collection, id) => ({ id }), runTransaction: async (_db, callback) => callback({get: async()=>({exists:()=>true,data:()=>({records:defaultCategories().map(c=>({...c,deleted:true}))})}),update:()=>assert.fail('No update allowed')}) };
+  await assert.rejects(assignUncategorizedToDiary(firebase, {firestore:{}}, {id:'categories'}, 'article', defaultCategories()[0]));
 });

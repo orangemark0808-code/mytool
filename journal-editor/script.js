@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-05';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-05';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-06';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-06';
 
-const VERSION = '2026-10-09-05';
+const VERSION = '2026-10-09-06';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -14,7 +14,7 @@ const state = {
   unsubscribe: null, unsubscribeCategories: null, firebase: null, firebaseReady: false,
   storageFailed: false, storageReadFailed: false, syncError: false, categoryError: false,
   draftListenerFailed: false, categoryListenerFailed: false, listenerGeneration: 0,
-  legacyImported: false, legacyReviewShown: false, snapshotCount: 0, serverDrafts: [], serverCategories: [],
+  legacyImported: false, legacyReviewShown: false, snapshotCount: 0, serverDrafts: [], serverCategories: [], bulkAssigning: false,
 };
 
 function currentDraft() { return state.drafts.find((draft) => draft.id === state.currentId); }
@@ -67,6 +67,7 @@ function refreshSyncStatus() {
   else if (!state.remoteReady || !state.categoriesReady) text = '同期を確認中';
   else { text = 'クラウド同期済み'; kind = 'synced'; }
   for (const id of ['syncStatus', 'editorSyncStatus']) { if ($(id).textContent !== text) $(id).textContent = text; $(id).className = `${id === 'syncStatus' ? 'sync-status' : 'toolbar-save-status'} ${kind}`; }
+  updateBulkCategoryControls();
 }
 function remoteDraftsRef(uid = state.user.uid) { return state.firebase.collection(state.db, 'users', uid, 'blogEditorDrafts'); }
 // Existing account-owned metadata collection: no extra security permissions.
@@ -204,6 +205,7 @@ async function handleAuth(user) {
   stopSession(); state.user = user; state.currentId = null; state.drafts = []; state.categories = [];
   state.remoteReady = state.categoriesReady = state.syncError = state.categoryError = state.storageFailed = state.storageReadFailed = false;
   state.legacyImported = state.categoriesDirty = state.showTrash = false;
+  state.bulkAssigning = false; $('bulkDiaryResult').textContent = '';
   state.legacyReviewShown = false;
   state.serverDrafts = []; state.serverCategories = [];
   state.searchQuery = ''; $('searchInput').value = '';
@@ -278,6 +280,45 @@ function deleteCategory(id) {
   category.deleted = true; category.updatedAt = new Date().toISOString(); const affected = [];
   state.drafts = state.drafts.map((draft) => { if (draft.category !== id) return draft; affected.push(draft.id); return editedDraft(draft, { category: null, categoryName: '' }); });
   persistLocal(affected); changedCategories(); for (const draftId of affected) queueSave(draftId);
+}
+function uncategorizedDrafts() { return state.drafts.filter((draft) => !draft.category && !draft.deletedAt); }
+function updateBulkCategoryControls() {
+  const count = uncategorizedDrafts().length;
+  $('bulkDiaryButton').textContent = `未分類${count}件を日記へ変更`;
+  const ready = migrationReady() && !state.categoriesDirty && !state.categoriesWriting && !state.writes.size && !state.drafts.some((draft) => draft.pendingSync);
+  $('bulkDiaryButton').disabled = state.bulkAssigning || !ready || !count;
+  $('bulkDiaryCount').textContent = state.bulkAssigning ? 'カテゴリを変更しています…' : `ごみ箱を除く未分類の記事：${count}件。本文・タイトル・投稿状況は保持します。`;
+}
+async function convertUncategorizedToDiary() {
+  if (state.bulkAssigning || !state.user || $('bulkDiaryButton').disabled) return;
+  const targets = uncategorizedDrafts().map((draft) => draft.id);
+  const diary = activeCategories().find((category) => category.name === '日記');
+  if (!diary) return toast('日記カテゴリを追加してから変更してください');
+  if (!confirm(`未分類の記事${targets.length}件を日記へ変更します。本文・タイトル・投稿状況は保持し、ごみ箱の記事は変更しません。変更しますか？`)) return;
+  const session = state.session, uid = state.user.uid;
+  let changed = 0, skipped = 0, failed = 0;
+  state.bulkAssigning = true; updateBulkCategoryControls();
+  try {
+    for (const id of targets) {
+      if (session !== state.session) return;
+      try {
+        const result = await assignUncategorizedToDiary(state.firebase, remoteDraftsRef(uid), categoriesRef(uid), id, diary);
+        if (session !== state.session) return;
+        if (result.updated) {
+          changed++;
+          state.drafts = state.drafts.map((draft) => draft.id === id && !draft.pendingSync && !state.writes.has(id) ? result.draft : draft);
+          persistLocal([id]);
+        } else skipped++;
+      } catch (error) { failed++; console.error('Category conversion failed:', error.code || error.name); }
+      $('bulkDiaryResult').textContent = `${changed}件変更済み／${targets.length}件`;
+    }
+  } finally {
+    if (session === state.session) {
+      state.bulkAssigning = false; renderList(); renderCategoryOptions(); refreshSyncStatus();
+      $('bulkDiaryResult').textContent = `${changed}件を日記へ変更しました。${skipped ? `対象外になった記事${skipped}件は変更していません。` : ''}${failed ? `${failed}件は変更できませんでした。同期を確認して再試行してください。` : ''}`;
+      toast(failed ? '一部の記事を変更できませんでした' : `${changed}件を日記へ変更しました`);
+    }
+  }
 }
 function updateStorageUi() { $('storageDescription').textContent = 'Googleアカウントごとにこの端末へ保存し、Firestoreへ同期します。'; $('storageLocation').value = 'この端末 + Firestore'; }
 function migrationReady() { return Boolean(state.user && state.remoteReady && state.categoriesReady && navigator.onLine && !state.draftListenerFailed && !state.categoryListenerFailed); }
@@ -393,19 +434,20 @@ function setEditorMode(mode, persist = true) {
   closeMore(); updateToolbarVisibility();
 }
 function showView(view) {
-  if (!state.user) return;
+  if (!state.user || state.bulkAssigning) return;
   state.view = view; for (const name of ['editor', 'list', 'settings']) $(`${name}View`).classList.toggle('hidden', name !== view);
   $('draftsButton').classList.toggle('active', view === 'list'); $('settingsButton').classList.toggle('active', view === 'settings');
   if (view === 'list') renderList(); if (view === 'settings') { renderCategoryManageList(); updateMigrationPanel(); }
   closeMore(); updateToolbarVisibility();
 }
 function loadDraft(id) {
+  if (state.bulkAssigning) return;
   const draft = state.drafts.find((item) => item.id === id && !item.deletedAt); if (!draft) return;
   state.currentId = id; titleInput.value = draft.title === '無題の記事' ? '' : draft.title; bodyInput.value = draft.body;
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([]); showView('editor'); bodyInput.focus({ preventScroll: true });
 }
 function newDraft() {
-  if (!state.user) return;
+  if (!state.user || state.bulkAssigning) return;
   const now = new Date().toISOString();
   let categoriesChanged = false;
   for (const standard of defaultCategories()) {
@@ -495,6 +537,7 @@ $('downloadButton').addEventListener('click', download); $('backupButton').addEv
 for (const id of ['newButton', 'listNewButton']) $(id).addEventListener('click', newDraft);
 for (const id of ['homeButton', 'draftsButton']) $(id).addEventListener('click', () => showView('list'));
 $('settingsButton').addEventListener('click', () => showView('settings'));
+$('bulkDiaryButton').addEventListener('click', convertUncategorizedToDiary);
 $('legacySettingsButton').addEventListener('click', () => showView('settings'));
 for (const id of ['loginButton', 'gateLoginButton']) $(id).addEventListener('click', signInWithGoogle);
 $('logoutButton').addEventListener('click', logout); $('migrateLocalButton').addEventListener('click', migrateLocal);

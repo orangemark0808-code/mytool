@@ -254,3 +254,28 @@ test('new diary is available even if its former standard category was deleted', 
   assert.equal(h.run('activeCategories().length'), 2);
   assert.equal(h.run("state.drafts.find(d=>d.id==='d').category"), 'unknown-category');
 });
+test('bulk diary controls count only active uncategorized articles', () => {
+  const h = harness();
+  h.context.bulkRecords = [core.normalizeDraft({...h.draft,id:'active',category:null}),core.normalizeDraft({...h.draft,id:'trash',category:null,deletedAt:'2026-10-09T00:00:00Z'}),core.normalizeDraft({...h.draft,id:'note',category:'journal-note'})];
+  h.run('state.drafts=bulkRecords;updateBulkCategoryControls();');
+  assert.match(h.elements.get('bulkDiaryButton').textContent,/未分類1件/);
+  assert.equal(h.elements.get('bulkDiaryButton').disabled,true);
+  h.run('state.remoteReady=state.categoriesReady=true;updateBulkCategoryControls();');
+  assert.equal(h.elements.get('bulkDiaryButton').disabled,false);
+});
+test('bulk diary operation reports changes and preserves other classifications', async () => {
+  const h = harness();
+  const article = core.normalizeDraft({...h.draft,category:null});
+  h.context.bulkArticle = article;
+  h.context.testFirebase.runTransaction = async (_db, callback) => callback({
+    get: async (ref) => ref.path ? {exists:()=>true,data:()=>({records:core.defaultCategories()})} : {id:'d',exists:()=>true,data:()=>article},
+    update: (_ref, changes) => Object.assign(article, changes),
+  });
+  h.context.testFirebase.doc = (source,...parts) => source.firestore ? {id:parts[0]} : {path:parts.join('/')};
+  h.run('state.drafts=[bulkArticle];state.firebaseReady=state.remoteReady=state.categoriesReady=true;updateBulkCategoryControls();');
+  await h.run('convertUncategorizedToDiary();');
+  assert.equal(h.run('currentDraft().category'),'journal-diary');
+  assert.equal(h.run('currentDraft().body'),'original');
+  assert.match(h.elements.get('bulkDiaryResult').textContent,/1件を日記へ変更/);
+  assert.equal(h.run('state.bulkAssigning'),false);
+});
