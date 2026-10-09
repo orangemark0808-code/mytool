@@ -1,13 +1,13 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-14';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-14';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-15';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-15';
 
-const VERSION = '2026-10-09-14';
+const VERSION = '2026-10-09-15';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
 const titleInput = $('titleInput'), bodyInput = $('bodyInput'), categorySelect = $('categorySelect'), noteStatusSelect = $('noteStatusSelect');
 const state = {
-  drafts: [], categories: [], currentId: null, user: null, view: 'list', mode: 'edit',
+  drafts: [], categories: [], currentId: null, editorDraftId: null, user: null, view: 'list', mode: 'edit',
   searchQuery: '', categoryFilter: 'all', noteStatusFilter: 'all', showTrash: false, history: [], historyIndex: -1, composing: false,
   previewDirty: true, saveTimers: new Map(), writes: new Map(), session: 0,
   remoteReady: false, categoriesReady: false, categoriesDirty: false, categoriesWriting: false,
@@ -15,6 +15,7 @@ const state = {
   storageFailed: false, storageReadFailed: false, syncError: false, categoryError: false,
   draftListenerFailed: false, categoryListenerFailed: false, listenerGeneration: 0,
   legacyImported: false, legacyReviewShown: false, snapshotCount: 0, serverDrafts: [], serverCategories: [], bulkAssigning: false,
+  selectedTrash: new Set(), purgeTargets: [], bulkPurging: false, visibleTrashIds: [], purgedIds: new Set(),
 };
 
 function currentDraft() { return state.drafts.find((draft) => draft.id === state.currentId); }
@@ -42,22 +43,35 @@ function loadAccount(uid) {
   if (!raw) return { drafts: [], categories: defaultCategories(), currentId: null };
   const saved = JSON.parse(raw);
   if (!Array.isArray(saved.ids)) throw new Error('Invalid local journal index');
-  return { ...saved, categories: normalizeCategories(saved.categories), drafts: saved.ids.map((id) => {
+  const purgedIds = Array.isArray(saved.purgedIds) ? saved.purgedIds : [];
+  return { ...saved, categories: normalizeCategories(saved.categories), drafts: saved.ids.filter((id) => !purgedIds.includes(id)).map((id) => {
     const value = localStorage.getItem(draftKey(uid, id));
     if (!value) throw new Error('A locally saved journal is missing');
     return normalizeDraft(JSON.parse(value), { id });
   }) };
 }
 // Write only the changed article on each keystroke, then its small account index.
-// Old article records and the legacy store are never erased by this migration.
+// The legacy store is never erased by migration. Explicit permanent deletion
+// removes only its account-owned article records through the separate helper.
 function persistLocal(changedIds = null) {
   if (!state.user || state.storageReadFailed) return false;
   try {
     const drafts = changedIds ? state.drafts.filter((draft) => changedIds.includes(draft.id)) : state.drafts;
     for (const draft of drafts) localStorage.setItem(draftKey(state.user.uid, draft.id), JSON.stringify(draft));
-    localStorage.setItem(storageKey(state.user.uid), JSON.stringify({ ids: state.drafts.map((draft) => draft.id), categories: state.categories, currentId: state.currentId, categoriesDirty: state.categoriesDirty, legacyImported: state.legacyImported }));
+    localStorage.setItem(storageKey(state.user.uid), JSON.stringify({ ids: state.drafts.map((draft) => draft.id), categories: state.categories, currentId: state.currentId, categoriesDirty: state.categoriesDirty, legacyImported: state.legacyImported, purgedIds: [...state.purgedIds] }));
     state.storageFailed = false; return true;
   } catch { state.storageFailed = true; refreshSyncStatus(); return false; }
+}
+function removeLocalDraftRecords(ids) {
+  for (const id of ids) { state.purgedIds.add(id); state.selectedTrash.delete(id); }
+  if (ids.includes(state.editorDraftId)) {
+    state.editorDraftId = null; titleInput.value = bodyInput.value = ''; resetHistory(); $('preview').innerHTML = ''; updatePreview();
+  }
+  if (!state.user || !persistLocal([])) return false;
+  try {
+    for (const id of ids) localStorage.removeItem(draftKey(state.user.uid, id));
+    return true;
+  } catch { state.storageFailed = true; return false; }
 }
 function refreshSyncStatus() {
   let text, kind = '';
@@ -71,7 +85,7 @@ function refreshSyncStatus() {
   else if (!state.remoteReady || !state.categoriesReady) text = '同期を確認中';
   else { text = 'クラウド同期済み'; kind = 'synced'; }
   for (const id of ['syncStatus', 'editorSyncStatus']) { if ($(id).textContent !== text) $(id).textContent = text; $(id).className = `${id === 'syncStatus' ? 'sync-status' : 'toolbar-save-status'} ${kind}`; }
-  updateBulkCategoryControls();
+  updateBulkCategoryControls(); updateTrashControls();
 }
 function remoteDraftsRef(uid = state.user.uid) { return state.firebase.collection(state.db, 'users', uid, 'blogEditorDrafts'); }
 // Existing account-owned metadata collection: no extra security permissions.
@@ -81,7 +95,7 @@ function queueSave(id, delay = 400) {
   state.saveTimers.set(id, setTimeout(() => { state.saveTimers.delete(id); void saveDraftById(id); }, delay));
 }
 async function saveDraftById(id) {
-  if (!state.user || !state.firebaseReady || !state.remoteReady || !navigator.onLine || state.storageReadFailed || state.writes.has(id)) return;
+  if (!state.user || !state.firebaseReady || !state.remoteReady || !navigator.onLine || state.storageReadFailed || state.writes.has(id) || state.purgedIds.has(id)) return;
   const draft = state.drafts.find((item) => item.id === id);
   if (!draft?.pendingSync || !persistLocal([id])) return;
   const sent = { ...draft }, uid = state.user.uid, session = state.session;
@@ -91,6 +105,10 @@ async function saveDraftById(id) {
     if (session !== state.session || state.user?.uid !== uid) return;
     const applied = applyWriteResult(state.drafts, sent, result, state.currentId);
     state.drafts = applied.drafts; state.currentId = applied.activeId; state.syncError = false;
+    if (state.view === 'editor' && state.currentId) state.editorDraftId = state.currentId;
+    if (result.kind === 'removed') {
+      removeLocalDraftRecords([sent.id]); toast('別端末で完全削除された記事のごみ箱データを除去しました');
+    }
     if (result.kind === 'conflict') {
       if (state.currentId === result.saved.id) titleInput.value = currentDraft().title;
       toast('別端末と競合したため、あなたの文章を別の下書きに保存しました');
@@ -166,14 +184,16 @@ function startRemoteSync() {
     if (!valid()) return;
     state.snapshotCount++;
     const authoritative = !snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites;
-    const remote = snapshot.docs.map((item) => normalizeDraft(item.data(), { remote: true, id: item.id }));
+    const remote = snapshot.docs.map((item) => normalizeDraft(item.data(), { remote: true, id: item.id })).filter((draft) => !state.purgedIds.has(draft.id));
     const previous = currentDraft(), visible = state.view === 'editor';
     const merged = reconcileDrafts(state.drafts, remote, { authoritative, activeId: visible ? state.currentId : null, writingIds: new Set(state.writes.keys()) });
     state.drafts = merged.drafts;
     const recovered = merged.recovered.find((item) => item.previousId === state.currentId);
-    if (recovered) { state.currentId = recovered.copy.id; titleInput.value = recovered.copy.title; toast('別端末で削除された記事を、復元用の下書きとして残しました'); }
+    if (recovered) { state.currentId = state.editorDraftId = recovered.copy.id; titleInput.value = recovered.copy.title; toast('別端末で削除された記事を、復元用の下書きとして残しました'); }
     if (authoritative) { state.remoteReady = true; state.syncError = false; state.serverDrafts = remote; }
+    if (state.currentId && !state.drafts.some((draft) => draft.id === state.currentId)) state.currentId = null;
     persistLocal();
+    if (merged.removedIds.length) removeLocalDraftRecords(merged.removedIds);
     const next = currentDraft();
     if (visible && previous && next && !next.deletedAt && contentKey(previous) !== contentKey(next) && !previous.pendingSync && !recovered) {
       const start = bodyInput.selectionStart, end = bodyInput.selectionEnd, scroll = bodyInput.scrollTop;
@@ -206,10 +226,12 @@ function stopSession() {
 }
 async function handleAuth(user) {
   if (state.user) persistLocal();
-  stopSession(); state.user = user; state.currentId = null; state.drafts = []; state.categories = [];
+  stopSession(); state.user = user; state.currentId = state.editorDraftId = null; state.drafts = []; state.categories = []; state.purgedIds.clear();
   state.remoteReady = state.categoriesReady = state.syncError = state.categoryError = state.storageFailed = state.storageReadFailed = false;
   state.legacyImported = state.categoriesDirty = state.showTrash = false;
   state.bulkAssigning = false; $('bulkDiaryResult').textContent = ''; $('bulkDiaryConfirmation').classList.add('hidden');
+  state.selectedTrash.clear(); state.purgeTargets = []; state.bulkPurging = false; state.visibleTrashIds = [];
+  $('purgeConfirmation').classList.add('hidden'); $('purgeTitles').innerHTML = ''; $('purgeResult').textContent = '';
   state.legacyReviewShown = false;
   state.serverDrafts = []; state.serverCategories = [];
   state.searchQuery = ''; state.categoryFilter = state.noteStatusFilter = 'all'; $('searchInput').value = '';
@@ -222,6 +244,7 @@ async function handleAuth(user) {
   }
   try {
     const account = loadAccount(user.uid); state.drafts = account.drafts; state.categories = account.categories;
+    state.purgedIds = new Set(Array.isArray(account.purgedIds) ? account.purgedIds.filter((id) => typeof id === 'string') : []);
     state.currentId = account.currentId || null; state.categoriesDirty = account.categoriesDirty || false; state.legacyImported = account.legacyImported || false;
   } catch { state.storageReadFailed = true; state.categories = defaultCategories(); toast('端末の保存データを読み込めませんでした。元データは保持しています'); }
   updateStorageUi(); showView('list'); updateMigrationPanel(); refreshSyncStatus(); startRemoteSync();
@@ -290,7 +313,7 @@ function updateBulkCategoryControls() {
   const count = uncategorizedDrafts().length;
   $('bulkDiaryButton').textContent = `未分類${count}件を日記へ変更`;
   const ready = migrationReady() && !state.categoriesDirty && !state.categoriesWriting && !state.writes.size && !state.drafts.some((draft) => draft.pendingSync);
-  $('bulkDiaryButton').disabled = state.bulkAssigning || !ready || !count;
+  $('bulkDiaryButton').disabled = state.bulkAssigning || state.bulkPurging || !ready || !count;
   $('bulkDiaryConfirmButton').disabled = $('bulkDiaryButton').disabled;
   if (!count) $('bulkDiaryConfirmation').classList.add('hidden');
   $('bulkDiaryCount').textContent = state.bulkAssigning ? 'カテゴリを変更しています…' : `ごみ箱を除く未分類の記事：${count}件。本文・タイトル・投稿状況は保持します。`;
@@ -386,7 +409,7 @@ function migrateLocal() {
       const draft = entry.draft;
       const current = state.drafts.find((item) => item.id === draft.id);
       if (current && current.title === draft.title && current.body === draft.body && current.category === draft.category) continue;
-      state.drafts.push(editedDraft(draft, { id: current ? crypto.randomUUID() : draft.id, baseVersion: null, title: current ? `${draft.title}（旧データ）` : draft.title, categoryName: categoryName(draft.category, draft.categoryName) }));
+      state.drafts.push(editedDraft(draft, { id: current || state.purgedIds.has(draft.id) ? crypto.randomUUID() : draft.id, baseVersion: null, title: current ? `${draft.title}（旧データ）` : draft.title, categoryName: categoryName(draft.category, draft.categoryName) }));
     }
     state.legacyImported = true; state.categoriesDirty = true;
     if (!persistLocal()) { state.legacyImported = false; return toast('端末に保存できません。旧データは保持しています'); }
@@ -446,7 +469,7 @@ function setEditorMode(mode, persist = true) {
   closeMore(); updateToolbarVisibility();
 }
 function showView(view) {
-  if (!state.user || state.bulkAssigning) return;
+  if (!state.user || state.bulkAssigning || state.bulkPurging) return;
   $('bulkDiaryConfirmation').classList.add('hidden');
   state.view = view; for (const name of ['editor', 'list', 'settings']) $(`${name}View`).classList.toggle('hidden', name !== view);
   $('draftsButton').classList.toggle('active', view === 'list'); $('settingsButton').classList.toggle('active', view === 'settings');
@@ -454,13 +477,13 @@ function showView(view) {
   closeMore(); updateToolbarVisibility();
 }
 function loadDraft(id) {
-  if (state.bulkAssigning) return;
+  if (state.bulkAssigning || state.bulkPurging) return;
   const draft = state.drafts.find((item) => item.id === id && !item.deletedAt); if (!draft) return;
-  state.currentId = id; titleInput.value = draft.title === '無題の記事' ? '' : draft.title; bodyInput.value = draft.body;
+  state.currentId = state.editorDraftId = id; titleInput.value = draft.title === '無題の記事' ? '' : draft.title; bodyInput.value = draft.body;
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([]); showView('editor'); bodyInput.focus({ preventScroll: true });
 }
 function newDraft() {
-  if (!state.user || state.bulkAssigning) return;
+  if (!state.user || state.bulkAssigning || state.bulkPurging) return;
   const now = new Date().toISOString();
   let categoriesChanged = false;
   for (const standard of defaultCategories()) {
@@ -473,7 +496,7 @@ function newDraft() {
   if (categoriesChanged) { state.categoriesDirty = true; void syncCategories(); }
   const diary = activeCategories().find((category) => category.name === '日記');
   const draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: '無題の記事', body: '', category: diary.id, categoryName: diary.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
-  state.drafts.unshift(draft); state.currentId = draft.id; titleInput.value = bodyInput.value = '';
+  state.drafts.unshift(draft); state.currentId = state.editorDraftId = draft.id; titleInput.value = bodyInput.value = '';
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); titleInput.focus();
 }
 function setListCategoryFilter(value) {
@@ -495,6 +518,67 @@ function draftTitleMarkup(draft) {
   const title = escapeHtml(draft.title);
   return state.showTrash ? `<span class="draft-title">${title}</span>` : `<button class="draft-title draft-title-button" type="button" data-edit="${escapeHtml(draft.id)}" title="記事を編集">${title}</button>`;
 }
+function purgeReady() {
+  return migrationReady() && state.firebaseReady && !state.storageReadFailed && !state.storageFailed && !state.bulkAssigning && !state.bulkPurging && !state.writes.size && !state.drafts.some((draft) => draft.pendingSync);
+}
+function updateTrashControls() {
+  const trashIds = new Set(state.drafts.filter((draft) => draft.deletedAt).map((draft) => draft.id));
+  state.selectedTrash = new Set([...state.selectedTrash].filter((id) => trashIds.has(id)));
+  const count = state.selectedTrash.size, busy = state.bulkPurging || state.bulkAssigning;
+  $('trashActions').classList.toggle('hidden', !state.showTrash);
+  $('trashSelectAll').checked = state.visibleTrashIds.length > 0 && state.visibleTrashIds.every((id) => state.selectedTrash.has(id));
+  $('trashSelectAll').indeterminate = state.visibleTrashIds.some((id) => state.selectedTrash.has(id)) && !$('trashSelectAll').checked;
+  $('trashSelectAll').disabled = busy || !state.visibleTrashIds.length;
+  $('purgeSelectedButton').textContent = `選択した${count}件を完全削除`;
+  $('purgeSelectedButton').disabled = !state.showTrash || !count || !purgeReady();
+  $('purgeConfirmButton').disabled = !state.showTrash || !state.purgeTargets.length || !purgeReady();
+  $('purgeCancelButton').disabled = busy;
+  $('trashSelectionStatus').textContent = state.bulkPurging ? '完全削除しています…' : `${count}件選択中${purgeReady() ? '' : '・オンラインで同期完了後に削除できます'}`;
+  if ((!state.showTrash || !count) && !state.bulkPurging) cancelPurge(false);
+}
+function cancelPurge(focus = true) {
+  if (state.bulkPurging) return;
+  state.purgeTargets = []; $('purgeConfirmation').classList.add('hidden'); $('purgeTitles').innerHTML = '';
+  if (focus) $('purgeSelectedButton').focus();
+}
+function requestPurge() {
+  if ($('purgeSelectedButton').disabled || !purgeReady()) return;
+  state.purgeTargets = state.drafts.filter((draft) => draft.deletedAt && state.selectedTrash.has(draft.id))
+    .map(({ id, title, deletedAt, baseVersion }) => ({ id, title, deletedAt, baseVersion }));
+  if (!state.purgeTargets.length) return;
+  $('purgeTitles').innerHTML = state.purgeTargets.map((draft) => `<li>${escapeHtml(draft.title)}</li>`).join('');
+  $('purgeConfirmButton').textContent = `${state.purgeTargets.length}件を完全削除する`;
+  $('purgeConfirmation').classList.remove('hidden'); updateTrashControls(); $('purgeCancelButton').focus();
+}
+async function purgeSelectedDrafts() {
+  if ($('purgeConfirmation').classList.contains('hidden') || $('purgeConfirmButton').disabled || !purgeReady()) return;
+  const targets = [...state.purgeTargets], session = state.session, uid = state.user.uid;
+  let deleted = 0, missing = 0, skipped = 0, failed = 0, localFailed = 0;
+  state.bulkPurging = true; renderList();
+  try {
+    for (const target of targets) {
+      if (session !== state.session) return;
+      try {
+        const result = await permanentlyDeleteDraft(state.firebase, remoteDraftsRef(uid), target);
+        if (session !== state.session) return;
+        if (result.kind === 'deleted' || result.kind === 'missing') {
+          result.kind === 'deleted' ? deleted++ : missing++;
+          state.drafts = state.drafts.filter((draft) => draft.id !== target.id);
+          state.serverDrafts = state.serverDrafts.filter((draft) => draft.id !== target.id);
+          if (state.currentId === target.id) state.currentId = null;
+          if (!removeLocalDraftRecords([target.id])) localFailed++;
+        } else { skipped++; state.selectedTrash.delete(target.id); }
+      } catch (error) { failed++; console.error('Permanent deletion failed:', error.code || error.name); }
+      $('purgeResult').textContent = `${deleted}件完全削除済み／${targets.length}件`;
+    }
+  } finally {
+    if (session === state.session) {
+      state.bulkPurging = false; cancelPurge(false); renderList(); refreshSyncStatus();
+      $('purgeResult').textContent = `${deleted}件を完全削除しました。${missing ? `すでに削除済みの${missing}件も端末から除去しました。` : ''}${skipped ? `別端末で復元・変更された${skipped}件は削除していません。確認し直してください。` : ''}${failed ? `${failed}件は削除できませんでした。元データを保持しています。` : ''}${localFailed ? 'クラウドからは削除しましたが、この端末の保存データを除去できませんでした。' : ''}`;
+      $('purgeSelectedButton').focus();
+    }
+  }
+}
 function renderList() {
   const query = state.searchQuery.trim().toLowerCase();
   renderListFilters();
@@ -504,23 +588,26 @@ function renderList() {
   if (!state.showTrash && state.categoryFilter !== 'all') drafts = drafts.filter((draft) => categoryBadgeKind(draft) === state.categoryFilter);
   if (!state.showTrash && state.categoryFilter === 'note' && state.noteStatusFilter !== 'all') drafts = drafts.filter((draft) => draft.noteStatus === state.noteStatusFilter);
   if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
+  state.visibleTrashIds = state.showTrash ? drafts.map((draft) => draft.id) : [];
   const trashCount = state.drafts.filter((draft) => draft.deletedAt).length;
   const trashLabel = state.showTrash ? 'Journal一覧へ' : `ごみ箱（${trashCount}件）`;
   $('trashButton').setAttribute('aria-label', trashLabel); $('trashButton').setAttribute('title', trashLabel); $('trashButton').setAttribute('aria-pressed', String(state.showTrash));
   $('trashNavIcon').classList.toggle('hidden', state.showTrash);
   $('backToListIcon').classList.toggle('hidden', !state.showTrash);
   $('trashCount').textContent = String(trashCount); $('trashCount').hidden = state.showTrash || trashCount === 0;
+  $('trashButton').disabled = state.bulkPurging; $('searchInput').disabled = state.bulkPurging;
   $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';
   $('listOrderDescription').textContent = state.showTrash ? '更新日の新しい順' : '作成日の新しい順';
-  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${draft.id === state.currentId ? 'active' : ''}"><div><div class="draft-title-row">${draftTitleMarkup(draft)}<span class="category-badge" data-category-kind="${categoryBadgeKind(draft)}">${escapeHtml(categoryName(draft.category, draft.categoryName))}</span>${isNoteDraft(draft, state.categories) ? `<span class="note-status-badge" data-note-status="${draft.noteStatus === 'published' ? 'published' : 'unpublished'}">${noteStatusLabel(draft)}</span>` : ''}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button">復元</button>` : `<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draft.title)}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}<span class="category-badge" data-category-kind="${categoryBadgeKind(draft)}">${escapeHtml(categoryName(draft.category, draft.categoryName))}</span>${isNoteDraft(draft, state.categories) ? `<span class="note-status-badge" data-note-status="${draft.noteStatus === 'published' ? 'published' : 'unpublished'}">${noteStatusLabel(draft)}</span>` : ''}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+  updateTrashControls();
 }
 function deleteDraft(id) {
-  const draft = state.drafts.find((item) => item.id === id); if (!draft) return;
+  const draft = state.drafts.find((item) => item.id === id); if (!draft || state.bulkPurging) return;
   const now = new Date().toISOString(); state.drafts = state.drafts.map((item) => item.id === id ? editedDraft(item, { deletedAt: now }, now) : item);
   if (state.currentId === id) state.currentId = null;
   persistLocal([id]); refreshSyncStatus(); queueSave(id); renderList(); toast('ごみ箱へ移しました。ごみ箱から復元できます');
 }
-function restoreDraft(id) { state.drafts = state.drafts.map((draft) => draft.id === id ? editedDraft(draft, { deletedAt: null }) : draft); persistLocal([id]); queueSave(id); refreshSyncStatus(); renderList(); toast('Journalを復元しました'); }
+function restoreDraft(id) { if (state.bulkPurging || state.purgedIds.has(id)) return; state.drafts = state.drafts.map((draft) => draft.id === id ? editedDraft(draft, { deletedAt: null }) : draft); persistLocal([id]); queueSave(id); refreshSyncStatus(); renderList(); toast('Journalを復元しました'); }
 
 async function copyMarkdown() {
   const value = exportMarkdown(titleInput.value, bodyInput.value);
@@ -589,7 +676,7 @@ $('logoutButton').addEventListener('click', logout); $('migrateLocalButton').add
 $('dismissLegacyButton').addEventListener('click', dismissLegacyNotice);
 $('reviewLegacyButton').addEventListener('click', () => { state.legacyImported = false; state.legacyReviewShown = false; persistLocal([]); updateMigrationPanel(); });
 $('retrySyncButton').addEventListener('click', retrySync); $('copyDiagnosticButton').addEventListener('click', copyDiagnostic);
-$('trashButton').addEventListener('click', () => { state.showTrash = !state.showTrash; renderList(); });
+$('trashButton').addEventListener('click', () => { if (state.bulkPurging || state.bulkAssigning) return; state.showTrash = !state.showTrash; state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = ''; renderList(); });
 $('draftList').addEventListener('click', (event) => {
   const button = event.target.closest('button'); if (!button) return;
   if (button.dataset.edit) { setEditorMode('edit'); loadDraft(button.dataset.edit); } if (button.dataset.restore) restoreDraft(button.dataset.restore);
@@ -598,7 +685,20 @@ $('draftList').addEventListener('click', (event) => {
 for (const [id, mode] of [['editTab', 'edit'], ['previewTab', 'preview'], ['splitTab', 'split']]) $(id).addEventListener('click', () => setEditorMode(mode));
 categorySelect.addEventListener('change', () => { updateNoteStatusControls(); scheduleSave(); });
 noteStatusSelect.addEventListener('change', scheduleSave);
-$('searchInput').addEventListener('input', (event) => { state.searchQuery = event.target.value; renderList(); });
+$('searchInput').addEventListener('input', (event) => { if (state.bulkPurging) return; state.searchQuery = event.target.value; state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = ''; renderList(); });
+$('draftList').addEventListener('change', (event) => {
+  const input = event.target.closest('[data-trash-select]'); if (!input || state.bulkPurging || !state.showTrash) return;
+  if (input.checked) state.selectedTrash.add(input.dataset.trashSelect); else state.selectedTrash.delete(input.dataset.trashSelect);
+  cancelPurge(false); $('purgeResult').textContent = ''; updateTrashControls();
+});
+$('trashSelectAll').addEventListener('change', (event) => {
+  if (state.bulkPurging || !state.showTrash) return;
+  for (const id of state.visibleTrashIds) event.target.checked ? state.selectedTrash.add(id) : state.selectedTrash.delete(id);
+  cancelPurge(false); $('purgeResult').textContent = ''; renderList();
+});
+$('purgeSelectedButton').addEventListener('click', requestPurge);
+$('purgeCancelButton').addEventListener('click', () => cancelPurge());
+$('purgeConfirmButton').addEventListener('click', purgeSelectedDrafts);
 $('listFilters').addEventListener('click', (event) => {
   const button = event.target.closest('button'); if (!button) return;
   if (button.dataset.categoryFilter) setListCategoryFilter(button.dataset.categoryFilter);

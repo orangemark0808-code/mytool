@@ -17,7 +17,7 @@ function harness() {
     if (!elements.has(id)) elements.set(id, { value: '', textContent: '', innerHTML: '', selectionStart: 0, selectionEnd: 0, scrollTop: 0, offsetHeight: 78, classList: classList(), style: { setProperty() {} }, setAttribute() {}, focus() {}, setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }, setRangeText(text, start, end) { this.value = this.value.slice(0, start) + text + this.value.slice(end); this.selectionStart = this.selectionEnd = start + text.length; }, addEventListener(name, fn) { events.set(`${id}:${name}`, fn); } });
     return elements.get(id);
   }
-  for (const id of ['editorView', 'listView', 'settingsView', 'bulkDiaryConfirmation']) element(id).classList.add('hidden');
+  for (const id of ['editorView', 'listView', 'settingsView', 'bulkDiaryConfirmation', 'purgeConfirmation']) element(id).classList.add('hidden');
   const document = { getElementById: element, querySelector: element, documentElement: element('root'), body: { dataset: {}, classList: classList() }, addEventListener(name, fn) { events.set(`document:${name}`, fn); } };
   const window = { innerHeight: 844, matchMedia: () => ({ matches: false }), addEventListener(name, fn) { events.set(`window:${name}`, fn); } };
   const firebase = {
@@ -25,7 +25,7 @@ function harness() {
     doc: (_db, ...parts) => ({ path: parts.join('/') }),
     onSnapshot(ref, _options, callback, failure) { listeners.set(ref.path, { callback, failure }); return () => {}; },
   };
-  const context = vm.createContext({ ...core, ...markdown, document, window, navigator: { onLine: true }, localStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) }, crypto, console: { error() {} }, Date, Intl, confirm: () => true, setTimeout(fn) { timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); } });
+  const context = vm.createContext({ ...core, ...markdown, document, window, navigator: { onLine: true }, localStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) }, crypto, console: { error() {} }, Date, Intl, confirm: () => true, setTimeout(fn) { timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); } });
   vm.runInContext(source, context);
   const run = (code) => vm.runInContext(code, context);
   context.testFirebase = firebase;
@@ -343,4 +343,91 @@ test('bulk diary operation reports changes and preserves other classifications',
   assert.equal(h.run('currentDraft().body'),'original');
   assert.match(h.elements.get('bulkDiaryResult').textContent,/1件を日記へ変更/);
   assert.equal(h.run('state.bulkAssigning'),false);
+});
+
+function purgeHarness(fail = false) {
+  const h = harness();
+  const articles = [
+    core.normalizeDraft({ ...h.draft, id: 'trash-one', title: 'Trash <one>', deletedAt: '2026-10-09T00:00:00Z' }, { remote: true }),
+    core.normalizeDraft({ ...h.draft, id: 'trash-two', title: 'Unselected trash', deletedAt: '2026-10-09T00:00:00Z' }, { remote: true }),
+    core.normalizeDraft({ ...h.draft, id: 'active', title: 'Active article' }, { remote: true }),
+  ];
+  const records = new Map(articles.map((article) => [article.id, structuredClone(article)])), deleted = [];
+  h.context.purgeArticles = articles;
+  h.context.testFirebase.doc = (source, ...parts) => source.firestore ? { id: parts[0] } : { path: parts.join('/') };
+  h.context.testFirebase.runTransaction = async (_db, callback) => {
+    if (fail) throw new Error('Test-only denied deletion');
+    return callback({
+      get: async ({ id }) => ({ id, exists: () => records.has(id), data: () => records.get(id) }),
+      delete: ({ id }) => { records.delete(id); deleted.push(id); },
+    });
+  };
+  h.run("state.drafts=purgeArticles;state.currentId=null;state.showTrash=true;state.view='list';state.firebaseReady=state.remoteReady=state.categoriesReady=true;persistLocal();renderList();");
+  return { h, records, deleted };
+}
+
+test('selected permanent deletion requires review, cancels safely, and removes only chosen cloud/local records', async () => {
+  const { h, records, deleted } = purgeHarness();
+  const otherAccount = `${core.storageKey('account-b')}:draft:trash-one`;
+  h.storage.set(otherAccount, 'other account content');
+  const input = { dataset: { trashSelect: 'trash-one' }, checked: true };
+  h.events.get('draftList:change')({ target: { closest: () => input } });
+  await h.run('purgeSelectedDrafts();'); assert.equal(deleted.length, 0);
+  h.events.get('purgeSelectedButton:click')();
+  assert.match(h.elements.get('purgeTitles').innerHTML, /Trash &lt;one&gt;/);
+  h.events.get('purgeCancelButton:click')();
+  await h.events.get('purgeConfirmButton:click')(); assert.equal(deleted.length, 0);
+  h.events.get('purgeSelectedButton:click')();
+  h.run("state.editorDraftId='trash-one';bodyInput.value='hidden old article';resetHistory();");
+  await h.events.get('purgeConfirmButton:click')();
+  assert.deepEqual(deleted, ['trash-one']);
+  assert.equal(records.has('trash-two'), true); assert.equal(records.has('active'), true);
+  assert.equal(h.storage.has(`${core.storageKey('account-a')}:draft:trash-one`), false);
+  assert.equal(h.storage.get(otherAccount), 'other account content');
+  const index = JSON.parse(h.storage.get(core.storageKey('account-a')));
+  assert.ok(!index.ids.includes('trash-one')); assert.ok(index.purgedIds.includes('trash-one'));
+  assert.equal(h.elements.get('bodyInput').value, '');
+  assert.equal(h.elements.get('purgeTitles').innerHTML, '');
+  assert.match(h.elements.get('purgeResult').textContent, /1件を完全削除/);
+});
+
+test('offline or failed permanent deletion keeps the selected article and its local content', async () => {
+  const { h, records, deleted } = purgeHarness(true);
+  h.run("state.selectedTrash.add('trash-one');navigator.onLine=false;renderList();");
+  assert.equal(h.elements.get('purgeSelectedButton').disabled, true);
+  h.run('navigator.onLine=true;renderList();requestPurge();');
+  await h.run('purgeSelectedDrafts();');
+  assert.equal(deleted.length, 0); assert.equal(records.has('trash-one'), true);
+  assert.equal(h.run("state.drafts.some(d=>d.id==='trash-one')"), true);
+  assert.equal(h.storage.has(`${core.storageKey('account-a')}:draft:trash-one`), true);
+  assert.match(h.elements.get('purgeResult').textContent, /元データを保持/);
+});
+
+test('concurrently restored article is not purged and changing accounts clears deletion review', async () => {
+  const { h, records, deleted } = purgeHarness();
+  h.run("state.selectedTrash.add('trash-one');renderList();requestPurge();");
+  records.get('trash-one').deletedAt = null;
+  await h.run('purgeSelectedDrafts();');
+  assert.equal(deleted.length, 0); assert.equal(records.has('trash-one'), true);
+  assert.match(h.elements.get('purgeResult').textContent, /復元・変更された1件/);
+  h.run("state.selectedTrash.add('trash-two');renderList();requestPurge();");
+  await h.run("handleAuth({uid:'account-b'});");
+  assert.equal(h.run('state.purgeTargets.length'), 0);
+  assert.equal(h.run('state.selectedTrash.size'), 0);
+  assert.equal(h.elements.get('purgeConfirmation').classList.contains('hidden'), true);
+  assert.equal(h.elements.get('purgeTitles').innerHTML, '');
+});
+
+test('confirmed purge on another device removes local trash and subsequent stale cache cannot bring it back', () => {
+  const h = harness();
+  const trash = core.normalizeDraft({ ...h.draft, deletedAt: '2026-10-09T00:00:00Z' }, { remote: true });
+  h.context.trashFixture = trash;
+  h.run('state.drafts=[trashFixture];state.currentId=null;persistLocal();startRemoteSync();');
+  h.articleSnapshot([], true);
+  assert.equal(h.run('state.drafts.length'), 1);
+  h.articleSnapshot([]);
+  assert.equal(h.run('state.drafts.length'), 0);
+  assert.equal(h.storage.has(`${core.storageKey('account-a')}:draft:d`), false);
+  h.articleSnapshot([trash], true);
+  assert.equal(h.run('state.drafts.length'), 0);
 });

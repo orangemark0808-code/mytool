@@ -10,14 +10,16 @@ const fixture = `state.user={uid:'local-fixture'};state.categories=defaultCatego
 http.createServer(async (request, response) => {
   const requestUrl = new URL(request.url, 'http://localhost');
   const name = requestUrl.pathname.slice(1) || 'index.html';
-  const scenario = ['legacy-matched', 'legacy-difference', 'badges'].includes(requestUrl.searchParams.get('scenario')) ? requestUrl.searchParams.get('scenario') : null;
+  const scenario = ['legacy-matched', 'legacy-difference', 'badges', 'trash'].includes(requestUrl.searchParams.get('scenario')) ? requestUrl.searchParams.get('scenario') : null;
   if (!files.has(name)) { response.writeHead(404); response.end('Not found'); return; }
   try {
     let text = await readFile(join(root, name), 'utf8');
     if (name === 'index.html') text = text.replace(/\s*<script src="firebase-config(?:\.local)?\.js"><\/script>/g, '');
     if (name === 'index.html' && scenario) text = text.replace(/(src="script\.js\?v=[0-9-]+)"/, `$1&scenario=${scenario}"`);
     if (name === 'script.js') {
-      const extra = scenario === 'badges'
+      const extra = scenario === 'trash'
+        ? `state.drafts=[['trash-one','削除確認サンプルA','journal-diary','unpublished'],['trash-two','削除確認サンプルB','journal-note','published'],['trash-three','残す記事サンプルC','journal-diary','unpublished'],['active-sample','一覧に残す記事','journal-diary','unpublished']].map(([id,title,category,noteStatus])=>normalizeDraft({...state.drafts[0],id,title,category,noteStatus,deletedAt:id==='active-sample'?null:'2026-10-09T00:00:00Z',body:'動作確認用の架空の記事です。実際のJournalは使用していません。'},{remote:true}));const mockRecords=new Map(state.drafts.map(d=>[d.id,{...d}]));state.firebase={collection:()=>({firestore:{}}),doc:(_ref,id)=>({id}),runTransaction:async(_db,fn)=>{const staged=[];const result=await fn({get:async({id})=>({id,exists:()=>mockRecords.has(id),data:()=>mockRecords.get(id)}),delete:({id})=>staged.push(()=>mockRecords.delete(id)),set:({id},record)=>staged.push(()=>mockRecords.set(id,{...record}))});staged.forEach(commit=>commit());return result;}};state.firebaseReady=true;state.db={};state.serverDrafts=state.drafts.map(d=>({...d}));state.currentId=state.editorDraftId=null;state.showTrash=true;showView('list');refreshSyncStatus();`
+        : scenario === 'badges'
         ? `state.drafts=[['diary','日記のサンプル','journal-diary','unpublished','2026-10-03T00:00:00Z','2026-10-09T00:00:00Z'],['note-draft','note用の下書き','journal-note','unpublished','2026-10-08T00:00:00Z','2026-10-08T00:00:00Z'],['note-posted','note用の投稿済記事','journal-note','published','2026-10-06T00:00:00Z','2026-10-06T00:00:00Z']].map(([id,title,category,noteStatus,createdAt,updatedAt])=>normalizeDraft({...state.drafts[0],id,title,category,noteStatus,createdAt,updatedAt,body:'タグの色と並び順を確認するための架空の記事です。'},{remote:true}));state.currentId=null;showView('list');`
         : scenario ? `state.serverDrafts=state.drafts.map(d=>normalizeDraft(d,{remote:true}));state.serverCategories=defaultCategories();readArray=key=>key===LEGACY_KEYS.drafts?[${scenario === 'legacy-matched' ? '{...state.drafts[0]}' : "{...state.drafts[0],title:'スマホに残った旧記事',body:'この端末だけに残った架空の文章です。'}"}]:key===LEGACY_KEYS.categories?defaultCategories():[];showView('settings');updateMigrationPanel();` : '';
       text = text.replace('void setupFirebase();', fixture + extra);

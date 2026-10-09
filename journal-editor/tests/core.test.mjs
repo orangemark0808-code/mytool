@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { storageKey, normalizeDraft, remotePayload, remoteVersion, contentKey, editedDraft, reconcileDrafts, writeDraftTransaction, assignUncategorizedToDiary, applyWriteResult, defaultCategories, orderedCategories, isNoteDraft, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
+import { storageKey, normalizeDraft, remotePayload, remoteVersion, contentKey, editedDraft, reconcileDrafts, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, applyWriteResult, defaultCategories, orderedCategories, isNoteDraft, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
 import { markdownToHtml } from '../markdown.mjs';
 
 function remote(body = 'server text', extra = {}) {
@@ -15,8 +15,9 @@ function fakeFirestore(initial) {
       const staged = [], result = await callback({
         get: async ({ id }) => ({ id, exists: () => data.has(id), data: () => structuredClone(data.get(id)) }),
         set: ({ id }, value) => staged.push([id, structuredClone(value)]),
+        delete: ({ id }) => staged.push([id, null]),
       });
-      for (const [id, value] of staged) { data.set(id, value); writes.push({ id, value }); }
+      for (const [id, value] of staged) { value === null ? data.delete(id) : data.set(id, value); writes.push({ id, value }); }
       return result;
     },
   };
@@ -110,6 +111,51 @@ test('deletion stores server text in a reversible tombstone', async () => {
   const restoreResult = await writeDraftTransaction(fake.firebase, fake.collection, restored);
   assert.equal(restoreResult.saved.deletedAt, null);
   assert.equal(restoreResult.saved.body, 'latest server text');
+});
+
+test('permanent deletion removes only an unchanged reviewed trash record', async () => {
+  const trash = remote('trash text', { deletedAt: '2026-10-09T00:00:00Z' });
+  const fake = fakeFirestore(trash);
+  const result = await permanentlyDeleteDraft(fake.firebase, fake.collection, trash);
+  assert.equal(result.kind, 'deleted');
+  assert.equal(fake.data.has('article'), false);
+  assert.equal(fake.writes.length, 1);
+});
+
+test('permanent deletion refuses restored, changed, or unreviewed articles and tolerates missing records', async () => {
+  const reviewed = remote('trash text', { deletedAt: '2026-10-09T00:00:00Z' });
+  for (const [server, expected, reason] of [
+    [remote(), reviewed, 'restored'],
+    [remote('new text', { deletedAt: reviewed.deletedAt, revision: 'changed' }), reviewed, 'changed'],
+    [reviewed, remote(), 'changed'],
+    [null, reviewed, 'missing'],
+  ]) {
+    const fake = fakeFirestore(server);
+    const result = await permanentlyDeleteDraft(fake.firebase, fake.collection, expected);
+    assert.equal(result.kind, reason);
+    assert.equal(fake.writes.length, 0);
+  }
+});
+
+test('delayed soft deletion cannot recreate a permanently removed record', async () => {
+  const sent = editedDraft(remote(), { deletedAt: '2026-10-09T00:00:00Z' });
+  const fake = fakeFirestore(null);
+  const result = await writeDraftTransaction(fake.firebase, fake.collection, sent);
+  assert.equal(result.kind, 'removed'); assert.equal(fake.writes.length, 0);
+  assert.equal(applyWriteResult([sent], sent, result, null).drafts.length, 0);
+  const newlyRestored = editedDraft(sent, { deletedAt: null, body: 'explicit newer restore' });
+  const applied = applyWriteResult([newlyRestored], sent, result, 'article');
+  assert.equal(applied.drafts.length, 1); assert.notEqual(applied.drafts[0].id, 'article');
+  assert.equal(applied.drafts[0].body, 'explicit newer restore');
+});
+
+test('only confirmed server absence removes settled trash; cached absence and pending writes retain it', () => {
+  const trash = remote('trash text', { deletedAt: '2026-10-09T00:00:00Z' });
+  assert.equal(reconcileDrafts([trash], [], { authoritative: false }).drafts.length, 1);
+  assert.equal(reconcileDrafts([editedDraft(trash, {})], [], { authoritative: true }).drafts.length, 1);
+  assert.equal(reconcileDrafts([trash], [], { authoritative: true, writingIds: new Set(['article']) }).drafts.length, 1);
+  const result = reconcileDrafts([trash], [], { authoritative: true });
+  assert.equal(result.drafts.length, 0); assert.deepEqual(result.removedIds, ['article']);
 });
 test('default category IDs are stable on all devices; empty/deleted categories remain deleted', () => {
   assert.deepEqual(defaultCategories(), defaultCategories());

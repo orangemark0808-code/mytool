@@ -66,10 +66,13 @@ export function reconcileDrafts(local, remote, { authoritative = false, activeId
     if (!authoritative || current.pendingSync || writingIds.has(current.id)) continue;
     merged.set(incoming.id, incoming);
   }
-  const recovered = [];
+  const recovered = [], removedIds = [];
   if (authoritative) {
     for (const draft of local) {
       const incoming = remoteById.get(draft.id);
+      if (!incoming && draft.deletedAt && draft.baseVersion && !draft.pendingSync && !writingIds.has(draft.id)) {
+        merged.delete(draft.id); removedIds.push(draft.id); continue;
+      }
       const deleted = incoming?.deletedAt || (!remoteById.has(draft.id) && draft.baseVersion);
       if (!deleted || draft.deletedAt || draft.pendingSync || writingIds.has(draft.id)) continue;
       if (draft.id === activeId) {
@@ -77,10 +80,10 @@ export function reconcileDrafts(local, remote, { authoritative = false, activeId
         merged.set(copy.id, copy);
         recovered.push({ previousId: draft.id, copy });
       }
-      if (!incoming) merged.delete(draft.id);
+      if (!incoming) { merged.delete(draft.id); removedIds.push(draft.id); }
     }
   }
-  return { drafts: [...merged.values()], recovered };
+  return { drafts: [...merged.values()], recovered, removedIds };
 }
 
 export function recoveryCopy(draft, suffix = '競合コピー', id = crypto.randomUUID()) {
@@ -99,6 +102,8 @@ export async function writeDraftTransaction(firebase, collectionRef, draft) {
     const ref = firebase.doc(collectionRef, draft.id);
     const snapshot = await transaction.get(ref);
     const current = snapshot.exists() ? normalizeDraft(snapshot.data(), { remote: true, id: snapshot.id || draft.id }) : null;
+    // A delayed soft-delete must not recreate an article already purged elsewhere.
+    if (!current && draft.deletedAt && draft.baseVersion) return { kind: 'removed', id: draft.id };
     const unchanged = current && remoteVersion(current) === draft.baseVersion;
     const sameContent = current && contentKey(current) === contentKey(draft);
     const conflict = current ? !unchanged && !sameContent : Boolean(draft.baseVersion);
@@ -133,9 +138,31 @@ export async function assignUncategorizedToDiary(firebase, collectionRef, catego
   });
 }
 
+// Delete only the reviewed, unchanged trash record. Never delete an active or
+// concurrently restored/edited article, and never write a replacement record.
+export async function permanentlyDeleteDraft(firebase, collectionRef, expected) {
+  return firebase.runTransaction(collectionRef.firestore, async (transaction) => {
+    const ref = firebase.doc(collectionRef, expected.id), snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) return { kind: 'missing' };
+    const current = normalizeDraft(snapshot.data(), { remote: true, id: snapshot.id || expected.id });
+    if (!current.deletedAt) return { kind: 'restored' };
+    if (!expected.deletedAt || remoteVersion(current) !== expected.baseVersion) return { kind: 'changed' };
+    transaction.delete(ref);
+    return { kind: 'deleted' };
+  });
+}
+
 export function applyWriteResult(drafts, sent, result, activeId) {
   const live = drafts.find((draft) => draft.id === sent.id);
   if (!live) return { drafts, activeId };
+  if (result.kind === 'removed') {
+    const next = drafts.filter((draft) => draft.id !== sent.id);
+    if (!live.deletedAt) {
+      const copy = recoveryCopy(live, '復元'); next.push(copy);
+      return { drafts: next, activeId: activeId === sent.id ? copy.id : activeId };
+    }
+    return { drafts: next, activeId: activeId === sent.id ? null : activeId };
+  }
   if (result.kind === 'saved') {
     const next = live.revision === sent.revision ? result.saved : { ...live, baseVersion: remoteVersion(result.saved), pendingSync: true };
     return { drafts: drafts.map((draft) => draft.id === sent.id ? next : draft), activeId };

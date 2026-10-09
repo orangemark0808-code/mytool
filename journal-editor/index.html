@@ -7,8 +7,8 @@
     <title>Journal Editor</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Cpath d='M23 17h20M37 17v25a10 10 0 0 1-20 0' fill='none' stroke='white' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=2026-10-09-14" />
-    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-14" />
+    <link rel="stylesheet" href="style.css?v=2026-10-09-15" />
+    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-15" />
   </head>
   <body>
     <header class="app-header">
@@ -95,6 +95,18 @@
           <div class="list-filter-group" role="group" aria-label="カテゴリで絞り込み"><button id="filterAll" type="button" data-category-filter="all" aria-pressed="true">すべて</button><button id="filterDiary" type="button" data-category-filter="diary" aria-pressed="false">日記</button><button id="filterNote" type="button" data-category-filter="note" aria-pressed="false">note用</button></div>
           <div id="listNoteFilters" class="list-filter-group hidden" role="group" aria-label="投稿状況で絞り込み"><button id="filterNoteAll" type="button" data-note-filter="all" aria-pressed="true">すべて</button><button id="filterUnpublished" type="button" data-note-filter="unpublished" aria-pressed="false">未投稿</button><button id="filterPublished" type="button" data-note-filter="published" aria-pressed="false">投稿済</button></div>
         </div>
+        <div id="trashActions" class="trash-actions hidden">
+          <label class="trash-select-all"><input id="trashSelectAll" type="checkbox" />表示中の記事をすべて選択</label>
+          <span id="trashSelectionStatus" class="trash-selection-status" role="status" aria-live="polite">0件選択中</span>
+          <button id="purgeSelectedButton" class="danger-button" type="button" disabled>選択した0件を完全削除</button>
+        </div>
+        <section id="purgeConfirmation" class="purge-confirmation hidden" aria-labelledby="purgeHeading">
+          <h2 id="purgeHeading">選択した記事を完全削除しますか？</h2>
+          <p>削除後は復元できません。この端末とクラウドの記事を削除し、別端末のごみ箱からも同期後に消えます。バックアップなどの別コピーは残ります。</p>
+          <ul id="purgeTitles"></ul>
+          <div class="settings-actions"><button id="purgeCancelButton" class="secondary-button" type="button">キャンセル</button><button id="purgeConfirmButton" class="danger-button" type="button" disabled>完全削除する</button></div>
+        </section>
+        <p id="purgeResult" class="purge-result" role="status" aria-live="polite"></p>
         <div id="legacyNotice" class="legacy-notice hidden"><span id="legacyNoticeMessage">この端末の旧データをクラウドと照合しています。</span><button id="legacySettingsButton" class="secondary-button" type="button">取り込みを確認</button></div>
         <div class="draft-list" id="draftList"></div>
       </section>
@@ -121,6 +133,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="firebase-config.js"></script>
     <script src="firebase-config.local.js"></script>
-    <script type="module" src="script.js?v=2026-10-09-14"></script>
+    <script type="module" src="script.js?v=2026-10-09-15"></script>
   </body>
 </html>
