@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-15';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-15';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-16';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-16';
 
-const VERSION = '2026-10-09-15';
+const VERSION = '2026-10-09-16';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -15,7 +15,7 @@ const state = {
   storageFailed: false, storageReadFailed: false, syncError: false, categoryError: false,
   draftListenerFailed: false, categoryListenerFailed: false, listenerGeneration: 0,
   legacyImported: false, legacyReviewShown: false, snapshotCount: 0, serverDrafts: [], serverCategories: [], bulkAssigning: false,
-  selectedTrash: new Set(), purgeTargets: [], bulkPurging: false, visibleTrashIds: [], purgedIds: new Set(),
+  selectedTrash: new Set(), purgeTargets: [], bulkPurging: false, visibleTrashIds: [], purgedIds: new Set(), listTagEditor: null,
 };
 
 function currentDraft() { return state.drafts.find((draft) => draft.id === state.currentId); }
@@ -231,6 +231,7 @@ async function handleAuth(user) {
   state.legacyImported = state.categoriesDirty = state.showTrash = false;
   state.bulkAssigning = false; $('bulkDiaryResult').textContent = ''; $('bulkDiaryConfirmation').classList.add('hidden');
   state.selectedTrash.clear(); state.purgeTargets = []; state.bulkPurging = false; state.visibleTrashIds = [];
+  state.listTagEditor = null;
   $('purgeConfirmation').classList.add('hidden'); $('purgeTitles').innerHTML = ''; $('purgeResult').textContent = '';
   state.legacyReviewShown = false;
   state.serverDrafts = []; state.serverCategories = [];
@@ -470,6 +471,7 @@ function setEditorMode(mode, persist = true) {
 }
 function showView(view) {
   if (!state.user || state.bulkAssigning || state.bulkPurging) return;
+  state.listTagEditor = null;
   $('bulkDiaryConfirmation').classList.add('hidden');
   state.view = view; for (const name of ['editor', 'list', 'settings']) $(`${name}View`).classList.toggle('hidden', name !== view);
   $('draftsButton').classList.toggle('active', view === 'list'); $('settingsButton').classList.toggle('active', view === 'settings');
@@ -501,11 +503,13 @@ function newDraft() {
 }
 function setListCategoryFilter(value) {
   if (!['all', 'diary', 'note'].includes(value)) return;
+  state.listTagEditor = null;
   if (state.categoryFilter !== value) state.noteStatusFilter = 'all';
   state.categoryFilter = value; renderList();
 }
 function setListNoteFilter(value) {
   if (state.categoryFilter !== 'note' || !['all', 'unpublished', 'published'].includes(value)) return;
+  state.listTagEditor = null;
   state.noteStatusFilter = value; renderList();
 }
 function renderListFilters() {
@@ -517,6 +521,62 @@ function renderListFilters() {
 function draftTitleMarkup(draft) {
   const title = escapeHtml(draft.title);
   return state.showTrash ? `<span class="draft-title">${title}</span>` : `<button class="draft-title draft-title-button" type="button" data-edit="${escapeHtml(draft.id)}" title="記事を編集">${title}</button>`;
+}
+function listTagId(id, kind, part) { return `list-tag-${part}-${kind}-${encodeURIComponent(id)}`; }
+function listTagMarkup(draft, kind) {
+  const category = kind === 'category';
+  if (!category && !isNoteDraft(draft, state.categories)) return '';
+  const label = category ? categoryName(draft.category, draft.categoryName) : noteStatusLabel(draft);
+  const badge = `<span class="${category ? 'category-badge' : 'note-status-badge'}" ${category ? `data-category-kind="${categoryBadgeKind(draft)}"` : `data-note-status="${draft.noteStatus === 'published' ? 'published' : 'unpublished'}"`}>${escapeHtml(label)}`;
+  if (state.showTrash) return `${badge}</span>`;
+  const open = state.listTagEditor?.id === draft.id && state.listTagEditor.kind === kind;
+  const selectId = listTagId(draft.id, kind, 'select');
+  const disabled = state.bulkAssigning || state.bulkPurging || state.storageReadFailed;
+  let options = '';
+  if (open) {
+    if (category) {
+      const categories = activeCategories();
+      options = categories.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.category ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
+      if (draft.category && !categories.some((item) => item.id === draft.category)) options += `<option value="${escapeHtml(draft.category)}" selected>${escapeHtml(label)}（確認待ち）</option>`;
+      options += `<option value="" ${!draft.category ? 'selected' : ''}>未分類</option>`;
+    } else options = `<option value="unpublished" ${draft.noteStatus !== 'published' ? 'selected' : ''}>未投稿</option><option value="published" ${draft.noteStatus === 'published' ? 'selected' : ''}>投稿済</option>`;
+  }
+  return `<div class="list-tag-field"><button id="${escapeHtml(listTagId(draft.id, kind, 'trigger'))}" class="list-tag-button" type="button" data-open-list-tag="${escapeHtml(draft.id)}" data-tag-kind="${kind}" title="${category ? 'カテゴリ' : '投稿状況'}を変更" aria-label="${category ? 'カテゴリ' : '投稿状況'}を変更：${escapeHtml(label)}" aria-expanded="${open}" ${open ? `aria-controls="${escapeHtml(selectId)}"` : ''} ${disabled ? 'disabled' : ''}>${badge}<svg class="tag-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></span></button>${open ? `<div class="list-tag-popover" role="group" aria-label="${category ? 'カテゴリ' : '投稿状況'}を変更"><select id="${escapeHtml(selectId)}" data-list-tag-select="${escapeHtml(draft.id)}" data-tag-kind="${kind}" aria-label="${escapeHtml(draft.title)}の${category ? 'カテゴリ' : '投稿状況'}">${options}</select><button class="secondary-button" type="button" data-close-list-tag="true">閉じる</button></div>` : ''}</div>`;
+}
+function openListTagEditor(id, kind) {
+  const draft = state.drafts.find((item) => item.id === id && !item.deletedAt);
+  if (!draft || !state.user || state.showTrash || state.bulkAssigning || state.bulkPurging || state.storageReadFailed || !['category', 'status'].includes(kind)) return;
+  if (kind === 'status' && !isNoteDraft(draft, state.categories)) return;
+  if (state.listTagEditor?.id === id && state.listTagEditor.kind === kind) return closeListTagEditor();
+  state.listTagEditor = { id, kind }; renderList(); $(listTagId(id, kind, 'select'))?.focus({ preventScroll: false });
+}
+function focusListTag(id, kind) {
+  const filter = state.categoryFilter === 'note' ? 'filterNote' : state.categoryFilter === 'diary' ? 'filterDiary' : 'filterAll';
+  (document.getElementById(listTagId(id, kind, 'trigger')) || $(filter))?.focus({ preventScroll: true });
+}
+function closeListTagEditor(focus = true) {
+  const editor = state.listTagEditor; state.listTagEditor = null; renderList();
+  if (editor && focus) focusListTag(editor.id, editor.kind);
+}
+function changeListTag(id, kind, value) {
+  const draft = state.drafts.find((item) => item.id === id && !item.deletedAt);
+  if (!draft || !state.user || state.showTrash || state.bulkAssigning || state.bulkPurging || state.storageReadFailed || state.purgedIds.has(id)) return;
+  let changes, message;
+  if (kind === 'category') {
+    if (value && !activeCategories().some((item) => item.id === value) && value !== draft.category) return toast('カテゴリが変更・削除されています。選択し直してください');
+    if ((value || null) === draft.category) return closeListTagEditor();
+    changes = { category: value || null, categoryName: value ? categoryName(value) : '' };
+    message = `カテゴリを${value ? changes.categoryName : '未分類'}に変更しました`;
+  } else if (kind === 'status' && isNoteDraft(draft, state.categories) && ['unpublished', 'published'].includes(value)) {
+    if (value === draft.noteStatus) return closeListTagEditor();
+    changes = { noteStatus: value }; message = `投稿状況を${value === 'published' ? '投稿済' : '未投稿'}に変更しました`;
+  } else return;
+  state.drafts = state.drafts.map((item) => item.id === id ? editedDraft(item, changes) : item);
+  state.listTagEditor = null;
+  const saved = persistLocal([id]);
+  if (state.currentId === id) { renderCategoryOptions(changes.category === undefined ? currentDraft().category : changes.category); updateDraftTimestamps(); }
+  renderList(); refreshSyncStatus(); if (saved) queueSave(id);
+  focusListTag(id, kind); toast(saved ? message : '端末に保存できません。同期せず変更を保持しています');
 }
 function purgeReady() {
   return migrationReady() && state.firebaseReady && !state.storageReadFailed && !state.storageFailed && !state.bulkAssigning && !state.bulkPurging && !state.writes.size && !state.drafts.some((draft) => draft.pendingSync);
@@ -588,6 +648,7 @@ function renderList() {
   if (!state.showTrash && state.categoryFilter !== 'all') drafts = drafts.filter((draft) => categoryBadgeKind(draft) === state.categoryFilter);
   if (!state.showTrash && state.categoryFilter === 'note' && state.noteStatusFilter !== 'all') drafts = drafts.filter((draft) => draft.noteStatus === state.noteStatusFilter);
   if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
+  if (state.listTagEditor && !drafts.some((draft) => draft.id === state.listTagEditor.id && !draft.deletedAt && (state.listTagEditor.kind === 'category' || isNoteDraft(draft, state.categories)))) state.listTagEditor = null;
   state.visibleTrashIds = state.showTrash ? drafts.map((draft) => draft.id) : [];
   const trashCount = state.drafts.filter((draft) => draft.deletedAt).length;
   const trashLabel = state.showTrash ? 'Journal一覧へ' : `ごみ箱（${trashCount}件）`;
@@ -598,7 +659,7 @@ function renderList() {
   $('trashButton').disabled = state.bulkPurging; $('searchInput').disabled = state.bulkPurging;
   $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';
   $('listOrderDescription').textContent = state.showTrash ? '更新日の新しい順' : '作成日の新しい順';
-  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draft.title)}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}<span class="category-badge" data-category-kind="${categoryBadgeKind(draft)}">${escapeHtml(categoryName(draft.category, draft.categoryName))}</span>${isNoteDraft(draft, state.categories) ? `<span class="note-status-badge" data-note-status="${draft.noteStatus === 'published' ? 'published' : 'unpublished'}">${noteStatusLabel(draft)}</span>` : ''}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draft.title)}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}${listTagMarkup(draft, 'category')}${listTagMarkup(draft, 'status')}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
   updateTrashControls();
 }
 function deleteDraft(id) {
@@ -660,7 +721,10 @@ const toolbarWrap = document.querySelector('.toolbar-wrap');
 toolbarWrap.addEventListener('pointerdown', (event) => { if (event.target.closest('button') && document.activeElement === bodyInput) event.preventDefault(); });
 toolbarWrap.addEventListener('click', (event) => { const action = event.target.closest('[data-action]')?.dataset.action; if (action) { toolbar(action); closeMore(); } });
 $('moreButton').addEventListener('click', () => { const expanded = $('toolbarMore').classList.toggle('expanded'); $('moreButton').setAttribute('aria-expanded', String(expanded)); updateToolbarViewport(); });
-document.addEventListener('click', (event) => { if (!event.target.closest('.toolbar-wrap')) closeMore(); });
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.toolbar-wrap')) closeMore();
+  if (state.listTagEditor && !event.target.closest('.list-tag-field')) closeListTagEditor(false);
+});
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMore(); });
 $('markdownCopyButton').addEventListener('click', () => copyMarkdown().catch(() => toast('コピーできませんでした。.md保存も利用できます')));
 $('downloadButton').addEventListener('click', download); $('backupButton').addEventListener('click', backup);
@@ -676,21 +740,26 @@ $('logoutButton').addEventListener('click', logout); $('migrateLocalButton').add
 $('dismissLegacyButton').addEventListener('click', dismissLegacyNotice);
 $('reviewLegacyButton').addEventListener('click', () => { state.legacyImported = false; state.legacyReviewShown = false; persistLocal([]); updateMigrationPanel(); });
 $('retrySyncButton').addEventListener('click', retrySync); $('copyDiagnosticButton').addEventListener('click', copyDiagnostic);
-$('trashButton').addEventListener('click', () => { if (state.bulkPurging || state.bulkAssigning) return; state.showTrash = !state.showTrash; state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = ''; renderList(); });
+$('trashButton').addEventListener('click', () => { if (state.bulkPurging || state.bulkAssigning) return; state.showTrash = !state.showTrash; state.listTagEditor = null; state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = ''; renderList(); });
 $('draftList').addEventListener('click', (event) => {
   const button = event.target.closest('button'); if (!button) return;
+  if (button.dataset.openListTag) return openListTagEditor(button.dataset.openListTag, button.dataset.tagKind);
+  if (button.dataset.closeListTag) return closeListTagEditor();
   if (button.dataset.edit) { setEditorMode('edit'); loadDraft(button.dataset.edit); } if (button.dataset.restore) restoreDraft(button.dataset.restore);
   if (button.dataset.delete && confirm('このJournalをごみ箱へ移しますか？あとで復元できます。')) deleteDraft(button.dataset.delete);
 });
 for (const [id, mode] of [['editTab', 'edit'], ['previewTab', 'preview'], ['splitTab', 'split']]) $(id).addEventListener('click', () => setEditorMode(mode));
 categorySelect.addEventListener('change', () => { updateNoteStatusControls(); scheduleSave(); });
 noteStatusSelect.addEventListener('change', scheduleSave);
-$('searchInput').addEventListener('input', (event) => { if (state.bulkPurging) return; state.searchQuery = event.target.value; state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = ''; renderList(); });
+$('searchInput').addEventListener('input', (event) => { if (state.bulkPurging) return; state.searchQuery = event.target.value; state.listTagEditor = null; state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = ''; renderList(); });
 $('draftList').addEventListener('change', (event) => {
+  const select = event.target.closest('[data-list-tag-select]');
+  if (select) return changeListTag(select.dataset.listTagSelect, select.dataset.tagKind, select.value);
   const input = event.target.closest('[data-trash-select]'); if (!input || state.bulkPurging || !state.showTrash) return;
   if (input.checked) state.selectedTrash.add(input.dataset.trashSelect); else state.selectedTrash.delete(input.dataset.trashSelect);
   cancelPurge(false); $('purgeResult').textContent = ''; updateTrashControls();
 });
+$('draftList').addEventListener('keydown', (event) => { if (event.key === 'Escape' && state.listTagEditor) { event.preventDefault(); closeListTagEditor(); } });
 $('trashSelectAll').addEventListener('change', (event) => {
   if (state.bulkPurging || !state.showTrash) return;
   for (const id of state.visibleTrashIds) event.target.checked ? state.selectedTrash.add(id) : state.selectedTrash.delete(id);

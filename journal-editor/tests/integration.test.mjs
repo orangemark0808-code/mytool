@@ -371,7 +371,7 @@ test('selected permanent deletion requires review, cancels safely, and removes o
   const otherAccount = `${core.storageKey('account-b')}:draft:trash-one`;
   h.storage.set(otherAccount, 'other account content');
   const input = { dataset: { trashSelect: 'trash-one' }, checked: true };
-  h.events.get('draftList:change')({ target: { closest: () => input } });
+  h.events.get('draftList:change')({ target: { closest: (selector) => selector === '[data-trash-select]' ? input : null } });
   await h.run('purgeSelectedDrafts();'); assert.equal(deleted.length, 0);
   h.events.get('purgeSelectedButton:click')();
   assert.match(h.elements.get('purgeTitles').innerHTML, /Trash &lt;one&gt;/);
@@ -430,4 +430,50 @@ test('confirmed purge on another device removes local trash and subsequent stale
   assert.equal(h.storage.has(`${core.storageKey('account-a')}:draft:d`), false);
   h.articleSnapshot([trash], true);
   assert.equal(h.run('state.drafts.length'), 0);
+});
+
+test('changing a list category saves the chosen article without changing its text or creation date', async () => {
+  const h = harness(), original = structuredClone(h.draft);
+  let saved;
+  h.context.testFirebase.doc = (_collection, id) => ({ id });
+  h.context.testFirebase.runTransaction = async (_db, callback) => callback({
+    get: async ({ id }) => ({ id, exists: () => true, data: () => original }),
+    set: (_ref, data) => { saved = data; },
+  });
+  h.run("state.view='list';state.firebaseReady=state.remoteReady=true;openListTagEditor('d','category');");
+  const select = { dataset: { listTagSelect: 'd', tagKind: 'category' }, value: 'journal-note' };
+  h.events.get('draftList:change')({ target: { closest: (selector) => selector === '[data-list-tag-select]' ? select : null } });
+  await h.run("saveDraftById('d');");
+  assert.equal(saved.category, 'journal-note'); assert.equal(saved.categoryName, 'note用');
+  assert.equal(saved.title, original.title); assert.equal(saved.body, original.body);
+  assert.equal(saved.createdAt, original.createdAt); assert.equal(saved.noteStatus, 'unpublished');
+  assert.equal(h.elements.get('categorySelect').value, 'journal-note');
+  assert.equal(h.run('state.listTagEditor'), null);
+});
+
+test('list status edits do not use the hidden editor text of a different article', () => {
+  const h = harness();
+  h.context.otherArticle = core.normalizeDraft({ ...h.draft, id: 'other', title: 'Other title', body: 'Other body', category: 'journal-note', noteStatus: 'published' }, { remote: true });
+  h.run("state.drafts.push(otherArticle);bodyInput.value='Unsaved first article';scheduleSave();showView('list');changeListTag('other','status','unpublished');");
+  const other = h.run("state.drafts.find(d=>d.id==='other')");
+  assert.equal(other.noteStatus, 'unpublished'); assert.equal(other.body, 'Other body'); assert.equal(other.title, 'Other title');
+  assert.equal(h.run('currentDraft().body'), 'Unsaved first article');
+  assert.equal(h.elements.get('bodyInput').value, 'Unsaved first article');
+  assert.equal(JSON.parse(h.storage.get(`${core.storageKey('account-a')}:draft:other`)).body, 'Other body');
+});
+
+test('tag edits immediately update filters, preserve unknown categories on cancel, and cannot edit trash', () => {
+  const h = harness();
+  h.run("state.view='list';openListTagEditor('d','category');");
+  assert.match(h.run("listTagMarkup(currentDraft(),'category')"), /unknown-category.*selected/);
+  h.run('closeListTagEditor();');
+  assert.equal(h.run('currentDraft().category'), 'unknown-category');
+  assert.equal(h.run('currentDraft().pendingSync'), false);
+  h.run("changeListTag('d','category','journal-note');setListCategoryFilter('note');setListNoteFilter('unpublished');changeListTag('d','status','published');");
+  assert.match(h.elements.get('draftList').innerHTML, /この条件に一致/);
+  assert.equal(h.run('currentDraft().noteStatus'), 'published');
+  h.run("state.drafts[0].deletedAt='2026-10-09T00:00:00Z';state.showTrash=true;changeListTag('d','category','journal-diary');openListTagEditor('d','category');renderList();");
+  assert.equal(h.run('currentDraft().category'), 'journal-note');
+  assert.equal(h.run('state.listTagEditor'), null);
+  assert.ok(!h.elements.get('draftList').innerHTML.includes('data-open-list-tag='));
 });
