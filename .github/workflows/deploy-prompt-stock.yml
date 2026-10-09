@@ -128,6 +128,22 @@ jobs:
           sed "s|window.PROMPT_STOCK_FIREBASE_CONFIG|window.BLOG_EDITOR_FIREBASE_CONFIG|" "dist/firebase-config.js" > "dist/journal-editor/firebase-config.js"
           printf 'window.MITAMONO_TMDB_KEY = "%s";\n' "$TMDB_API_KEY" > "dist/MITAMONO/tmdb-config.js"
 
+      - name: Version Journal Editor assets
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const directory = 'dist/journal-editor';
+          const entry = path.join(directory, 'index.html');
+          const html = fs.readFileSync(entry, 'utf8');
+          const versioned = html.replace(/((?:src|href)=")(script\.js|style\.css|layout-overrides\.css)\?v=([0-9-]+)"/g, (_, prefix, file, version) => {
+            const target = file.replace(/\.(css|js)$/, `.${version}.$1`);
+            fs.copyFileSync(path.join(directory, file), path.join(directory, target));
+            return `${prefix}${target}"`;
+          });
+          fs.writeFileSync(entry, versioned);
+          NODE
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
