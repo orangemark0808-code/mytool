@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-13';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-13';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-14';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-14';
 
-const VERSION = '2026-10-09-13';
+const VERSION = '2026-10-09-14';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -504,7 +504,12 @@ function renderList() {
   if (!state.showTrash && state.categoryFilter !== 'all') drafts = drafts.filter((draft) => categoryBadgeKind(draft) === state.categoryFilter);
   if (!state.showTrash && state.categoryFilter === 'note' && state.noteStatusFilter !== 'all') drafts = drafts.filter((draft) => draft.noteStatus === state.noteStatusFilter);
   if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
-  $('trashButton').textContent = state.showTrash ? 'Journal一覧へ' : `ごみ箱（${state.drafts.filter((draft) => draft.deletedAt).length}）`; $('trashButton').setAttribute('aria-pressed', String(state.showTrash));
+  const trashCount = state.drafts.filter((draft) => draft.deletedAt).length;
+  const trashLabel = state.showTrash ? 'Journal一覧へ' : `ごみ箱（${trashCount}件）`;
+  $('trashButton').setAttribute('aria-label', trashLabel); $('trashButton').setAttribute('title', trashLabel); $('trashButton').setAttribute('aria-pressed', String(state.showTrash));
+  $('trashNavIcon').classList.toggle('hidden', state.showTrash);
+  $('backToListIcon').classList.toggle('hidden', !state.showTrash);
+  $('trashCount').textContent = String(trashCount); $('trashCount').hidden = state.showTrash || trashCount === 0;
   $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';
   $('listOrderDescription').textContent = state.showTrash ? '更新日の新しい順' : '作成日の新しい順';
   $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${draft.id === state.currentId ? 'active' : ''}"><div><div class="draft-title-row">${draftTitleMarkup(draft)}<span class="category-badge" data-category-kind="${categoryBadgeKind(draft)}">${escapeHtml(categoryName(draft.category, draft.categoryName))}</span>${isNoteDraft(draft, state.categories) ? `<span class="note-status-badge" data-note-status="${draft.noteStatus === 'published' ? 'published' : 'unpublished'}">${noteStatusLabel(draft)}</span>` : ''}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button">復元</button>` : `<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;

@@ -7,8 +7,8 @@
     <title>Journal Editor</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Cpath d='M23 17h20M37 17v25a10 10 0 0 1-20 0' fill='none' stroke='white' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=2026-10-09-13" />
-    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-13" />
+    <link rel="stylesheet" href="style.css?v=2026-10-09-14" />
+    <link rel="stylesheet" href="layout-overrides.css?v=2026-10-09-14" />
   </head>
   <body>
     <header class="app-header">
@@ -89,7 +89,7 @@
       </section>
 
       <section class="list-view hidden" id="listView">
-        <div class="view-heading"><div><h1 id="listTitle">Journal一覧</h1><p id="listOrderDescription">作成日の新しい順</p></div><div class="list-heading-actions"><button class="secondary-button" id="trashButton" type="button" aria-pressed="false">ごみ箱（0）</button><button class="primary-button" id="listNewButton" type="button">新規作成</button></div></div>
+        <div class="view-heading"><div><h1 id="listTitle">Journal一覧</h1><p id="listOrderDescription">作成日の新しい順</p></div><div class="list-heading-actions"><button class="secondary-button list-heading-icon" id="trashButton" type="button" aria-pressed="false" aria-label="ごみ箱（0件）" title="ごみ箱（0件）"><svg id="trashNavIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg><svg id="backToListIcon" class="hidden" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 5-7 7 7 7M5 12h15"/></svg><span id="trashCount" class="trash-count" aria-hidden="true" hidden>0</span></button><button class="primary-button list-heading-icon" id="listNewButton" type="button" aria-label="新規作成" title="新規作成"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M12 11v6M9 14h6"/></svg></button></div></div>
         <div class="search-field"><input id="searchInput" type="search" aria-label="Journalを検索" placeholder="タイトル・本文・カテゴリ・投稿状況で検索" autocomplete="off" /></div>
         <div id="listFilters" class="list-filters">
           <div class="list-filter-group" role="group" aria-label="カテゴリで絞り込み"><button id="filterAll" type="button" data-category-filter="all" aria-pressed="true">すべて</button><button id="filterDiary" type="button" data-category-filter="diary" aria-pressed="false">日記</button><button id="filterNote" type="button" data-category-filter="note" aria-pressed="false">note用</button></div>
@@ -121,6 +121,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="firebase-config.js"></script>
     <script src="firebase-config.local.js"></script>
-    <script type="module" src="script.js?v=2026-10-09-13"></script>
+    <script type="module" src="script.js?v=2026-10-09-14"></script>
   </body>
 </html>
