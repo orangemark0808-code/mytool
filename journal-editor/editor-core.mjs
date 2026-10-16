@@ -58,9 +58,9 @@ export function editedDraft(draft, changes, now = new Date().toISOString()) {
   return { ...draft, ...changes, updatedAt: now, revision: crypto.randomUUID(), pendingSync: true };
 }
 
-// Missing cached records are never evidence of deletion. Pending edits always win
-// locally; the transaction below preserves both versions if the server changed.
-export function reconcileDrafts(local, remote, { authoritative = false, activeId = null, writingIds = new Set() } = {}) {
+// Missing query records are not evidence of deletion without a document read.
+// Pending edits always win locally; transactions preserve conflicting versions.
+export function reconcileDrafts(local, remote, { authoritative = false, writingIds = new Set(), confirmedMissingIds = new Set() } = {}) {
   const merged = new Map(local.map((draft) => [draft.id, draft]));
   const remoteById = new Map(remote.map((draft) => [draft.id, draft]));
   for (const incoming of remote) {
@@ -72,18 +72,13 @@ export function reconcileDrafts(local, remote, { authoritative = false, activeId
   const recovered = [], removedIds = [];
   if (authoritative) {
     for (const draft of local) {
-      const incoming = remoteById.get(draft.id);
-      if (!incoming && draft.deletedAt && draft.baseVersion && !draft.pendingSync && !writingIds.has(draft.id)) {
-        merged.delete(draft.id); removedIds.push(draft.id); continue;
+      // A collection listener can lag a completed transaction. Absence alone
+      // must never delete a newly saved article or start a recovery-copy loop.
+      // Clean articles follow confirmed deletions; only unsent edits may need
+      // recovery, which is handled by the conflict-aware write transaction.
+      if (!remoteById.has(draft.id) && confirmedMissingIds.has(draft.id) && draft.baseVersion && !draft.pendingSync && !writingIds.has(draft.id)) {
+        merged.delete(draft.id); removedIds.push(draft.id);
       }
-      const deleted = incoming?.deletedAt || (!remoteById.has(draft.id) && draft.baseVersion);
-      if (!deleted || draft.deletedAt || draft.pendingSync || writingIds.has(draft.id)) continue;
-      if (draft.id === activeId) {
-        const copy = recoveryCopy(draft, '復元');
-        merged.set(copy.id, copy);
-        recovered.push({ previousId: draft.id, copy });
-      }
-      if (!incoming) { merged.delete(draft.id); removedIds.push(draft.id); }
     }
   }
   return { drafts: [...merged.values()], recovered, removedIds };
@@ -92,8 +87,12 @@ export function reconcileDrafts(local, remote, { authoritative = false, activeId
 export function recoveryCopy(draft, suffix = '競合コピー', id = crypto.randomUUID()) {
   const now = new Date().toISOString();
   return editedDraft({ ...draft, id, baseVersion: null, deletedAt: null, createdAt: now }, {
-    title: `${draft.title || '無題の記事'}（${suffix}）`,
+    title: recoveryTitle(draft.title, suffix),
   }, now);
+}
+function recoveryTitle(title, suffix) {
+  const base = (title || '無題の記事').replace(/(?:（(?:競合コピー|復元)）)+$/u, '');
+  return `${base || '無題の記事'}（${suffix}）`;
 }
 
 // All reads precede writes, and retries reuse the same copy ID. A stale client
@@ -172,7 +171,7 @@ export function applyWriteResult(drafts, sent, result, activeId) {
   }
   const copy = live.revision === sent.revision ? result.saved : {
     ...live, id: result.saved.id,
-    title: live.title === sent.title ? result.saved.title : `${live.title || '無題の記事'}（${result.original && !result.original.deletedAt ? '競合コピー' : '復元'}）`,
+    title: live.title === sent.title ? result.saved.title : recoveryTitle(live.title, result.original && !result.original.deletedAt ? '競合コピー' : '復元'),
     createdAt: result.saved.createdAt,
     baseVersion: remoteVersion(result.saved), pendingSync: true,
   };

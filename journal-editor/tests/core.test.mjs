@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { storageKey, normalizeDraft, remotePayload, remoteVersion, contentKey, editedDraft, reconcileDrafts, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, applyWriteResult, defaultCategories, orderedCategories, isNoteDraft, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
+import { storageKey, normalizeDraft, remotePayload, remoteVersion, contentKey, editedDraft, reconcileDrafts, recoveryCopy, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, applyWriteResult, defaultCategories, orderedCategories, isNoteDraft, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
 import { markdownToHtml } from '../markdown.mjs';
 
 function remote(body = 'server text', extra = {}) {
@@ -40,22 +40,31 @@ test('pending local edits survive newer server text and cached text', () => {
     assert.equal(result.drafts[0].pendingSync, true);
   }
 });
-test('physical server deletion of open journal creates writable recovery draft', () => {
+test('a missing query record never creates a recovery copy or deletes a saved article', () => {
   const result = reconcileDrafts([remote()], [], { authoritative: true, activeId: 'article' });
-  assert.equal(result.recovered.length, 1);
-  assert.notEqual(result.recovered[0].copy.id, 'article');
-  assert.equal(result.recovered[0].copy.body, 'server text');
-  assert.equal(result.recovered[0].copy.pendingSync, true);
+  assert.equal(result.recovered.length, 0);
+  assert.equal(result.drafts[0].id, 'article');
+  assert.equal(result.drafts[0].pendingSync, false);
+  const confirmed = reconcileDrafts([remote()], [], { authoritative: true, confirmedMissingIds: new Set(['article']) });
+  assert.equal(confirmed.drafts.length, 0);
 });
-test('soft server deletion of open journal preserves trash and recovery copy', () => {
+test('soft server deletion of an unedited open journal follows the deletion without copying', () => {
   const result = reconcileDrafts([remote()], [remote('server text', { deletedAt: '2026-10-09T00:00:00Z' })], { authoritative: true, activeId: 'article' });
-  assert.equal(result.drafts.length, 2);
-  assert.equal(result.recovered.length, 1);
+  assert.equal(result.drafts.length, 1);
+  assert.equal(result.recovered.length, 0);
   assert.equal(result.drafts.find((draft) => draft.id === 'article').deletedAt, '2026-10-09T00:00:00Z');
 });
 test('in-flight draft is never replaced by listener acknowledgement', () => {
   const result = reconcileDrafts([remote('local')], [remote('server')], { authoritative: true, writingIds: new Set(['article']) });
   assert.equal(result.drafts[0].body, 'local');
+});
+
+test('new recovery copies do not accumulate generated title suffixes or alter existing records', () => {
+  const original = remote('preserved text', { title: 'Test（競合コピー）（復元）（復元）' });
+  const copy = recoveryCopy(original, '復元');
+  assert.equal(copy.title, 'Test（復元）');
+  assert.equal(copy.body, original.body);
+  assert.equal(original.title, 'Test（競合コピー）（復元）（復元）');
 });
 test('transaction saves normal edits only against their original server version', async () => {
   const original = remote(), pending = editedDraft(original, { body: 'my edit' });
@@ -154,7 +163,8 @@ test('only confirmed server absence removes settled trash; cached absence and pe
   assert.equal(reconcileDrafts([trash], [], { authoritative: false }).drafts.length, 1);
   assert.equal(reconcileDrafts([editedDraft(trash, {})], [], { authoritative: true }).drafts.length, 1);
   assert.equal(reconcileDrafts([trash], [], { authoritative: true, writingIds: new Set(['article']) }).drafts.length, 1);
-  const result = reconcileDrafts([trash], [], { authoritative: true });
+  assert.equal(reconcileDrafts([trash], [], { authoritative: true }).drafts.length, 1);
+  const result = reconcileDrafts([trash], [], { authoritative: true, confirmedMissingIds: new Set(['article']) });
   assert.equal(result.drafts.length, 0); assert.deepEqual(result.removedIds, ['article']);
 });
 test('default category IDs are stable on all devices; empty/deleted categories remain deleted', () => {

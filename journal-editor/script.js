@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-2';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-2';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-3';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-3';
 
-const VERSION = '2026-10-16-2';
+const VERSION = '2026-10-16-3';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -13,6 +13,7 @@ const state = {
   remoteReady: false, categoriesReady: false, categoriesDirty: false, categoriesWriting: false,
   draftsCurrent: false, categoriesCurrent: false, serverSnapshotCount: 0, remoteRefreshNeeded: false,
   deferredDrafts: null, composingInput: null, compositionWaiters: new Set(),
+  presenceChecks: new Map(), presenceError: false,
   unsubscribe: null, unsubscribeCategories: null, firebase: null, firebaseReady: false,
   storageFailed: false, storageReadFailed: false, syncError: false, categoryError: false,
   draftListenerFailed: false, categoryListenerFailed: false, listenerGeneration: 0,
@@ -81,13 +82,17 @@ function refreshSyncStatus() {
   if (!state.user) text = navigator.onLine ? 'ログインが必要' : 'オフライン';
   else if (state.storageReadFailed || state.storageFailed) { text = '端末に保存できません・バックアップしてください'; kind = 'error'; }
   else if (!navigator.onLine) text = pending ? '端末に保存済み・未同期' : 'オフライン・端末に保存済み';
-  else if (state.syncError || state.categoryError) { text = '端末に保存済み・同期エラー'; kind = 'error'; }
+  else if (state.syncError || state.categoryError || state.presenceError) { text = '端末に保存済み・同期エラー'; kind = 'error'; }
   else if (state.writes.size || state.categoriesWriting) text = '端末に保存済み・同期中';
   else if (pending) text = '端末に保存済み・未同期';
-  else if (!state.remoteReady || !state.categoriesReady || !state.draftsCurrent || !state.categoriesCurrent || state.remoteRefreshNeeded) text = '同期を確認中';
+  else if (!state.remoteReady || !state.categoriesReady || !state.draftsCurrent || !state.categoriesCurrent || state.remoteRefreshNeeded || state.presenceChecks.size || !draftsMatchServer()) text = '同期を確認中';
   else { text = 'クラウド同期済み'; kind = 'synced'; }
   for (const id of ['syncStatus', 'editorSyncStatus']) { if ($(id).textContent !== text) $(id).textContent = text; $(id).className = `${id === 'syncStatus' ? 'sync-status' : 'toolbar-save-status'} ${kind}`; }
   updateBulkCategoryControls(); updateTrashControls();
+}
+function draftsMatchServer() {
+  const remote = new Map(state.serverDrafts.map((draft) => [draft.id, remoteVersion(draft)]));
+  return remote.size === state.drafts.length && state.drafts.every((draft) => remote.get(draft.id) === remoteVersion(draft));
 }
 function remoteDraftsRef(uid = state.user.uid) { return state.firebase.collection(state.db, 'users', uid, 'blogEditorDrafts'); }
 // Existing account-owned metadata collection: no extra security permissions.
@@ -194,7 +199,7 @@ function scheduleSave() {
   state.drafts = state.drafts.map((item) => item.id === draft.id ? draft : item);
   persistLocal([draft.id]); updateDraftTimestamps(); refreshSyncStatus(); queueSave(draft.id);
 }
-function applyRemoteDrafts(remote, authoritative, onlyId = null) {
+function applyRemoteDrafts(remote, authoritative, onlyId = null, confirmedMissingIds = new Set()) {
   const previous = currentDraft(), visible = state.view === 'editor';
   const protectedIds = new Set(state.writes.keys());
   if (state.composing && state.currentId) {
@@ -202,21 +207,68 @@ function applyRemoteDrafts(remote, authoritative, onlyId = null) {
     if (authoritative) state.deferredDrafts = { id: state.currentId, drafts: remote.filter((draft) => draft.id === state.currentId) };
   }
   const local = onlyId ? state.drafts.filter((draft) => draft.id === onlyId) : state.drafts;
-  const merged = reconcileDrafts(local, remote, { authoritative, activeId: visible ? state.currentId : null, writingIds: protectedIds });
+  const merged = reconcileDrafts(local, remote, { authoritative, writingIds: protectedIds, confirmedMissingIds });
   state.drafts = onlyId ? [...state.drafts.filter((draft) => draft.id !== onlyId), ...merged.drafts] : merged.drafts;
-  const recovered = merged.recovered.find((item) => item.previousId === state.currentId);
-  if (recovered) { state.currentId = state.editorDraftId = recovered.copy.id; titleInput.value = recovered.copy.title; toast('別端末で削除された記事を、復元用の下書きとして残しました'); }
   if (state.currentId && !state.drafts.some((draft) => draft.id === state.currentId)) state.currentId = null;
   persistLocal();
   if (merged.removedIds.length) removeLocalDraftRecords(merged.removedIds);
   const next = currentDraft();
-  if (visible && previous && next && !next.deletedAt && contentKey(previous) !== contentKey(next) && !previous.pendingSync && !recovered && !state.composing) {
+  if (visible && previous && (!next || next.deletedAt) && !state.composing) {
+    state.currentId = state.editorDraftId = null;
+    titleInput.value = bodyInput.value = ''; resetHistory(); updatePreview(); showView('list');
+    toast('別端末で削除された記事を一覧に反映しました');
+  }
+  if (visible && previous && next && !next.deletedAt && contentKey(previous) !== contentKey(next) && !previous.pendingSync && !state.composing) {
     const start = bodyInput.selectionStart, end = bodyInput.selectionEnd, scroll = bodyInput.scrollTop;
     titleInput.value = next.title === '無題の記事' ? '' : next.title; bodyInput.value = next.body;
     bodyInput.setSelectionRange(Math.min(start, next.body.length), Math.min(end, next.body.length)); bodyInput.scrollTop = scroll;
     renderCategoryOptions(); updatePreview(); recordHistory(); toast('別端末での変更を反映しました');
   }
   updateDraftTimestamps(); renderList(); refreshSyncStatus(); updateMigrationPanel();
+}
+// Repair historical local purge markers and verify missing records through a
+// server-only document read. Never let a lagging query decide physical deletion.
+function checkDraftPresence() {
+  if (!state.user || !state.draftsCurrent || !navigator.onLine) return;
+  const remoteIds = new Set(state.serverDrafts.map((draft) => draft.id));
+  const ids = new Set(state.serverDrafts.filter((draft) => state.purgedIds.has(draft.id)).map((draft) => draft.id));
+  for (const draft of state.drafts) {
+    if (!remoteIds.has(draft.id) && draft.baseVersion && !draft.pendingSync) ids.add(draft.id);
+  }
+  for (const id of ids) {
+    if (!state.presenceChecks.has(id) && !state.writes.has(id) && !(state.composing && state.currentId === id)) void verifyDraftPresence(id);
+  }
+}
+async function verifyDraftPresence(id) {
+  const session = state.session, generation = state.listenerGeneration, serial = state.serverSnapshotCount;
+  const before = state.drafts.find((draft) => draft.id === id), revision = before?.revision;
+  const token = {}; state.presenceChecks.set(id, token); refreshSyncStatus();
+  let retry = false;
+  try {
+    const snapshot = await state.firebase.getDocFromServer(state.firebase.doc(remoteDraftsRef(), id));
+    if (session !== state.session || generation !== state.listenerGeneration) return;
+    const live = state.drafts.find((draft) => draft.id === id);
+    if (serial !== state.serverSnapshotCount || live?.revision !== revision || state.writes.has(id) || (state.composing && state.currentId === id)) { retry = true; return; }
+    if (snapshot.metadata?.fromCache || snapshot.metadata?.hasPendingWrites) throw new Error('Server confirmation required');
+    if (snapshot.exists()) {
+      const incoming = normalizeDraft(snapshot.data(), { remote: true, id });
+      state.purgedIds.delete(id);
+      state.serverDrafts = [...state.serverDrafts.filter((draft) => draft.id !== id), incoming];
+      applyRemoteDrafts([incoming], true, id);
+    } else {
+      state.serverDrafts = state.serverDrafts.filter((draft) => draft.id !== id);
+      applyRemoteDrafts([], true, id, new Set([id]));
+    }
+  } catch (error) {
+    if (session === state.session && generation === state.listenerGeneration) {
+      state.presenceError = true; console.error('Journal presence check failed:', error.code || error.name);
+    }
+  } finally {
+    if (state.presenceChecks.get(id) === token) {
+      state.presenceChecks.delete(id); refreshSyncStatus();
+      if (retry) checkDraftPresence();
+    }
+  }
 }
 function finishComposition() {
   if (!state.composing) return;
@@ -229,12 +281,14 @@ function finishComposition() {
   for (const resolve of state.compositionWaiters) resolve();
   state.compositionWaiters.clear();
   if (currentDraft()?.pendingSync) queueSave(state.currentId);
+  checkDraftPresence();
 }
 function startRemoteSync() {
   const uid = state.user.uid, session = state.session, generation = ++state.listenerGeneration;
   state.remoteReady = state.categoriesReady = false;
   state.draftsCurrent = state.categoriesCurrent = state.remoteRefreshNeeded = false;
   state.deferredDrafts = null;
+  state.presenceChecks.clear(); state.presenceError = false;
   state.draftListenerFailed = state.categoryListenerFailed = false;
   const valid = () => session === state.session && generation === state.listenerGeneration;
   const fail = (kind) => (error) => {
@@ -248,10 +302,10 @@ function startRemoteSync() {
     state.snapshotCount++;
     const authoritative = !snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites;
     state.draftsCurrent = authoritative;
-    const remote = snapshot.docs.map((item) => normalizeDraft(item.data(), { remote: true, id: item.id })).filter((draft) => !state.purgedIds.has(draft.id));
+    const remote = snapshot.docs.map((item) => normalizeDraft(item.data(), { remote: true, id: item.id }));
     if (authoritative) { state.remoteReady = true; state.syncError = false; state.serverDrafts = remote; state.serverSnapshotCount++; }
-    applyRemoteDrafts(remote, authoritative);
-    if (authoritative) pumpSync();
+    applyRemoteDrafts(remote.filter((draft) => !state.purgedIds.has(draft.id)), authoritative);
+    if (authoritative) { checkDraftPresence(); pumpSync(); }
   }, fail('drafts'));
   state.unsubscribeCategories = state.firebase.onSnapshot(categoriesRef(uid), { includeMetadataChanges: true }, (snapshot) => {
     if (!valid()) return;
@@ -274,6 +328,7 @@ function stopSession() {
   for (const timer of state.saveTimers.values()) clearTimeout(timer);
   state.saveTimers.clear(); state.writes.clear(); state.session++; state.categoriesWriting = false;
   state.composing = false; state.composingInput = null; state.deferredDrafts = null;
+  state.presenceChecks.clear(); state.presenceError = false;
   state.draftsCurrent = state.categoriesCurrent = state.remoteRefreshNeeded = false;
   for (const resolve of state.compositionWaiters) resolve();
   state.compositionWaiters.clear();
@@ -768,8 +823,27 @@ function backup() { downloadFile(JSON.stringify({ schemaVersion: SCHEMA_VERSION,
 let toastTimer;
 function toast(message) { $('toast').textContent = message; $('toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.remove('visible'), 4500); }
 async function copyDiagnostic() {
-  const text = JSON.stringify({ version: VERSION, online: navigator.onLine, status: $('syncStatus').textContent, serverSnapshotReceived: state.remoteReady, draftsServerConfirmed: state.draftsCurrent, categoriesServerConfirmed: state.categoriesCurrent, pendingDraftCount: state.drafts.filter((draft) => draft.pendingSync).length, snapshotCount: state.snapshotCount }, null, 2);
-  try { if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text); else if (!copyPlainTextFallback(text)) throw new Error(); toast('診断情報をコピーしました'); } catch { toast('診断情報をコピーできませんでした'); }
+  try {
+    const fingerprint = async (value) => {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)));
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    };
+    const records = (drafts) => drafts.map((draft) => [draft.id, remoteVersion(draft)]).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+    // Hashes compare accounts/data across browsers without disclosing article
+    // text, document IDs, project settings, email addresses or user IDs.
+    const report = { version: VERSION, online: navigator.onLine, status: $('syncStatus').textContent,
+      serverSnapshotReceived: state.remoteReady, draftsServerConfirmed: state.draftsCurrent, categoriesServerConfirmed: state.categoriesCurrent,
+      pendingDraftCount: state.drafts.filter((draft) => draft.pendingSync).length, snapshotCount: state.snapshotCount,
+      localDraftCount: state.drafts.length, serverDraftCount: state.serverDrafts.length,
+      localTrashCount: state.drafts.filter((draft) => draft.deletedAt).length, localPurgeMarkerCount: state.purgedIds.size,
+      presenceChecks: state.presenceChecks.size, presenceError: state.presenceError, localMatchesServer: draftsMatchServer(),
+    };
+    const scope = [config.projectId || '', state.user?.uid || ''], local = records(state.drafts), remote = records(state.serverDrafts);
+    [report.scopeFingerprint, report.localFingerprint, report.serverFingerprint] = await Promise.all([fingerprint(scope), fingerprint(local), fingerprint(remote)]);
+    const text = JSON.stringify(report, null, 2);
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text); else if (!copyPlainTextFallback(text)) throw new Error();
+    toast('診断情報をコピーしました');
+  } catch { toast('診断情報をコピーできませんでした'); }
 }
 function closeMore() { $('toolbarMore').classList.remove('expanded'); $('moreButton').setAttribute('aria-expanded', 'false'); updateToolbarViewport(); }
 function updateToolbarVisibility() { document.body.classList.toggle('editor-active', Boolean(state.user && state.view === 'editor' && state.mode !== 'preview')); updateToolbarViewport(); }

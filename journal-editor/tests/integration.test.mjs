@@ -7,7 +7,7 @@ import * as markdown from '../markdown.mjs';
 
 const source = readFileSync(new URL('../script.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n').replace(/^import .*;\n/gm, '').replace(/^init\(\);\s*$/m, '');
 function harness() {
-  const elements = new Map(), storage = new Map(), events = new Map(), timers = new Map(), listeners = new Map();
+  const elements = new Map(), storage = new Map(), events = new Map(), timers = new Map(), listeners = new Map(), serverRecords = new Map();
   let timerId = 0;
   const classList = () => {
     const names = new Set();
@@ -24,6 +24,10 @@ function harness() {
     collection: (_db, ...parts) => ({ firestore: {}, path: parts.join('/') }),
     doc: (_db, ...parts) => ({ path: parts.join('/') }),
     onSnapshot(ref, _options, callback, failure) { listeners.set(ref.path, { callback, failure }); return () => {}; },
+    async getDocFromServer(ref) {
+      const record = serverRecords.get(ref.path);
+      return { id: ref.path, metadata: { fromCache: false, hasPendingWrites: false }, exists: () => Boolean(record), data: () => record };
+    },
   };
   const context = vm.createContext({ ...core, ...markdown, document, window, navigator: { onLine: true }, localStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) }, crypto, console: { error() {} }, Date, Intl, confirm: () => true, setTimeout(fn) { timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); } });
   vm.runInContext(source, context);
@@ -32,12 +36,14 @@ function harness() {
   run("state.user={uid:'account-a'};state.firebase=testFirebase;state.db={};state.categories=defaultCategories();state.view='editor';$('editorView').classList.remove('hidden');");
   const draft = core.normalizeDraft({ id: 'd', title: 'Synthetic', body: 'original', category: 'unknown-category', categoryName: 'Legacy name', createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z', revision: 'v1' }, { remote: true });
   context.fixture = draft;
+  serverRecords.set(draft.id, draft);
   run("state.drafts=[fixture];state.currentId='d';titleInput.value='Synthetic';bodyInput.value='original';renderCategoryOptions();resetHistory();persistLocal();");
-  const articleSnapshot = (drafts, fromCache = false) => {
+  const articleSnapshot = (drafts, fromCache = false, updateServer = true) => {
+    if (!fromCache && updateServer) { serverRecords.clear(); for (const draft of drafts) serverRecords.set(draft.id, draft); }
     const callback = listeners.get('users/account-a/blogEditorDrafts').callback;
     callback({ metadata: { fromCache, hasPendingWrites: false }, docs: drafts.map((draft) => ({ id: draft.id, data: () => draft })) });
   };
-  return { context, elements, storage, events, timers, listeners, run, draft, articleSnapshot };
+  return { context, elements, storage, events, timers, listeners, serverRecords, run, draft, articleSnapshot };
 }
 
 function connect(h) {
@@ -52,7 +58,7 @@ function confirmCategories(h, fromCache = false) {
   });
 }
 function delayedWrite(h) {
-  const records = new Map([[h.draft.id, h.draft]]);
+  const records = h.serverRecords;
   let release, committed;
   const gate = new Promise((resolve) => { release = resolve; });
   const didCommit = new Promise((resolve) => { committed = resolve; });
@@ -94,7 +100,7 @@ for (const kind of ['soft-delete', 'purge', 'edit']) {
     assert.notEqual(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
     // A superseded listener cannot restore a stale version.
     previousListener({ metadata: { fromCache: false, hasPendingWrites: false }, docs: [{ id: 'd', data: () => saved }] });
-    h.articleSnapshot(later); confirmCategories(h);
+    h.articleSnapshot(later); confirmCategories(h); await new Promise((resolve) => setImmediate(resolve));
     const local = h.run("state.drafts.find(d=>d.id==='d')");
     if (kind === 'purge') assert.equal(local, undefined);
     else if (kind === 'soft-delete') assert.ok(local.deletedAt);
@@ -107,7 +113,7 @@ test('a pre-commit snapshot is not replayed over a successful upload', async () 
   const h = harness(); connect(h); const server = delayedWrite(h);
   h.elements.get('bodyInput').value = 'new saved text'; h.run('scheduleSave();');
   const saving = h.run("saveDraftById('d')"); await server.didCommit;
-  h.articleSnapshot([h.draft]); server.release(); await saving;
+  h.articleSnapshot([h.draft], false, false); server.release(); await saving;
   assert.equal(h.run('currentDraft().body'), 'new saved text');
   h.articleSnapshot([...server.records.values()]); confirmCategories(h);
   assert.equal(h.run('currentDraft().body'), 'new saved text');
@@ -216,15 +222,15 @@ test('releasing deferred composition does not replay stale data for other articl
   assert.equal(h.elements.get('bodyInput').value, 'remote edit');
 });
 
-test('deletion deferred during composition leaves a writable recovery after cancellation', () => {
+test('confirmed deletion after cancelled composition closes the clean editor without a copy', async () => {
   const h = harness(); connect(h);
   h.events.get('bodyInput:compositionstart')(); h.articleSnapshot([]);
   assert.equal(h.run('state.currentId'), 'd');
   h.events.get('bodyInput:compositionend')();
-  assert.notEqual(h.run('state.currentId'), 'd');
-  h.elements.get('bodyInput').value = 'continue typing'; h.events.get('bodyInput:input')();
-  assert.equal(h.run('currentDraft().body'), 'continue typing');
-  assert.equal(h.run('currentDraft().pendingSync'), true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.run('state.currentId'), null);
+  assert.equal(h.run('state.view'), 'list');
+  assert.equal(h.run('state.drafts.length'), 0);
 });
 
 test('blur releases composition and account switches discard deferred work', async () => {
@@ -269,6 +275,122 @@ test('new article after preview always opens the text input mode', () => {
   assert.equal(h.run('state.view'), 'editor');
 });
 
+test('three clients converge despite historical purge markers and existing conflict copies', async () => {
+  const clients = [harness(), harness(), harness()];
+  const cloud = [clients[0].draft, core.normalizeDraft({ ...clients[0].draft, id: 'existing-copy', title: 'Synthetic（競合コピー）（復元）', body: 'different preserved text', revision: 'copy-v1' }, { remote: true })];
+  for (const [index, h] of clients.entries()) {
+    connect(h); h.run("showView('list');");
+    if (index === 0) h.run("state.purgedIds.add('d');state.drafts=[];");
+    if (index === 1) h.run("state.purgedIds.add('existing-copy');");
+    h.articleSnapshot(cloud);
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+  for (const h of clients) {
+    assert.deepEqual(Array.from(h.run('state.drafts.map(d=>d.id).sort()')), ['d', 'existing-copy']);
+    assert.equal(h.run('state.purgedIds.size'), 0);
+    assert.equal(h.run('state.drafts.some(d=>d.pendingSync)'), false);
+    assert.equal(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+    assert.equal(h.run("state.drafts.find(d=>d.id==='existing-copy').body"), 'different preserved text');
+  }
+});
+
+test('repeated lagging collection snapshots never turn a saved article into recovery copies', async () => {
+  const h = harness(); connect(h);
+  for (let i = 0; i < 4; i++) {
+    h.articleSnapshot([], false, false);
+    assert.notEqual(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(h.run('state.drafts.length'), 1);
+    assert.equal(h.run('state.currentId'), 'd');
+    assert.equal(h.run('currentDraft().title'), 'Synthetic');
+    assert.equal(h.run('currentDraft().pendingSync'), false);
+    assert.equal(h.run('state.purgedIds.size'), 0);
+    assert.equal(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+  }
+});
+
+test('a stale server query cannot resurrect a genuinely purged article', async () => {
+  const h = harness(); connect(h);
+  h.run("state.drafts=[];state.currentId=null;state.purgedIds.add('d');"); h.serverRecords.clear();
+  h.articleSnapshot([h.draft], false, false);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.run('state.drafts.length'), 0);
+  assert.equal(h.run('state.serverDrafts.length'), 0);
+  assert.equal(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+});
+
+test('failed presence confirmation preserves local content and prevents a synced label', async () => {
+  const h = harness(); connect(h);
+  const read = h.context.testFirebase.getDocFromServer;
+  h.context.testFirebase.getDocFromServer = async () => { throw { code: 'unavailable' }; };
+  h.articleSnapshot([], false, false); await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.run('currentDraft().body'), 'original');
+  assert.match(h.elements.get('syncStatus').textContent, /同期エラー/);
+  h.context.testFirebase.getDocFromServer = read;
+  h.run('retrySync();'); h.articleSnapshot([h.draft]); confirmCategories(h);
+  assert.equal(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+});
+
+test('typing during a presence read prevents its absent result from discarding the draft', async () => {
+  const h = harness(); connect(h); let release;
+  h.context.testFirebase.getDocFromServer = () => new Promise((resolve) => { release = resolve; });
+  h.articleSnapshot([]);
+  h.elements.get('bodyInput').value = 'unsent typing'; h.events.get('bodyInput:input')();
+  release({ exists: () => false, metadata: { fromCache: false } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.run('currentDraft().body'), 'unsent typing');
+  assert.equal(h.run('currentDraft().pendingSync'), true);
+  assert.equal(h.run('state.purgedIds.size'), 0);
+});
+
+test('an older document read cannot replace a newer listener update', async () => {
+  const h = harness(); connect(h); let release;
+  h.context.testFirebase.getDocFromServer = () => new Promise((resolve) => { release = resolve; });
+  h.articleSnapshot([], false, false);
+  h.articleSnapshot([{ ...h.draft, body: 'latest text', revision: 'latest' }]);
+  release({ exists: () => false, metadata: { fromCache: false } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.run('currentDraft().body'), 'latest text');
+  assert.equal(h.run('state.presenceChecks.size'), 0);
+});
+
+test('account switches ignore pending presence checks from the previous account', async () => {
+  const h = harness(); connect(h); let release;
+  h.context.testFirebase.getDocFromServer = () => new Promise((resolve) => { release = resolve; });
+  h.articleSnapshot([], false, false);
+  await h.run("handleAuth({uid:'account-b'})");
+  release({ exists: () => true, data: () => h.draft, metadata: { fromCache: false } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.run('state.drafts.length'), 0);
+  assert.equal(h.run('state.presenceChecks.size'), 0);
+});
+
+test('the synced label requires local article contents to match the confirmed server data', () => {
+  const h = harness(); connect(h);
+  h.run("state.drafts=[{...fixture,body:'different local text'}];refreshSyncStatus();");
+  assert.equal(h.elements.get('syncStatus').textContent, '同期を確認中');
+});
+
+test('diagnostics compare browser data without exposing account IDs or journal text', async () => {
+  const h = harness(); connect(h); let copied;
+  h.context.TextEncoder = TextEncoder;
+  h.context.navigator.clipboard = { writeText: async (text) => { copied = text; } };
+  await h.run('copyDiagnostic();');
+  const report = JSON.parse(copied);
+  assert.equal(report.localDraftCount, 1);
+  assert.equal(report.localMatchesServer, true);
+  assert.equal(report.localFingerprint, report.serverFingerprint);
+  assert.match(report.scopeFingerprint, /^[a-f0-9]{64}$/);
+  for (const secret of ['Synthetic', 'original', 'account-a']) assert.equal(copied.includes(secret), false);
+  h.run("state.drafts=[{...fixture,body:'different local text'}];");
+  await h.run('copyDiagnostic();');
+  const different = JSON.parse(copied);
+  assert.equal(different.localMatchesServer, false);
+  assert.notEqual(different.localFingerprint, different.serverFingerprint);
+  assert.equal(different.scopeFingerprint, report.scopeFingerprint);
+  assert.equal(copied.includes('different local text'), false);
+});
+
 test('Japanese composition Enter is left to the IME', () => {
   const h = harness(); let prevented = false;
   h.events.get('bodyInput:keydown')({ key: 'Enter', isComposing: true, preventDefault() { prevented = true; } });
@@ -302,9 +424,12 @@ test('empty cached snapshot cannot remove journal from the local index', () => {
   assert.equal(h.run('state.drafts.length'), 1);
   assert.deepEqual(JSON.parse(h.storage.get(core.storageKey('account-a'))).ids, ['d']);
 });
-test('typing after server deletion is saved under a recovered article ID', () => {
+test('a clean editor closes after verified server deletion and new typing uses explicit new draft', async () => {
   const h = harness(); h.run('startRemoteSync();'); h.articleSnapshot([]);
-  const id = h.run('state.currentId'); assert.notEqual(id, 'd');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.run('state.currentId'), null);
+  assert.equal(h.run('state.drafts.length'), 0);
+  h.run('newDraft();'); const id = h.run('state.currentId'); assert.notEqual(id, 'd');
   h.elements.get('bodyInput').value = 'typing after deletion'; h.run('scheduleSave();');
   const saved = JSON.parse(h.storage.get(`${core.storageKey('account-a')}:draft:${id}`));
   assert.equal(saved.body, 'typing after deletion'); assert.equal(saved.pendingSync, true);
@@ -647,7 +772,7 @@ test('concurrently restored article is not purged and changing accounts clears d
   assert.equal(h.elements.get('purgeTitles').innerHTML, '');
 });
 
-test('confirmed purge on another device removes local trash and subsequent stale cache cannot bring it back', () => {
+test('confirmed purge on another device removes local trash and subsequent stale cache cannot bring it back', async () => {
   const h = harness();
   const trash = core.normalizeDraft({ ...h.draft, deletedAt: '2026-10-09T00:00:00Z' }, { remote: true });
   h.context.trashFixture = trash;
@@ -655,6 +780,7 @@ test('confirmed purge on another device removes local trash and subsequent stale
   h.articleSnapshot([], true);
   assert.equal(h.run('state.drafts.length'), 1);
   h.articleSnapshot([]);
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(h.run('state.drafts.length'), 0);
   assert.equal(h.storage.has(`${core.storageKey('account-a')}:draft:d`), false);
   h.articleSnapshot([trash], true);
