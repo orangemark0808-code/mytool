@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import * as core from '../editor-core.mjs';
 import * as markdown from '../markdown.mjs';
 
-const source = readFileSync(new URL('../script.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace(/^init\(\);\s*$/m, '');
+const source = readFileSync(new URL('../script.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n').replace(/^import .*;\n/gm, '').replace(/^init\(\);\s*$/m, '');
 function harness() {
   const elements = new Map(), storage = new Map(), events = new Map(), timers = new Map(), listeners = new Map();
   let timerId = 0;
