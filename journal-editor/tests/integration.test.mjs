@@ -304,11 +304,13 @@ test('sort preference survives trash and filters; trash keeps its own updated or
   const h = harness(); h.run("changeListSort('updatedAt');setListCategoryFilter('diary');");
   assert.equal(h.run('state.listSort'), 'updatedAt');
   h.events.get('trashButton:click')();
+  assert.equal(h.elements.get('draftList').classList.contains('card-list'), false);
   assert.equal(h.elements.get('listSortField').hidden, true);
   assert.equal(h.elements.get('backToListLabel').hidden, false);
   assert.equal(h.elements.get('trashButton').classList.contains('list-back-button'), true);
   assert.equal(h.elements.get('listOrderDescription').textContent, '更新日の新しい順');
   h.events.get('homeButton:click')();
+  assert.equal(h.elements.get('draftList').classList.contains('card-list'), true);
   assert.equal(h.elements.get('listSortField').hidden, false);
   assert.equal(h.elements.get('backToListLabel').hidden, true);
   assert.equal(h.run('state.listSort'), 'updatedAt');

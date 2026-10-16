@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-5';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-5';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-6';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-6';
 
-const VERSION = '2026-10-16-5';
+const VERSION = '2026-10-16-6';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const SORT_KEY = 'orangemania-journal-list-sort-v1';
 const COMPACT_EDITOR_QUERY = '(max-width: 700px), (max-width: 1366px) and (pointer: coarse)';
@@ -795,6 +795,7 @@ async function purgeSelectedDrafts() {
 function renderList() {
   const query = state.searchQuery.trim().toLowerCase();
   renderListFilters();
+  $('draftList').classList.toggle('card-list', !state.showTrash);
   const sortField = state.showTrash ? 'updatedAt' : state.listSort;
   $('listSortField').hidden = state.showTrash;
   $('listSortSelect').value = state.listSort;

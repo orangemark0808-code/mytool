@@ -424,7 +424,7 @@ h1, h2, h3, h4, h5, h6, .draft-title, .legacy-details summary {
   box-shadow: none;
 }
 .category-badge { background: var(--accent-light); color: var(--accent); }
-.category-badge[data-category-kind="diary"] { background: #fff0e3; color: #99480a; }
+.category-badge[data-category-kind="diary"] { color: #fff; background: #a95115; border-color: #a95115; }
 .category-badge[data-category-kind="note"] { background: #e8f3ec; color: #24583b; }
 .list-tag-field { display: inline-flex; align-items: center; }
 .list-tag-button { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; border-radius: 14px; background: transparent; }
@@ -723,4 +723,24 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
   .editor-pane > .toolbar-wrap { left: 4px; right: 4px; }
   .toolbar { grid-template-columns: repeat(6, minmax(44px, 1fr)); padding-inline: 4px; gap: 2px; }
   .toolbar > button { font-size: 12px; padding-inline: 2px; }
+}
+
+/* Article cards: row order follows the selected sort; trash retains its selection layout. */
+.draft-list.card-list { display: grid; gap: 18px; margin-top: 14px; }
+.card-list .draft-row { position: relative; display: block; min-width: 0; min-height: 244px; padding: 18px 20px 82px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.card-list .draft-row.active { background: #fff0e3; }
+.card-list .draft-row.active, .card-list .draft-row.pinned:not(.active) { border-left: 3px solid var(--accent); padding-left: 20px; }
+.card-list .draft-title-button { padding: 0; font-size: 16px; line-height: 1.55; }
+.card-list .draft-label-row { gap: 4px 7px; margin-top: 4px; }
+.card-list .draft-excerpt { margin: 6px 0 0; }
+.card-list .draft-dates { position: absolute; left: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 3px; max-width: calc(100% - 128px); }
+.card-list .draft-actions { position: absolute; right: 16px; bottom: 18px; gap: 7px; }
+.card-list .list-tag-popover { max-width: 100%; }
+.card-list > .empty { grid-column: 1 / -1; }
+@media (min-width: 900px) { .draft-list.card-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) {
+ .card-list .draft-row { padding-inline: 14px; }
+ .card-list .draft-row.active, .card-list .draft-row.pinned:not(.active) { padding-left: 14px; }
+ .card-list .draft-dates { left: 14px; font-size: 11px; }
+ .card-list .draft-actions { right: 12px; }
 }
