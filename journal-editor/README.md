@@ -4,6 +4,12 @@ Googleログイン後、Journalを端末内に保存し、Firestoreへ同期す�
 
 公開URL: https://orangemark0808-code.github.io/mytool/journal-editor/
 
+## 2026-10-16の改善
+
+- Journal一覧の各記事にピン止めボタン（ごみ箱アイコンの左）を追加しました。ピン止めした記事は絞り込み・検索の結果の中で先頭に表示し、複数ある場合は新しくピン止めした順に並べます。押下中のボタンはオレンジで塗り、行の左端にも印を付けます。
+- ピン止めは記事の`pinnedAt`として端末内とFirestoreに保存し、別端末にも同期します。本文・タイトル・カテゴリ・作成日・更新日は変更しません。ごみ箱ではピン止めを表示せず更新日順のままです。復元するとピン止めも戻ります。
+- 旧バージョンを開いたままのタブで記事を編集すると、その記事のピン止めは外れることがあります。
+
 ## 2026-10-09の改善
 
 - Journal一覧のカテゴリ・投稿状況タグを押すと、その記事のタグを変更できます。選択後に自動保存し、本文・タイトル・作成日は保持します。検索・絞り込みにも即時反映します。ごみ箱内のタグは表示だけです。
@@ -56,7 +62,7 @@ node journal-editor/tests/preview-server.mjs
 
 ブラウザで`http://localhost:8765/`を開きます。この確認サーバーは架空の長文を表示し、Firebase設定・認証情報・実際のJournalを読み込みません。公開用成果物には確認サーバーやテストを含めません。
 
-`?scenario=legacy-matched`でクラウドと同じ旧データ、`?scenario=legacy-difference`で内容の異なる旧データの案内、`?scenario=badges`でタグ・作成日順、`?scenario=trash`で完全削除の確認画面を検証できます。trashの削除はメモリ上のモックに限定され、Firebaseには接続しません。旧形式のlocalStorageは書き換えず、確認画面内だけで架空のデータを使用します。
+`?scenario=legacy-matched`でクラウドと同じ旧データ、`?scenario=legacy-difference`で内容の異なる旧データの案内、`?scenario=badges`でタグ・作成日順・ピン止め、`?scenario=trash`で完全削除の確認画面を検証できます。trashの削除はメモリ上のモックに限定され、Firebaseには接続しません。旧形式のlocalStorageは書き換えず、確認画面内だけで架空のデータを使用します。
 
 実際のログインを試す場合は、元の案内どおりHTTPサーバー経由で起動してください。`index.html`の直接起動（file://）は対応していません。
 

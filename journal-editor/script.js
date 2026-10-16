@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-09-16';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-09-16';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-1';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-1';
 
-const VERSION = '2026-10-09-16';
+const VERSION = '2026-10-16-1';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -643,8 +643,10 @@ function renderList() {
   const query = state.searchQuery.trim().toLowerCase();
   renderListFilters();
   const sortField = state.showTrash ? 'updatedAt' : 'createdAt';
+  // Pinned articles lead the list (newest pin first); trash ignores pins.
+  const pinTime = (draft) => state.showTrash ? 0 : Date.parse(draft.pinnedAt) || 0;
   let drafts = state.drafts.filter((draft) => Boolean(draft.deletedAt) === state.showTrash)
-    .sort((a, b) => (Date.parse(b[sortField]) || 0) - (Date.parse(a[sortField]) || 0) || a.id.localeCompare(b.id));
+    .sort((a, b) => pinTime(b) - pinTime(a) || (Date.parse(b[sortField]) || 0) - (Date.parse(a[sortField]) || 0) || a.id.localeCompare(b.id));
   if (!state.showTrash && state.categoryFilter !== 'all') drafts = drafts.filter((draft) => categoryBadgeKind(draft) === state.categoryFilter);
   if (!state.showTrash && state.categoryFilter === 'note' && state.noteStatusFilter !== 'all') drafts = drafts.filter((draft) => draft.noteStatus === state.noteStatusFilter);
   if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
@@ -658,9 +660,28 @@ function renderList() {
   $('trashCount').textContent = String(trashCount); $('trashCount').hidden = state.showTrash || trashCount === 0;
   $('trashButton').disabled = state.bulkPurging; $('searchInput').disabled = state.bulkPurging;
   $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';
-  $('listOrderDescription').textContent = state.showTrash ? '更新日の新しい順' : '作成日の新しい順';
-  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draft.title)}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}${listTagMarkup(draft, 'category')}${listTagMarkup(draft, 'status')}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+  $('listOrderDescription').textContent = state.showTrash ? '更新日の新しい順' : drafts.some((draft) => draft.pinnedAt) ? 'ピン止めを先頭・作成日の新しい順' : '作成日の新しい順';
+  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''} ${!state.showTrash && draft.pinnedAt ? 'pinned' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draft.title)}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}${listTagMarkup(draft, 'category')}${listTagMarkup(draft, 'status')}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `${pinButtonMarkup(draft)}<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
   updateTrashControls();
+}
+function pinButtonId(id) { return `pin-button-${encodeURIComponent(id)}`; }
+function pinButtonMarkup(draft) {
+  const label = draft.pinnedAt ? 'ピン止めを外す' : 'ピン止め';
+  const disabled = state.bulkAssigning || state.bulkPurging || state.storageReadFailed;
+  return `<button id="${escapeHtml(pinButtonId(draft.id))}" class="small-button draft-icon-button draft-pin-button" data-pin="${escapeHtml(draft.id)}" type="button" aria-pressed="${Boolean(draft.pinnedAt)}" aria-label="${escapeHtml(draft.title)}を${label}" title="${label}" ${disabled ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 17v5M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V17h14v-1.8a2 2 0 0 0-1.1-1.8l-1.8-.9a2 2 0 0 1-1.1-1.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>`;
+}
+// Pinning is list metadata: it syncs like a tag edit but keeps the visible
+// updated date, so the trash order and the article's "更新" stay unchanged.
+function togglePin(id) {
+  const draft = state.drafts.find((item) => item.id === id && !item.deletedAt);
+  if (!draft || !state.user || state.showTrash || state.bulkAssigning || state.bulkPurging || state.storageReadFailed || state.purgedIds.has(id)) return;
+  const pinnedAt = draft.pinnedAt ? null : new Date().toISOString();
+  state.drafts = state.drafts.map((item) => item.id === id ? { ...editedDraft(item, { pinnedAt }), updatedAt: item.updatedAt } : item);
+  state.listTagEditor = null;
+  const saved = persistLocal([id]);
+  renderList(); refreshSyncStatus(); if (saved) queueSave(id);
+  $(pinButtonId(id))?.focus({ preventScroll: true });
+  toast(saved ? (pinnedAt ? 'ピン止めしました' : 'ピン止めを外しました') : '端末に保存できません。同期せず変更を保持しています');
 }
 function deleteDraft(id) {
   const draft = state.drafts.find((item) => item.id === id); if (!draft || state.bulkPurging) return;
@@ -745,6 +766,7 @@ $('draftList').addEventListener('click', (event) => {
   const button = event.target.closest('button'); if (!button) return;
   if (button.dataset.openListTag) return openListTagEditor(button.dataset.openListTag, button.dataset.tagKind);
   if (button.dataset.closeListTag) return closeListTagEditor();
+  if (button.dataset.pin) return togglePin(button.dataset.pin);
   if (button.dataset.edit) { setEditorMode('edit'); loadDraft(button.dataset.edit); } if (button.dataset.restore) restoreDraft(button.dataset.restore);
   if (button.dataset.delete && confirm('このJournalをごみ箱へ移しますか？あとで復元できます。')) deleteDraft(button.dataset.delete);
 });

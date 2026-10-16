@@ -18,6 +18,8 @@ export function contentKey(draft) {
   // Preserve old-version baselines for articles with no posting state. An
   // explicitly published state participates in conflict detection.
   if (draft.noteStatus === 'published') fields.push('published');
+  // Same rule for pins: unpinned articles keep their old baseline.
+  if (draft.pinnedAt) fields.push(['pinned', draft.pinnedAt]);
   return JSON.stringify(fields);
 }
 
@@ -34,6 +36,7 @@ export function normalizeDraft(raw, { remote = false, id = raw?.id } = {}) {
     category: typeof raw?.category === 'string' && raw.category ? raw.category : null,
     categoryName: typeof raw?.categoryName === 'string' ? raw.categoryName : '',
     noteStatus: raw?.noteStatus === 'published' ? 'published' : 'unpublished',
+    pinnedAt: validDate(raw?.pinnedAt) || null,
     createdAt: validDate(raw?.createdAt) || validDate(raw?.updatedAt),
     updatedAt: validDate(raw?.updatedAt) || validDate(raw?.createdAt),
     revision: typeof raw?.revision === 'string' ? raw.revision : '',
@@ -47,8 +50,8 @@ export function normalizeDraft(raw, { remote = false, id = raw?.id } = {}) {
 }
 
 export function remotePayload(draft) {
-  const { id, title, body, category, categoryName, noteStatus, createdAt, updatedAt, revision, deletedAt } = normalizeDraft(draft);
-  return { id, title, body, category, categoryName, noteStatus, createdAt, updatedAt, revision, deletedAt, schemaVersion: SCHEMA_VERSION };
+  const { id, title, body, category, categoryName, noteStatus, pinnedAt, createdAt, updatedAt, revision, deletedAt } = normalizeDraft(draft);
+  return { id, title, body, category, categoryName, noteStatus, pinnedAt, createdAt, updatedAt, revision, deletedAt, schemaVersion: SCHEMA_VERSION };
 }
 
 export function editedDraft(draft, changes, now = new Date().toISOString()) {

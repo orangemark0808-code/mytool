@@ -320,3 +320,14 @@ test('bulk diary assignment refuses a deleted target category', async () => {
   const firebase = { doc: (_collection, id) => ({ id }), runTransaction: async (_db, callback) => callback({get: async()=>({exists:()=>true,data:()=>({records:defaultCategories().map(c=>({...c,deleted:true}))})}),update:()=>assert.fail('No update allowed')}) };
   await assert.rejects(assignUncategorizedToDiary(firebase, {firestore:{}}, {id:'categories'}, 'article', defaultCategories()[0]));
 });
+
+test('pins round-trip through Firestore payloads without changing unpinned baselines', () => {
+  const article = normalizeDraft({ id: 'p', title: 'Pin', body: 'text', updatedAt: '2026-10-01T00:00:00Z' }, { remote: true });
+  assert.equal(article.pinnedAt, null);
+  assert.equal(normalizeDraft({ pinnedAt: 'not a date' }).pinnedAt, null);
+  assert.equal(contentKey(article), JSON.stringify([article.title, article.body, null, '', null]));
+  const pinned = { ...article, pinnedAt: '2026-10-16T00:00:00.000Z' };
+  assert.notEqual(contentKey(pinned), contentKey(article));
+  assert.equal(remotePayload(pinned).pinnedAt, '2026-10-16T00:00:00.000Z');
+  assert.equal(normalizeDraft(remotePayload(pinned), { remote: true }).pinnedAt, '2026-10-16T00:00:00.000Z');
+});

@@ -620,6 +620,13 @@ h1, h2, h3, h4, h5, h6, .draft-title, .legacy-details summary {
 .purge-result:empty { display: none; }
 .draft-row.trash-row { grid-template-columns: 44px minmax(0,1fr) auto; gap: 8px 12px; }
 @media (max-width: 700px) { .draft-row.trash-row { grid-template-columns: 44px minmax(0,1fr); } .trash-row .draft-actions { grid-column: 2; } }
+/* ピン止め: 押下中はアクセント色で塗り、行の左端にも印を付ける。 */
+.draft-pin-button { color: var(--muted); }
+.draft-pin-button svg { transform: rotate(45deg); }
+.draft-pin-button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+.draft-pin-button[aria-pressed="true"] svg { fill: currentColor; }
+.draft-pin-button:disabled { opacity: .45; cursor: not-allowed; }
+.draft-row.pinned:not(.active) { border-left: 3px solid var(--accent); padding-left: 9px; }
 .pending-badge { font-family: var(--font-mono); color: var(--muted); font-size: 12px; }
 .note-status-field[hidden] { display: none !important; }
 .note-status-badge { border-color: var(--border); color: var(--muted); }

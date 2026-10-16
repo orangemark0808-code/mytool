@@ -477,3 +477,39 @@ test('tag edits immediately update filters, preserve unknown categories on cance
   assert.equal(h.run('state.listTagEditor'), null);
   assert.ok(!h.elements.get('draftList').innerHTML.includes('data-open-list-tag='));
 });
+
+test('pinned articles lead the list, sync, and keep the visible updated date', async () => {
+  const h = harness();
+  h.context.newer = core.normalizeDraft({ ...h.draft, id: 'newer', title: 'Newer article', createdAt: '2026-10-05T00:00:00Z' }, { remote: true });
+  let saved;
+  h.context.testFirebase.doc = (_collection, id) => ({ id });
+  h.context.testFirebase.runTransaction = async (_db, callback) => callback({
+    get: async ({ id }) => ({ id, exists: () => true, data: () => structuredClone(h.draft) }),
+    set: (_ref, data) => { saved = data; },
+  });
+  h.run("state.drafts.push(newer);state.firebaseReady=state.remoteReady=true;showView('list');");
+  assert.ok(h.elements.get('draftList').innerHTML.indexOf('Newer article') < h.elements.get('draftList').innerHTML.indexOf('Synthetic'));
+  h.events.get('draftList:click')({ target: { closest: () => ({ dataset: { pin: 'd' } }) } });
+  const html = h.elements.get('draftList').innerHTML;
+  assert.ok(html.indexOf('Synthetic') < html.indexOf('Newer article'));
+  assert.match(html, /aria-pressed="true"/);
+  assert.equal(h.elements.get('listOrderDescription').textContent, 'ピン止めを先頭・作成日の新しい順');
+  assert.equal(h.run('currentDraft().updatedAt'), h.draft.updatedAt);
+  assert.equal(h.run('currentDraft().pendingSync'), true);
+  assert.ok(JSON.parse(h.storage.get(`${core.storageKey('account-a')}:draft:d`)).pinnedAt);
+  await h.run("saveDraftById('d');");
+  assert.ok(saved.pinnedAt); assert.equal(saved.body, h.draft.body); assert.equal(saved.updatedAt, h.draft.updatedAt);
+  h.run("togglePin('d');");
+  assert.equal(h.run('currentDraft().pinnedAt'), null);
+  assert.equal(h.elements.get('listOrderDescription').textContent, '作成日の新しい順');
+});
+
+test('trash ignores pins and restoring keeps the pin', () => {
+  const h = harness();
+  h.run("showView('list');togglePin('d');deleteDraft('d');state.showTrash=true;renderList();");
+  assert.ok(!h.elements.get('draftList').innerHTML.includes('data-pin='));
+  h.run("togglePin('d');");
+  assert.ok(h.run('currentDraft() ? currentDraft().pinnedAt : state.drafts[0].pinnedAt'));
+  h.run("restoreDraft('d');state.showTrash=false;renderList();");
+  assert.match(h.elements.get('draftList').innerHTML, /pinned/);
+});
