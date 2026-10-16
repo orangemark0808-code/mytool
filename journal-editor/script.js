@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-3';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-3';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-4';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-4';
 
-const VERSION = '2026-10-16-3';
+const VERSION = '2026-10-16-4';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
@@ -189,7 +189,10 @@ function pumpSync() {
 }
 function scheduleSave() {
   let draft = currentDraft();
-  if (!draft || draft.deletedAt || !state.user) return;
+  // currentId may be restored at login while the editor is still empty, or
+  // receive newer remote data while the editor is hidden. Only save fields
+  // that are visibly loaded for this article.
+  if (!draft || draft.deletedAt || !state.user || state.view !== 'editor' || state.editorDraftId !== draft.id) return;
   const category = categorySelect.value || null;
   const categoryLabel = category ? categoryName(category, draft.category === category ? draft.categoryName : '') : '';
   const noteStatus = categoryLabel === 'note用' ? (noteStatusSelect.value === 'published' ? 'published' : 'unpublished') : draft.noteStatus;
@@ -589,6 +592,15 @@ function showView(view) {
   if (view === 'list') renderList(); if (view === 'settings') { renderCategoryManageList(); updateMigrationPanel(); }
   closeMore(); updateToolbarVisibility();
 }
+function openJournalList() {
+  if (!state.user || state.bulkAssigning || state.bulkPurging) return;
+  finishComposition();
+  state.showTrash = false; state.listTagEditor = null;
+  state.searchQuery = ''; $('searchInput').value = '';
+  state.categoryFilter = state.noteStatusFilter = 'all';
+  state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = '';
+  showView('list');
+}
 function loadDraft(id) {
   if (state.bulkAssigning || state.bulkPurging) return;
   finishComposition();
@@ -885,7 +897,7 @@ document.addEventListener('keydown', (event) => { if (event.key === 'Escape') cl
 $('markdownCopyButton').addEventListener('click', () => copyMarkdown().catch(() => toast('コピーできませんでした。.md保存も利用できます')));
 $('downloadButton').addEventListener('click', download); $('backupButton').addEventListener('click', backup);
 for (const id of ['newButton', 'listNewButton']) $(id).addEventListener('click', newDraft);
-for (const id of ['homeButton', 'draftsButton']) $(id).addEventListener('click', () => showView('list'));
+for (const id of ['homeButton', 'draftsButton']) $(id).addEventListener('click', openJournalList);
 $('settingsButton').addEventListener('click', () => showView('settings'));
 $('bulkDiaryButton').addEventListener('click', requestBulkDiaryConversion);
 $('bulkDiaryConfirmButton').addEventListener('click', convertUncategorizedToDiary);

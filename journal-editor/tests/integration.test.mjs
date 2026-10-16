@@ -37,7 +37,7 @@ function harness() {
   const draft = core.normalizeDraft({ id: 'd', title: 'Synthetic', body: 'original', category: 'unknown-category', categoryName: 'Legacy name', createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z', revision: 'v1' }, { remote: true });
   context.fixture = draft;
   serverRecords.set(draft.id, draft);
-  run("state.drafts=[fixture];state.currentId='d';titleInput.value='Synthetic';bodyInput.value='original';renderCategoryOptions();resetHistory();persistLocal();");
+  run("state.drafts=[fixture];state.currentId=state.editorDraftId='d';titleInput.value='Synthetic';bodyInput.value='original';renderCategoryOptions();resetHistory();persistLocal();");
   const articleSnapshot = (drafts, fromCache = false, updateServer = true) => {
     if (!fromCache && updateServer) { serverRecords.clear(); for (const draft of drafts) serverRecords.set(draft.id, draft); }
     const callback = listeners.get('users/account-a/blogEditorDrafts').callback;
@@ -87,9 +87,9 @@ test('cache-only article or category snapshots revoke the synced label', () => {
 
 for (const kind of ['soft-delete', 'purge', 'edit']) {
   test(`a ${kind} received before an upload resolves is rechecked after the write`, async () => {
-    const h = harness(); connect(h); h.run("showView('list');");
+    const h = harness(); connect(h);
     const server = delayedWrite(h);
-    h.elements.get('bodyInput').value = 'uploaded text'; h.run('scheduleSave();');
+    h.elements.get('bodyInput').value = 'uploaded text'; h.run("scheduleSave();showView('list');");
     const saving = h.run("saveDraftById('d')"); await server.didCommit;
     const saved = server.records.get('d');
     const later = kind === 'purge' ? [] : [{ ...saved, revision: 'other-device',
@@ -273,6 +273,64 @@ test('new article after preview always opens the text input mode', () => {
   assert.equal(h.run('state.mode'), 'edit');
   assert.equal(h.elements.get('workspace').className, 'workspace mode-edit');
   assert.equal(h.run('state.view'), 'editor');
+});
+
+test('logout after account reload never saves the empty, unloaded editor over the restored article', async () => {
+  const h = harness(); let signedOut = false;
+  h.context.testFirebase.signOut = async () => { signedOut = true; };
+  await h.run("handleAuth({uid:'account-a'})");
+  assert.equal(h.run('state.currentId'), 'd');
+  assert.equal(h.run('state.editorDraftId'), null);
+  assert.equal(h.elements.get('bodyInput').value, '');
+  await h.run('logout();');
+  assert.equal(signedOut, true);
+  assert.equal(h.run('currentDraft().title'), 'Synthetic');
+  assert.equal(h.run('currentDraft().body'), 'original');
+  assert.equal(h.run('currentDraft().pendingSync'), false);
+  assert.equal(JSON.parse(h.storage.get(`${core.storageKey('account-a')}:draft:d`)).body, 'original');
+});
+
+test('logout from the list cannot overwrite a newer server update with hidden editor fields', async () => {
+  const h = harness(); connect(h);
+  h.context.testFirebase.signOut = async () => {};
+  h.run("showView('list');");
+  h.articleSnapshot([{ ...h.draft, title: 'remote title', body: 'remote body', revision: 'remote-v2' }]);
+  assert.equal(h.elements.get('bodyInput').value, 'original');
+  await h.run('logout();');
+  assert.equal(h.run('currentDraft().body'), 'remote body');
+  assert.equal(h.run('currentDraft().title'), 'remote title');
+  assert.equal(h.run('currentDraft().pendingSync'), false);
+});
+
+test('editor fields belonging to a different article cannot be saved into currentId', () => {
+  const h = harness(); h.run("state.editorDraftId='other';titleInput.value='wrong';bodyInput.value='wrong';scheduleSave();");
+  assert.equal(h.run('currentDraft().body'), 'original');
+  assert.equal(h.run('currentDraft().title'), 'Synthetic');
+});
+
+for (const button of ['homeButton', 'draftsButton']) {
+  test(`${button} exits trash, clears deletion review and opens the complete journal list`, () => {
+    const h = harness();
+    h.run("showView('list');state.showTrash=true;state.searchQuery='trash-only';$('searchInput').value='trash-only';state.categoryFilter='note';state.noteStatusFilter='published';state.selectedTrash.add('d');state.purgeTargets=[fixture];$('purgeConfirmation').classList.remove('hidden');renderList();");
+    const before = h.run('JSON.stringify(state.drafts)');
+    h.events.get(`${button}:click`)();
+    assert.equal(h.run('state.showTrash'), false);
+    assert.equal(h.elements.get('listTitle').textContent, 'Journal一覧');
+    assert.equal(h.elements.get('searchInput').value, '');
+    assert.equal(h.run('state.categoryFilter'), 'all');
+    assert.equal(h.run('state.noteStatusFilter'), 'all');
+    assert.equal(h.run('state.selectedTrash.size'), 0);
+    assert.equal(h.run('state.purgeTargets.length'), 0);
+    assert.equal(h.elements.get('purgeConfirmation').classList.contains('hidden'), true);
+    assert.match(h.elements.get('draftList').innerHTML, /Synthetic/);
+    assert.equal(h.run('JSON.stringify(state.drafts)'), before);
+  });
+}
+
+test('header navigation waits for a running bulk deletion before clearing its state', () => {
+  const h = harness(); h.run('state.showTrash=true;state.bulkPurging=true;');
+  h.events.get('homeButton:click')();
+  assert.equal(h.run('state.showTrash'), true);
 });
 
 test('three clients converge despite historical purge markers and existing conflict copies', async () => {
