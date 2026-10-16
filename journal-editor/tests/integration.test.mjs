@@ -40,6 +40,235 @@ function harness() {
   return { context, elements, storage, events, timers, listeners, run, draft, articleSnapshot };
 }
 
+function connect(h) {
+  h.run('startRemoteSync();state.firebaseReady=true;');
+  h.articleSnapshot([h.draft]);
+  confirmCategories(h);
+}
+function confirmCategories(h, fromCache = false) {
+  h.listeners.get('users/account-a/blogEditorMigrations/editorCategoriesV2').callback({
+    metadata: { fromCache, hasPendingWrites: false }, exists: () => true,
+    data: () => ({ records: h.run('state.categories') }),
+  });
+}
+function delayedWrite(h) {
+  const records = new Map([[h.draft.id, h.draft]]);
+  let release, committed;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const didCommit = new Promise((resolve) => { committed = resolve; });
+  h.context.testFirebase.runTransaction = async (_db, callback) => {
+    const result = await callback({
+      get: async (ref) => ({ id: ref.path, exists: () => records.has(ref.path), data: () => records.get(ref.path) }),
+      set: (ref, payload) => records.set(ref.path, payload),
+    });
+    committed(); await gate; return result;
+  };
+  return { records, release, didCommit };
+}
+
+test('cache-only article or category snapshots revoke the synced label', () => {
+  const h = harness(); connect(h);
+  assert.equal(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+  h.articleSnapshot([h.draft], true);
+  assert.equal(h.elements.get('syncStatus').textContent, '同期を確認中');
+  // Initial readiness remains available for offline-first upload attempts.
+  assert.equal(h.run('state.remoteReady'), true);
+  h.articleSnapshot([h.draft]); confirmCategories(h, true);
+  assert.equal(h.elements.get('syncStatus').textContent, '同期を確認中');
+  confirmCategories(h);
+  assert.equal(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+});
+
+for (const kind of ['soft-delete', 'purge', 'edit']) {
+  test(`a ${kind} received before an upload resolves is rechecked after the write`, async () => {
+    const h = harness(); connect(h); h.run("showView('list');");
+    const server = delayedWrite(h);
+    h.elements.get('bodyInput').value = 'uploaded text'; h.run('scheduleSave();');
+    const saving = h.run("saveDraftById('d')"); await server.didCommit;
+    const saved = server.records.get('d');
+    const later = kind === 'purge' ? [] : [{ ...saved, revision: 'other-device',
+      ...(kind === 'soft-delete' ? { deletedAt: '2026-10-16T03:00:00Z' } : { body: 'newer remote text' }) }];
+    const previousListener = h.listeners.get('users/account-a/blogEditorDrafts').callback;
+    h.articleSnapshot(later); server.release(); await saving;
+    assert.notEqual(h.listeners.get('users/account-a/blogEditorDrafts').callback, previousListener);
+    assert.notEqual(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+    // A superseded listener cannot restore a stale version.
+    previousListener({ metadata: { fromCache: false, hasPendingWrites: false }, docs: [{ id: 'd', data: () => saved }] });
+    h.articleSnapshot(later); confirmCategories(h);
+    const local = h.run("state.drafts.find(d=>d.id==='d')");
+    if (kind === 'purge') assert.equal(local, undefined);
+    else if (kind === 'soft-delete') assert.ok(local.deletedAt);
+    else assert.equal(local.body, 'newer remote text');
+    assert.equal(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+  });
+}
+
+test('a pre-commit snapshot is not replayed over a successful upload', async () => {
+  const h = harness(); connect(h); const server = delayedWrite(h);
+  h.elements.get('bodyInput').value = 'new saved text'; h.run('scheduleSave();');
+  const saving = h.run("saveDraftById('d')"); await server.didCommit;
+  h.articleSnapshot([h.draft]); server.release(); await saving;
+  assert.equal(h.run('currentDraft().body'), 'new saved text');
+  h.articleSnapshot([...server.records.values()]); confirmCategories(h);
+  assert.equal(h.run('currentDraft().body'), 'new saved text');
+  assert.equal(h.run('state.drafts.length'), 1);
+});
+
+test('a normal acknowledged upload does not restart the listeners', async () => {
+  const h = harness(); connect(h); const server = delayedWrite(h);
+  const listener = h.listeners.get('users/account-a/blogEditorDrafts').callback;
+  h.elements.get('bodyInput').value = 'new saved text'; h.run('scheduleSave();');
+  const saving = h.run("saveDraftById('d')"); await server.didCommit;
+  h.articleSnapshot([...server.records.values()]); server.release(); await saving;
+  assert.equal(h.listeners.get('users/account-a/blogEditorDrafts').callback, listener);
+  assert.equal(h.elements.get('syncStatus').textContent, 'クラウド同期済み');
+});
+
+test('newer local typing survives deletion received during the previous upload', async () => {
+  const h = harness(); connect(h); const server = delayedWrite(h);
+  h.elements.get('bodyInput').value = 'first edit'; h.run('scheduleSave();');
+  const saving = h.run("saveDraftById('d')"); await server.didCommit;
+  h.elements.get('bodyInput').value = 'newer unsent edit'; h.run('scheduleSave();');
+  const deleted = { ...server.records.get('d'), revision: 'deleted-elsewhere', deletedAt: '2026-10-16T03:00:00Z' };
+  h.articleSnapshot([deleted]); server.release(); await saving;
+  h.articleSnapshot([deleted]);
+  assert.equal(h.elements.get('bodyInput').value, 'newer unsent edit');
+  assert.equal(h.run('currentDraft().pendingSync'), true);
+  server.records.set('d', deleted);
+  await h.run("saveDraftById('d')");
+  assert.notEqual(h.run('state.currentId'), 'd');
+  assert.equal(h.run('currentDraft().body'), 'newer unsent edit');
+  assert.ok(server.records.get('d').deletedAt);
+});
+
+for (const input of ['bodyInput', 'titleInput']) {
+  test(`${input} composition preserves local text and defers remote replacement`, async () => {
+    const h = harness(); connect(h);
+    h.events.get(`${input}:compositionstart`)();
+    // A remote update before the first IME input must not change the baseline.
+    h.articleSnapshot([{ ...h.draft, title: 'remote title', body: 'remote body', revision: 'remote-edit' }]);
+    assert.equal(h.elements.get('bodyInput').value, 'original');
+    assert.equal(h.elements.get('titleInput').value, 'Synthetic');
+    h.elements.get(input).value = '変換途中'; h.events.get(`${input}:input`)();
+    let uploads = 0;
+    h.context.testFirebase.runTransaction = async () => { uploads++; throw new Error('not during composition'); };
+    await h.run("saveDraftById('d')");
+    assert.equal(uploads, 0);
+    const saved = JSON.parse(h.storage.get(`${core.storageKey('account-a')}:draft:d`));
+    assert.equal(saved[input === 'bodyInput' ? 'body' : 'title'], '変換途中');
+    h.elements.get(input).value = '変換確定'; h.events.get(`${input}:compositionend`)();
+    assert.equal(h.elements.get(input).value, '変換確定');
+    assert.equal(h.run('currentDraft().pendingSync'), true);
+    assert.equal(h.run('currentDraft().baseVersion'), h.draft.baseVersion);
+    assert.equal(h.run("state.saveTimers.has('d')"), true);
+  });
+}
+
+test('cancelled composition applies a deferred update without claiming cached data is synced', () => {
+  const h = harness(); connect(h);
+  h.events.get('bodyInput:compositionstart')();
+  const remote = { ...h.draft, body: 'new remote text', revision: 'remote-edit' };
+  h.articleSnapshot([remote]); h.articleSnapshot([remote], true);
+  h.events.get('bodyInput:compositionend')();
+  assert.equal(h.elements.get('bodyInput').value, 'new remote text');
+  assert.equal(h.run('currentDraft().pendingSync'), false);
+  assert.equal(h.elements.get('syncStatus').textContent, '同期を確認中');
+});
+
+test('an upload finishing during composition waits for the final local input', async () => {
+  const h = harness(); connect(h); const server = delayedWrite(h);
+  h.elements.get('bodyInput').value = 'first edit'; h.run('scheduleSave();');
+  const saving = h.run("saveDraftById('d')"); await server.didCommit;
+  h.events.get('bodyInput:compositionstart')();
+  h.elements.get('bodyInput').value = '変換途中'; h.events.get('bodyInput:input')();
+  server.release(); await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.run("state.writes.has('d')"), true);
+  assert.equal(h.elements.get('bodyInput').value, '変換途中');
+  h.elements.get('bodyInput').value = '変換確定'; h.events.get('bodyInput:compositionend')();
+  await saving;
+  assert.equal(h.run('currentDraft().body'), '変換確定');
+  assert.equal(h.run('currentDraft().pendingSync'), true);
+});
+
+test('a conflict result preserves a newer title composed during the upload', async () => {
+  const h = harness(); connect(h); const server = delayedWrite(h);
+  server.records.set('d', { ...h.draft, body: 'other device edit', revision: 'other-edit' });
+  h.elements.get('bodyInput').value = 'my body'; h.run('scheduleSave();');
+  const saving = h.run("saveDraftById('d')"); await server.didCommit;
+  h.events.get('titleInput:compositionstart')();
+  h.elements.get('titleInput').value = '新しいタイトル'; h.events.get('titleInput:input')();
+  server.release(); await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.elements.get('titleInput').value, '新しいタイトル');
+  h.events.get('titleInput:compositionend')(); await saving;
+  assert.equal(h.run('currentDraft().title'), '新しいタイトル（競合コピー）');
+  assert.equal(h.elements.get('titleInput').value, '新しいタイトル（競合コピー）');
+  assert.equal(h.run('currentDraft().pendingSync'), true);
+  assert.equal(server.records.get('d').body, 'other device edit');
+});
+
+test('releasing deferred composition does not replay stale data for other articles', () => {
+  const h = harness(); connect(h);
+  h.events.get('bodyInput:compositionstart')();
+  h.articleSnapshot([{ ...h.draft, body: 'remote edit', revision: 'remote-edit' }]);
+  h.run("state.drafts.push(normalizeDraft({...fixture,id:'separately-saved'}, {remote:true}));");
+  h.events.get('bodyInput:compositionend')();
+  assert.equal(h.run("state.drafts.some(d=>d.id==='separately-saved')"), true);
+  assert.equal(h.elements.get('bodyInput').value, 'remote edit');
+});
+
+test('deletion deferred during composition leaves a writable recovery after cancellation', () => {
+  const h = harness(); connect(h);
+  h.events.get('bodyInput:compositionstart')(); h.articleSnapshot([]);
+  assert.equal(h.run('state.currentId'), 'd');
+  h.events.get('bodyInput:compositionend')();
+  assert.notEqual(h.run('state.currentId'), 'd');
+  h.elements.get('bodyInput').value = 'continue typing'; h.events.get('bodyInput:input')();
+  assert.equal(h.run('currentDraft().body'), 'continue typing');
+  assert.equal(h.run('currentDraft().pendingSync'), true);
+});
+
+test('blur releases composition and account switches discard deferred work', async () => {
+  const h = harness(); connect(h); const server = delayedWrite(h);
+  h.elements.get('bodyInput').value = 'first edit'; h.run('scheduleSave();');
+  const saving = h.run("saveDraftById('d')"); await server.didCommit;
+  h.events.get('bodyInput:compositionstart')();
+  h.elements.get('bodyInput').value = 'blurred IME text'; h.events.get('bodyInput:blur')();
+  assert.equal(h.run('state.composing'), false);
+  assert.equal(h.run('currentDraft().body'), 'blurred IME text');
+  h.events.get('bodyInput:compositionstart')();
+  server.release(); await new Promise((resolve) => setImmediate(resolve));
+  await h.run("handleAuth({uid:'account-b'})"); await saving;
+  assert.equal(h.run('state.drafts.length'), 0);
+  assert.equal(h.run('state.compositionWaiters.size'), 0);
+  assert.equal(h.elements.get('bodyInput').value, '');
+});
+
+test('resuming a page or retrying invalidates old sync confirmation and reconnects', () => {
+  const h = harness(); connect(h);
+  let listener = h.listeners.get('users/account-a/blogEditorDrafts').callback;
+  h.events.get('window:pageshow')({ persisted: true });
+  assert.notEqual(h.listeners.get('users/account-a/blogEditorDrafts').callback, listener);
+  assert.equal(h.elements.get('syncStatus').textContent, '同期を確認中');
+  h.articleSnapshot([h.draft]); confirmCategories(h);
+  h.context.document.visibilityState = 'hidden'; h.events.get('document:visibilitychange')();
+  assert.equal(h.elements.get('syncStatus').textContent, '同期を確認中');
+  listener = h.listeners.get('users/account-a/blogEditorDrafts').callback;
+  h.context.document.visibilityState = 'visible'; h.events.get('document:visibilitychange')();
+  assert.notEqual(h.listeners.get('users/account-a/blogEditorDrafts').callback, listener);
+  h.articleSnapshot([h.draft]); confirmCategories(h);
+  listener = h.listeners.get('users/account-a/blogEditorDrafts').callback;
+  h.run('retrySync();');
+  assert.notEqual(h.listeners.get('users/account-a/blogEditorDrafts').callback, listener);
+  assert.equal(h.elements.get('syncStatus').textContent, '同期を確認中');
+});
+
+test('new article after preview always opens the text input mode', () => {
+  const h = harness(); h.run("setEditorMode('preview');newDraft();");
+  assert.equal(h.run('state.mode'), 'edit');
+  assert.equal(h.elements.get('workspace').className, 'workspace mode-edit');
+  assert.equal(h.run('state.view'), 'editor');
+});
+
 test('Japanese composition Enter is left to the IME', () => {
   const h = harness(); let prevented = false;
   h.events.get('bodyInput:keydown')({ key: 'Enter', isComposing: true, preventDefault() { prevented = true; } });

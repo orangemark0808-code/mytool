@@ -171,7 +171,9 @@ export function applyWriteResult(drafts, sent, result, activeId) {
     return { drafts: drafts.map((draft) => draft.id === sent.id ? next : draft), activeId };
   }
   const copy = live.revision === sent.revision ? result.saved : {
-    ...live, id: result.saved.id, title: result.saved.title, createdAt: result.saved.createdAt,
+    ...live, id: result.saved.id,
+    title: live.title === sent.title ? result.saved.title : `${live.title || '無題の記事'}（${result.original && !result.original.deletedAt ? '競合コピー' : '復元'}）`,
+    createdAt: result.saved.createdAt,
     baseVersion: remoteVersion(result.saved), pendingSync: true,
   };
   const next = drafts.filter((draft) => draft.id !== sent.id && draft.id !== copy.id);
