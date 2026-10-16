@@ -14,7 +14,7 @@ function harness() {
     return { add: (name) => names.add(name), remove: (name) => names.delete(name), contains: (name) => names.has(name), toggle(name, value = !names.has(name)) { value ? names.add(name) : names.delete(name); return value; } };
   };
   function element(id) {
-    if (!elements.has(id)) elements.set(id, { value: '', textContent: '', innerHTML: '', selectionStart: 0, selectionEnd: 0, scrollTop: 0, offsetHeight: 78, classList: classList(), style: { setProperty() {} }, setAttribute() {}, focus() {}, setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }, setRangeText(text, start, end) { this.value = this.value.slice(0, start) + text + this.value.slice(end); this.selectionStart = this.selectionEnd = start + text.length; }, addEventListener(name, fn) { events.set(`${id}:${name}`, fn); } });
+    if (!elements.has(id)) elements.set(id, { value: '', textContent: '', innerHTML: '', selectionStart: 0, selectionEnd: 0, scrollTop: 0, offsetHeight: 78, classList: classList(), style: { setProperty() {} }, setAttribute() {}, focus() {}, blur() {}, setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }, setRangeText(text, start, end) { this.value = this.value.slice(0, start) + text + this.value.slice(end); this.selectionStart = this.selectionEnd = start + text.length; }, addEventListener(name, fn) { events.set(`${id}:${name}`, fn); } });
     return elements.get(id);
   }
   for (const id of ['editorView', 'listView', 'settingsView', 'bulkDiaryConfirmation', 'purgeConfirmation']) element(id).classList.add('hidden');
@@ -273,6 +273,95 @@ test('new article after preview always opens the text input mode', () => {
   assert.equal(h.run('state.mode'), 'edit');
   assert.equal(h.elements.get('workspace').className, 'workspace mode-edit');
   assert.equal(h.run('state.view'), 'editor');
+});
+
+test('list sorting switches dates, keeps pins first and never edits article records', () => {
+  const h = harness();
+  h.context.sortArticles = [
+    core.normalizeDraft({ ...h.draft, id: 'old', title: 'Old creation recent edit', createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-10-16T00:00:00Z' }, { remote: true }),
+    core.normalizeDraft({ ...h.draft, id: 'new', title: 'New creation older edit', createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' }, { remote: true }),
+    core.normalizeDraft({ ...h.draft, id: 'pin', title: 'Pinned', pinnedAt: '2026-10-01T00:00:00Z', createdAt: '2026-01-01T00:00:00Z' }, { remote: true }),
+  ];
+  h.run("state.drafts=sortArticles;showView('list');persistLocal();");
+  const before = h.run('JSON.stringify(state.drafts)'), localBefore = h.storage.get(`${core.storageKey('account-a')}:draft:old`);
+  let html = h.elements.get('draftList').innerHTML;
+  assert.ok(html.indexOf('data-edit="pin"') < html.indexOf('data-edit="new"'));
+  assert.ok(html.indexOf('data-edit="new"') < html.indexOf('data-edit="old"'));
+  h.events.get('listSortSelect:change')({ target: { value: 'updatedAt' } });
+  html = h.elements.get('draftList').innerHTML;
+  assert.ok(html.indexOf('data-edit="pin"') < html.indexOf('data-edit="old"'));
+  assert.ok(html.indexOf('data-edit="old"') < html.indexOf('data-edit="new"'));
+  assert.equal(h.elements.get('listOrderDescription').textContent, 'ピン止めを先頭・更新日の新しい順');
+  assert.equal(h.run('readListSort()'), 'updatedAt');
+  assert.equal(h.run('JSON.stringify(state.drafts)'), before);
+  assert.equal(h.storage.get(`${core.storageKey('account-a')}:draft:old`), localBefore);
+  assert.equal(h.run('state.saveTimers.size'), 0);
+  h.events.get('listSortSelect:change')({ target: { value: 'createdAt' } });
+  assert.equal(h.run('readListSort()'), 'createdAt');
+});
+
+test('sort preference survives trash and filters; trash keeps its own updated order', () => {
+  const h = harness(); h.run("changeListSort('updatedAt');setListCategoryFilter('diary');");
+  assert.equal(h.run('state.listSort'), 'updatedAt');
+  h.events.get('trashButton:click')();
+  assert.equal(h.elements.get('listSortField').hidden, true);
+  assert.equal(h.elements.get('backToListLabel').hidden, false);
+  assert.equal(h.elements.get('trashButton').classList.contains('list-back-button'), true);
+  assert.equal(h.elements.get('listOrderDescription').textContent, '更新日の新しい順');
+  h.events.get('homeButton:click')();
+  assert.equal(h.elements.get('listSortField').hidden, false);
+  assert.equal(h.elements.get('backToListLabel').hidden, true);
+  assert.equal(h.run('state.listSort'), 'updatedAt');
+  h.storage.set('orangemania-journal-list-sort-v1', 'invalid');
+  assert.equal(h.run('readListSort()'), 'createdAt');
+});
+
+test('copy suffixes become unique escaped list labels without changing saved or editable titles', () => {
+  const h = harness();
+  h.run("state.drafts[0].title='<Synthetic>（競合コピー）（復元）（復元）';showView('list');");
+  const original = h.run('currentDraft().title');
+  const html = h.elements.get('draftList').innerHTML;
+  assert.match(html, /&lt;Synthetic&gt;<\/button>/);
+  assert.equal((html.match(/class="article-state-badge"/g) || []).length, 2);
+  assert.ok(!h.run("draftTitleMarkup(currentDraft())").includes('（復元）（復元）'));
+  assert.equal(h.run('currentDraft().title'), original);
+  h.run("loadDraft('d');");
+  assert.equal(h.elements.get('titleInput').value, original);
+});
+
+test('PC keeps the normal editing layout and split view', () => {
+  const h = harness(); h.events.get('bodyInput:focus')();
+  assert.equal(h.context.document.body.classList.contains('editor-typing'), false);
+  h.run("setEditorMode('split');");
+  assert.equal(h.run('state.mode'), 'split');
+});
+
+test('using a mouse on a touch-capable PC restores desktop editing controls', () => {
+  const h = harness(); h.context.window.matchMedia = (query) => ({ matches: query.includes('pointer: coarse') });
+  h.context.document.activeElement = h.elements.get('bodyInput');
+  h.events.get('window:pointerdown')({ pointerType: 'touch' });
+  assert.equal(h.context.document.body.classList.contains('compact-editor'), true);
+  h.events.get('window:pointerdown')({ pointerType: 'mouse' });
+  assert.equal(h.context.document.body.classList.contains('compact-editor'), false);
+  assert.equal(h.context.document.body.classList.contains('editor-typing'), false);
+  h.run("setEditorMode('split');");
+  assert.equal(h.run('state.mode'), 'split');
+});
+
+test('tablet and phone focused editing preserves IME input and Done restores controls', () => {
+  const h = harness();
+  h.context.window.matchMedia = (query) => ({ matches: query.includes('pointer: coarse') });
+  h.events.get('bodyInput:focus')();
+  assert.equal(h.context.document.body.classList.contains('editor-typing'), true);
+  h.events.get('bodyInput:compositionstart')();
+  h.elements.get('bodyInput').value = '外出先での追記'; h.events.get('bodyInput:input')();
+  h.events.get('finishInputButton:click')();
+  assert.equal(h.run('currentDraft().body'), '外出先での追記');
+  assert.equal(h.run('currentDraft().pendingSync'), true);
+  assert.equal(h.run('state.composing'), false);
+  assert.equal(h.context.document.body.classList.contains('editor-typing'), false);
+  h.run("setEditorMode('split');");
+  assert.equal(h.run('state.mode'), 'edit');
 });
 
 test('logout after account reload never saves the empty, unloaded editor over the restored article', async () => {

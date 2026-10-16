@@ -1,14 +1,18 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-4';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-4';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-5';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-5';
 
-const VERSION = '2026-10-16-4';
+const VERSION = '2026-10-16-5';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
+const SORT_KEY = 'orangemania-journal-list-sort-v1';
+const COMPACT_EDITOR_QUERY = '(max-width: 700px), (max-width: 1366px) and (pointer: coarse)';
 const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
 const titleInput = $('titleInput'), bodyInput = $('bodyInput'), categorySelect = $('categorySelect'), noteStatusSelect = $('noteStatusSelect');
 const state = {
   drafts: [], categories: [], currentId: null, editorDraftId: null, user: null, view: 'list', mode: 'edit',
   searchQuery: '', categoryFilter: 'all', noteStatusFilter: 'all', showTrash: false, history: [], historyIndex: -1, composing: false,
+  listSort: readListSort(),
+  pointerType: null,
   previewDirty: true, saveTimers: new Map(), writes: new Map(), session: 0,
   remoteReady: false, categoriesReady: false, categoriesDirty: false, categoriesWriting: false,
   draftsCurrent: false, categoriesCurrent: false, serverSnapshotCount: 0, remoteRefreshNeeded: false,
@@ -22,6 +26,18 @@ const state = {
 };
 
 function currentDraft() { return state.drafts.find((draft) => draft.id === state.currentId); }
+function isCompactEditor() {
+  return window.matchMedia('(max-width: 700px)').matches || (state.pointerType !== 'mouse' && window.matchMedia(COMPACT_EDITOR_QUERY).matches);
+}
+function readListSort() {
+  try { return localStorage.getItem(SORT_KEY) === 'updatedAt' ? 'updatedAt' : 'createdAt'; } catch { return 'createdAt'; }
+}
+function changeListSort(value) {
+  if (!['createdAt', 'updatedAt'].includes(value) || state.showTrash || state.bulkPurging || state.bulkAssigning) return;
+  state.listSort = value; state.listTagEditor = null;
+  try { localStorage.setItem(SORT_KEY, value); } catch {}
+  renderList();
+}
 function activeCategories() { return orderedCategories(state.categories); }
 function noteStatusLabel(draft) { return draft.noteStatus === 'published' ? '投稿済' : '未投稿'; }
 function categoryBadgeKind(draft) {
@@ -576,7 +592,7 @@ function toolbar(action) {
 }
 function setEditorMode(mode, persist = true) {
   if (!['edit', 'preview', 'split'].includes(mode)) mode = 'edit';
-  if (window.matchMedia('(max-width: 700px)').matches && mode === 'split') mode = 'edit';
+  if (isCompactEditor() && mode === 'split') mode = 'edit';
   state.mode = mode; $('workspace').className = `workspace mode-${mode}`; $('editorView').classList.toggle('single-mode', mode !== 'split');
   for (const [id, value] of [['editTab', 'edit'], ['previewTab', 'preview'], ['splitTab', 'split']]) { $(id).classList.toggle('active', value === mode); $(id).setAttribute('aria-selected', String(value === mode)); }
   if (mode !== 'edit') renderPreview(); if (persist) { try { localStorage.setItem(VIEW_KEY, mode); } catch {} }
@@ -644,8 +660,20 @@ function renderListFilters() {
   for (const [id, value] of [['filterNoteAll', 'all'], ['filterUnpublished', 'unpublished'], ['filterPublished', 'published']]) $(id).setAttribute('aria-pressed', String(state.noteStatusFilter === value));
 }
 function draftTitleMarkup(draft) {
-  const title = escapeHtml(draft.title);
+  const title = escapeHtml(draftDisplayTitle(draft).title);
   return state.showTrash ? `<span class="draft-title">${title}</span>` : `<button class="draft-title draft-title-button" type="button" data-edit="${escapeHtml(draft.id)}" title="記事を編集">${title}</button>`;
+}
+function draftDisplayTitle(draft) {
+  const suffix = draft.title.match(/(?:（(?:競合コピー|復元)）)+$/u);
+  if (!suffix || suffix.index === 0) return { title: draft.title, labels: [] };
+  return { title: draft.title.slice(0, suffix.index), labels: [...new Set(Array.from(suffix[0].matchAll(/（(競合コピー|復元)）/gu), (match) => match[1]))] };
+}
+function draftStateMarkup(draft) {
+  return draftDisplayTitle(draft).labels.map((label) => `<span class="article-state-badge">${label}</span>`).join('');
+}
+function draftAccessibleTitle(draft) {
+  const display = draftDisplayTitle(draft);
+  return display.title + (display.labels.length ? `（${display.labels.join('・')}）` : '');
 }
 function listTagId(id, kind, part) { return `list-tag-${part}-${kind}-${encodeURIComponent(id)}`; }
 function listTagMarkup(draft, kind) {
@@ -666,7 +694,7 @@ function listTagMarkup(draft, kind) {
       options += `<option value="" ${!draft.category ? 'selected' : ''}>未分類</option>`;
     } else options = `<option value="unpublished" ${draft.noteStatus !== 'published' ? 'selected' : ''}>未投稿</option><option value="published" ${draft.noteStatus === 'published' ? 'selected' : ''}>投稿済</option>`;
   }
-  return `<div class="list-tag-field"><button id="${escapeHtml(listTagId(draft.id, kind, 'trigger'))}" class="list-tag-button" type="button" data-open-list-tag="${escapeHtml(draft.id)}" data-tag-kind="${kind}" title="${category ? 'カテゴリ' : '投稿状況'}を変更" aria-label="${category ? 'カテゴリ' : '投稿状況'}を変更：${escapeHtml(label)}" aria-expanded="${open}" ${open ? `aria-controls="${escapeHtml(selectId)}"` : ''} ${disabled ? 'disabled' : ''}>${badge}<svg class="tag-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></span></button>${open ? `<div class="list-tag-popover" role="group" aria-label="${category ? 'カテゴリ' : '投稿状況'}を変更"><select id="${escapeHtml(selectId)}" data-list-tag-select="${escapeHtml(draft.id)}" data-tag-kind="${kind}" aria-label="${escapeHtml(draft.title)}の${category ? 'カテゴリ' : '投稿状況'}">${options}</select><button class="secondary-button" type="button" data-close-list-tag="true">閉じる</button></div>` : ''}</div>`;
+  return `<div class="list-tag-field"><button id="${escapeHtml(listTagId(draft.id, kind, 'trigger'))}" class="list-tag-button" type="button" data-open-list-tag="${escapeHtml(draft.id)}" data-tag-kind="${kind}" title="${category ? 'カテゴリ' : '投稿状況'}を変更" aria-label="${category ? 'カテゴリ' : '投稿状況'}を変更：${escapeHtml(label)}" aria-expanded="${open}" ${open ? `aria-controls="${escapeHtml(selectId)}"` : ''} ${disabled ? 'disabled' : ''}>${badge}<svg class="tag-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></span></button>${open ? `<div class="list-tag-popover" role="group" aria-label="${category ? 'カテゴリ' : '投稿状況'}を変更"><select id="${escapeHtml(selectId)}" data-list-tag-select="${escapeHtml(draft.id)}" data-tag-kind="${kind}" aria-label="${escapeHtml(draftAccessibleTitle(draft))}の${category ? 'カテゴリ' : '投稿状況'}">${options}</select><button class="secondary-button" type="button" data-close-list-tag="true">閉じる</button></div>` : ''}</div>`;
 }
 function openListTagEditor(id, kind) {
   const draft = state.drafts.find((item) => item.id === id && !item.deletedAt);
@@ -767,7 +795,10 @@ async function purgeSelectedDrafts() {
 function renderList() {
   const query = state.searchQuery.trim().toLowerCase();
   renderListFilters();
-  const sortField = state.showTrash ? 'updatedAt' : 'createdAt';
+  const sortField = state.showTrash ? 'updatedAt' : state.listSort;
+  $('listSortField').hidden = state.showTrash;
+  $('listSortSelect').value = state.listSort;
+  $('listSortSelect').disabled = state.bulkPurging || state.bulkAssigning;
   // Pinned articles lead the list (newest pin first); trash ignores pins.
   const pinTime = (draft) => state.showTrash ? 0 : Date.parse(draft.pinnedAt) || 0;
   let drafts = state.drafts.filter((draft) => Boolean(draft.deletedAt) === state.showTrash)
@@ -782,18 +813,21 @@ function renderList() {
   $('trashButton').setAttribute('aria-label', trashLabel); $('trashButton').setAttribute('title', trashLabel); $('trashButton').setAttribute('aria-pressed', String(state.showTrash));
   $('trashNavIcon').classList.toggle('hidden', state.showTrash);
   $('backToListIcon').classList.toggle('hidden', !state.showTrash);
+  $('backToListLabel').hidden = !state.showTrash;
+  $('trashButton').classList.toggle('list-back-button', state.showTrash);
   $('trashCount').textContent = String(trashCount); $('trashCount').hidden = state.showTrash || trashCount === 0;
   $('trashButton').disabled = state.bulkPurging; $('searchInput').disabled = state.bulkPurging;
   $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';
-  $('listOrderDescription').textContent = state.showTrash ? '更新日の新しい順' : drafts.some((draft) => draft.pinnedAt) ? 'ピン止めを先頭・作成日の新しい順' : '作成日の新しい順';
-  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''} ${!state.showTrash && draft.pinnedAt ? 'pinned' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draft.title)}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}${listTagMarkup(draft, 'category')}${listTagMarkup(draft, 'status')}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span>作成 ${formatDateTime(draft.createdAt)}</span><span>更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `${pinButtonMarkup(draft)}<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+  const orderLabel = sortField === 'updatedAt' ? '更新日の新しい順' : '作成日の新しい順';
+  $('listOrderDescription').textContent = !state.showTrash && drafts.some((draft) => draft.pinnedAt) ? `ピン止めを先頭・${orderLabel}` : orderLabel;
+  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''} ${!state.showTrash && draft.pinnedAt ? 'pinned' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draftAccessibleTitle(draft))}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}</div><div class="draft-label-row">${draftStateMarkup(draft)}${listTagMarkup(draft, 'category')}${listTagMarkup(draft, 'status')}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span class="${sortField === 'createdAt' ? 'sort-date' : ''}">作成 ${formatDateTime(draft.createdAt)}</span><span class="${sortField === 'updatedAt' ? 'sort-date' : ''}">更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `${pinButtonMarkup(draft)}<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
   updateTrashControls();
 }
 function pinButtonId(id) { return `pin-button-${encodeURIComponent(id)}`; }
 function pinButtonMarkup(draft) {
   const label = draft.pinnedAt ? 'ピン止めを外す' : 'ピン止め';
   const disabled = state.bulkAssigning || state.bulkPurging || state.storageReadFailed;
-  return `<button id="${escapeHtml(pinButtonId(draft.id))}" class="small-button draft-icon-button draft-pin-button" data-pin="${escapeHtml(draft.id)}" type="button" aria-pressed="${Boolean(draft.pinnedAt)}" aria-label="${escapeHtml(draft.title)}を${label}" title="${label}" ${disabled ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 17v5M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V17h14v-1.8a2 2 0 0 0-1.1-1.8l-1.8-.9a2 2 0 0 1-1.1-1.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>`;
+  return `<button id="${escapeHtml(pinButtonId(draft.id))}" class="small-button draft-icon-button draft-pin-button" data-pin="${escapeHtml(draft.id)}" type="button" aria-pressed="${Boolean(draft.pinnedAt)}" aria-label="${escapeHtml(draftAccessibleTitle(draft))}を${label}" title="${label}" ${disabled ? 'disabled' : ''}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 17v5M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V17h14v-1.8a2 2 0 0 0-1.1-1.8l-1.8-.9a2 2 0 0 1-1.1-1.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>`;
 }
 // Pinning is list metadata: it syncs like a tag edit but keeps the visible
 // updated date, so the trash order and the article's "更新" stay unchanged.
@@ -858,12 +892,25 @@ async function copyDiagnostic() {
   } catch { toast('診断情報をコピーできませんでした'); }
 }
 function closeMore() { $('toolbarMore').classList.remove('expanded'); $('moreButton').setAttribute('aria-expanded', 'false'); updateToolbarViewport(); }
-function updateToolbarVisibility() { document.body.classList.toggle('editor-active', Boolean(state.user && state.view === 'editor' && state.mode !== 'preview')); updateToolbarViewport(); }
+function updateToolbarVisibility() {
+  document.body.classList.toggle('compact-editor', isCompactEditor());
+  const active = Boolean(state.user && state.view === 'editor' && state.mode !== 'preview');
+  document.body.classList.toggle('editor-active', active);
+  if (!active) document.body.classList.remove('editor-typing');
+  updateToolbarViewport();
+}
+function updateTypingFocus(typing) {
+  const compact = isCompactEditor(); document.body.classList.toggle('compact-editor', compact);
+  document.body.classList.toggle('editor-typing', Boolean(typing && state.user && state.view === 'editor' && state.mode !== 'preview' && compact));
+  updateToolbarViewport();
+}
 function updateToolbarViewport() {
   const viewport = window.visualViewport, gap = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
   document.documentElement.style.setProperty('--keyboard-gap', `${gap}px`);
   document.documentElement.style.setProperty('--keyboard-safe-area', gap > 100 ? '0px' : 'env(safe-area-inset-bottom, 0px)');
   document.documentElement.style.setProperty('--mobile-bar-height', `${document.querySelector('.toolbar-wrap').offsetHeight || 78}px`);
+  document.documentElement.style.setProperty('--editor-viewport-height', `${viewport?.height || window.innerHeight}px`);
+  document.documentElement.style.setProperty('--editor-header-height', `${document.querySelector('.app-header').offsetHeight || 58}px`);
 }
 function onBodyKeydown(event) {
   if (event.isComposing || state.composing || event.keyCode === 229) return;
@@ -882,9 +929,12 @@ bodyInput.addEventListener('input', () => { updatePreview(); if (!state.composin
 for (const input of [titleInput, bodyInput]) {
   input.addEventListener('compositionstart', () => { state.composing = true; state.composingInput = input; });
   input.addEventListener('compositionend', finishComposition);
-  input.addEventListener('blur', () => { if (state.composingInput === input) finishComposition(); });
+  input.addEventListener('blur', () => { if (state.composingInput === input) finishComposition(); if (input === bodyInput) updateTypingFocus(false); });
 }
 bodyInput.addEventListener('keydown', onBodyKeydown);
+bodyInput.addEventListener('focus', () => updateTypingFocus(true));
+$('finishInputButton').addEventListener('click', () => { finishComposition(); bodyInput.blur(); updateTypingFocus(false); });
+$('listSortSelect').addEventListener('change', (event) => changeListSort(event.target.value));
 const toolbarWrap = document.querySelector('.toolbar-wrap');
 toolbarWrap.addEventListener('pointerdown', (event) => { if (event.target.closest('button') && document.activeElement === bodyInput) event.preventDefault(); });
 toolbarWrap.addEventListener('click', (event) => { const action = event.target.closest('[data-action]')?.dataset.action; if (action) { toolbar(action); closeMore(); } });
@@ -954,7 +1004,13 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') retrySync(); else invalidateSyncConfirmation();
 });
 window.addEventListener('pagehide', () => { if (state.user) persistLocal(); });
-window.addEventListener('resize', () => { if (window.matchMedia('(max-width: 700px)').matches && state.mode === 'split') setEditorMode('edit'); updateToolbarViewport(); });
+window.addEventListener('pointerdown', (event) => {
+  if (!['mouse', 'touch', 'pen'].includes(event.pointerType)) return;
+  state.pointerType = event.pointerType;
+  if (isCompactEditor() && state.mode === 'split') setEditorMode('edit');
+  updateTypingFocus(document.activeElement === bodyInput);
+}, { passive: true });
+window.addEventListener('resize', () => { if (isCompactEditor() && state.mode === 'split') setEditorMode('edit'); updateTypingFocus(document.activeElement === bodyInput); });
 window.visualViewport?.addEventListener('resize', updateToolbarViewport); window.visualViewport?.addEventListener('scroll', updateToolbarViewport);
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(updateToolbarViewport).observe(toolbarWrap);
 init();
