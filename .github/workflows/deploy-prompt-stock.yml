@@ -29,6 +29,9 @@ jobs:
       - name: Test Journal Editor
         run: node --test journal-editor/tests/core.test.mjs journal-editor/tests/integration.test.mjs journal-editor/tests/publish.test.mjs
 
+      - name: Test Iroiro
+        run: node --test iroiro/tests/regression.test.mjs iroiro/tests/task.test.mjs
+
       - name: Validate Firebase secrets
         shell: bash
         env:
@@ -88,6 +91,7 @@ jobs:
           cp "iroiro/index.html" "dist/iroiro/index.html"
           cp "iroiro/style.css" "dist/iroiro/style.css"
           cp "iroiro/script.js" "dist/iroiro/script.js"
+          cp "iroiro/task-core.mjs" "dist/iroiro/task-core.mjs"
           cp "iroiro/README.md" "dist/iroiro/README.md"
           cp "journal-editor/README.md" "dist/journal-editor/README.md"
           cp "journal-editor/index.html" "dist/journal-editor/index.html"

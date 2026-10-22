@@ -4,9 +4,17 @@
 
 ## Firebase設定
 
-`firebase-config.example.js` を参考に `firebase-config.local.js` へFirebase Web設定を入れてください。実値はGitに含めません。公開時はGitHub Actionsが同等の `firebase-config.js` を生成する構成を想定しています（現時点ではActionsは未変更）。
+`firebase-config.example.js` を参考に `firebase-config.local.js` へFirebase Web設定を入れてください。実値はGitに含めません。公開時はGitHub ActionsがSecretsから `firebase-config.js` を生成します。
 
 Firestore保存先は `users/{uid}/iroiroNotes/{noteId}`、カテゴリー設定は `users/{uid}/iroiroSettings/main` です。
+
+## タスク管理
+
+- カテゴリー名が「タスク」のとき、専用フォームに切り替わります。タスク一覧から新規作成すると、そのカテゴリーを引き継ぎます。
+- タスク名、任意の期限、状態（未着手・進行中・完了）、優先度（高・通常・低）、チェック項目、補足メモを自動保存します。内容のあるタスクはタスク名が必要です。空の新規タスクは保存しません。
+- タスク一覧は期限の近い順で表示し、完了したタスクを折り畳みます。カードのチェックボックスから完了・未着手を切り替えられます。
+- 期限は端末の現地日付で判定します。未完了で期限を過ぎたタスクを強調し、日付が変わると表示を更新します。
+- タスク設定は `task` フィールド、補足メモは既存の `content` フィールドに保存します。カテゴリーを切り替えてもタスク設定と元の入力形式を保持します。既存の箇条書き・チェックリストは、タスクとして保存するまで元データを書き換えません。
 
 ## バックアップと移行
 
@@ -22,7 +30,9 @@ Firestore保存先は `users/{uid}/iroiroNotes/{noteId}`、カテゴリー設定
 Node.js 18以降で、次を実行します。FirebaseやGoogleアカウントへの接続は不要です。
 
 ```sh
-node --test iroiro/tests/regression.test.mjs
+node --test iroiro/tests/regression.test.mjs iroiro/tests/task.test.mjs
 ```
 
-上記のコマンドは `mytool` フォルダーで実行してください。保存待ち中の追加編集、不正なバックアップ、カテゴリーの統合、途中失敗した移行の再試行を確認します。
+上記のコマンドは `mytool` フォルダーで実行してください。保存待ち中の追加編集、不正なバックアップ、カテゴリーの統合、途中失敗した移行の再試行に加え、タスクの保存・期限・完了操作・互換性を確認します。公開前にGitHub Actionsでも実行します。
+
+画面を架空のデータで確認する場合は `node iroiro/tests/preview-server.mjs` を実行し、`http://127.0.0.1:4177/` を開いてください。データはブラウザー内だけに保存され、Firebaseには接続しません。`/mobile-preview.html` では幅390pxの表示を確認できます。
