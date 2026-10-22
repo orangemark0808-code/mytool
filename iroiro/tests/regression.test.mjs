@@ -1,0 +1,257 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { webcrypto } from 'node:crypto';
+import vm from 'node:vm';
+
+const source = await readFile(new URL('../script.js', import.meta.url), 'utf8');
+const executable = source.replace(/^import .*;\n/gm, '').replace(/initialize\(\);\s*$/, '');
+const tick = () => new Promise(resolve => setImmediate(resolve));
+
+// FirebaseとDOMだけを置き換え、アプリ本体の関数を実行する。外部通信は行わない。
+function harness(initial = []) {
+  const elements = new Map();
+  const timers = new Map();
+  const store = new Map(initial);
+  const writes = [];
+  let timerId = 0;
+  let generatedId = 0;
+  const element = id => {
+    if (!elements.has(id)) elements.set(id, {
+      value: '', textContent: '', innerHTML: '', open: false, disabled: false,
+      dataset: {}, classList: { add() {}, remove() {}, toggle() {} },
+      showModal() { this.open = true; }, close() { this.open = false; },
+      focus() {}, addEventListener() {}, querySelector() { return null; },
+      querySelectorAll() { return []; },
+    });
+    return elements.get(id);
+  };
+  const snapshot = ref => ({
+    exists: () => store.has(ref), data: () => structuredClone(store.get(ref)),
+  });
+  const write = async (ref, data, options) => {
+    await api.beforeWrite?.(ref, data);
+    const next = options?.merge ? { ...store.get(ref), ...structuredClone(data) } : structuredClone(data);
+    store.set(ref, next);
+    writes.push({ ref, data: next });
+  };
+  const context = vm.createContext({
+    window: {}, document: { getElementById: element, querySelectorAll: () => [],
+      body: { dataset: {}, classList: { add() {}, remove() {} } } },
+    crypto: webcrypto, TextEncoder, structuredClone, URL, Date, Intl,
+    setTimeout: (cb, ms) => { timers.set(++timerId, { cb, ms }); return timerId; },
+    clearTimeout: id => timers.delete(id),
+    serverTimestamp: () => new Date('2026-10-22T00:00:00Z'),
+    collection: (_db, ...parts) => parts.join('/'),
+    doc: (...parts) => (typeof parts[0] === 'string' ? parts : parts.slice(1)).join('/'),
+    Timestamp: { fromDate: date => date },
+    getDoc: async ref => snapshot(ref), setDoc: write, updateDoc: write,
+    addDoc: async (ref, data) => { const id = `generated-${++generatedId}`; await write(`${ref}/${id}`, data); return { id }; },
+    runTransaction: async (_db, callback) => {
+      const pending = [];
+      const result = await callback({ get: async ref => snapshot(ref),
+        set: (ref, data, options) => pending.push([ref, data, options]) });
+      for (const args of pending) await write(...args);
+      return result;
+    },
+    writeBatch: () => {
+      const pending = [];
+      return { set: (...args) => pending.push(args), commit: async () => {
+        await api.beforeBatch?.();
+        for (const args of pending) await write(...args);
+      } };
+    },
+    localStorage: { getItem: () => null },
+    onSnapshot: () => () => {}, query: (...args) => args, orderBy: (...args) => args,
+  });
+  vm.runInContext(executable, context);
+  const api = { context, element, timers, store, writes,
+    run: code => vm.runInContext(code, context) };
+  api.run("currentUser={uid:'test-user'}");
+  return api;
+}
+
+const notePath = id => `users/test-user/iroiroNotes/${id}`;
+const settingsPath = 'users/test-user/iroiroSettings/main';
+const backup = (notes = [], categories = []) => ({ app: 'iroiro', backupFormatVersion: 1,
+  data: { notes, settings: { categories } } });
+const category = (id, name = id) => ({ id, name, color: '#FF7F00', order: 0 });
+
+test('閉じる途中の追加入力も保存完了まで待つ', async () => {
+  const h = harness();
+  const pending = [];
+  h.context.updateDoc = (ref, data) => new Promise(resolve => {
+    h.writes.push({ ref, data }); pending.push(resolve);
+  });
+  h.run("openEditor(normalizeNote('note-1',{content:'初期値'}))");
+  h.element('noteContentInput').value = '最初の変更';
+  h.run('syncEditingNoteFromForm();scheduleSave()');
+  const closing = h.run('closeEditor()');
+  h.element('noteContentInput').value = '保存待ち中の追加変更';
+  h.run('syncEditingNoteFromForm();scheduleSave()');
+  pending.shift()();
+  await tick();
+  assert.equal(h.writes.length, 2);
+  assert.equal(h.element('editorDialog').open, true);
+  assert.equal(h.writes[1].data.content, '保存待ち中の追加変更');
+  pending.shift()();
+  await closing;
+  assert.equal(h.element('editorDialog').open, false);
+  assert.equal(h.timers.size, 1); // 初回フォーカス用タイマーのみ残る
+});
+
+test('保存失敗時は編集内容を残し、再試行で保存できる', async () => {
+  const h = harness();
+  h.run("openEditor(normalizeNote('note-1',{content:'初期値'}))");
+  h.element('noteContentInput').value = '未保存の内容';
+  h.run('syncEditingNoteFromForm();scheduleSave()');
+  h.context.updateDoc = async () => { throw new Error('offline'); };
+  await h.run('closeEditor()');
+  assert.equal(h.element('editorDialog').open, true);
+  assert.equal(h.run('editingNote.content'), '未保存の内容');
+  assert.equal(h.run('closingEditor'), false);
+  h.context.updateDoc = async (ref, data) => h.writes.push({ ref, data });
+  await h.run('closeEditor()');
+  assert.equal(h.writes[0].data.content, '未保存の内容');
+  assert.equal(h.element('editorDialog').open, false);
+});
+
+test('新規メモの保存待ち中に編集してもメモを重複作成しない', async () => {
+  const h = harness();
+  let release;
+  h.context.addDoc = (ref, data) => new Promise(resolve => {
+    h.writes.push({ ref, data }); release = () => resolve({ id: 'new-id' });
+  });
+  h.run('openEditor(createNote())');
+  h.element('noteContentInput').value = '最初の本文';
+  h.run('syncEditingNoteFromForm();scheduleSave()');
+  const closing = h.run('closeEditor()');
+  h.element('noteContentInput').value = '追加した本文';
+  h.run('syncEditingNoteFromForm();scheduleSave()');
+  release();
+  await closing;
+  assert.equal(h.writes.length, 2);
+  assert.equal(h.writes[1].ref, notePath('new-id'));
+  assert.equal(h.writes[1].data.content, '追加した本文');
+});
+
+test('HTMLを含むIDと不正なFirestoreパスを復元前に拒否する', () => {
+  const h = harness();
+  for (const id of ['x"><img src=x onerror="void(0)">', 'parent/child', '.', '..', '']) {
+    h.context.input = backup([{ id, note: { content: '本文' } }]);
+    assert.throws(() => h.run('validateBackup(input)'));
+    h.context.input = backup([], [category(id)]);
+    assert.throws(() => h.run('validateBackup(input)'));
+  }
+  h.context.input = backup([], [category('all')]);
+  assert.throws(() => h.run('validateBackup(input)'));
+  h.context.input = backup([], [category('same'), category('same')]);
+  assert.throws(() => h.run('validateBackup(input)'));
+});
+
+test('既存データにHTMLを含むIDがあっても属性をエスケープする', () => {
+  const h = harness();
+  h.context.badId = 'x"><img src=x onerror="void(0)">';
+  h.run("categories=[{id:badId,name:'分類',color:'#FF7F00'}];notes=[normalizeNote(badId,{content:'本文',categoryId:badId})];renderAll();openEditor(notes[0]);renderCategoryManagement()");
+  for (const id of ['sidebarCategories', 'categoryTabs', 'notesGrid', 'noteCategorySelect', 'categoryManagementList']) {
+    assert.equal(h.element(id).innerHTML.includes('<img src=x'), false, id);
+    assert.equal(h.element(id).innerHTML.includes('&quot;&gt;&lt;img'), true, id);
+  }
+});
+
+test('不正なURLキャッシュは無視して本文から安全に再生成する', () => {
+  const h = harness();
+  h.context.input = backup([{ id: 'n1', note: { content: '本文 https://example.com',
+    urls: [null, { url: 'javascript:void(0)' }] } }]);
+  h.run('notes=validateBackup(input).notes.map(x=>normalizeNote(x.id,x.data));renderNotes();openEditor(notes[0])');
+  assert.equal(h.run('notes[0].urls.length'), 1);
+  assert.equal(h.run('notes[0].urls[0].url'), 'https://example.com/');
+  assert.equal(h.element('relatedLinks').innerHTML.includes('javascript:'), false);
+});
+
+test('nullの項目や壊れた形式別データでも一覧・形式切替が動く', () => {
+  const h = harness();
+  h.context.input = backup([{ id: 'n1', note: { type: 'checklist', items: [null, { text: '項目' }],
+    contentByType: { text: 123 }, itemsByType: { bullet: [null, { text: '箇条書き' }] } } }]);
+  h.run('notes=validateBackup(input).notes.map(x=>normalizeNote(x.id,x.data));renderNotes();openEditor(notes[0]);requestTypeChange("bullet")');
+  assert.equal(h.run('notes[0].items.length'), 1);
+});
+
+test('カテゴリー復元は最新の保存済み設定と統合し、既存の参照先を残す', async () => {
+  const h = harness([[settingsPath, { categories: [category('recent'), category('shared', '現在の名前')] }]]);
+  h.context.input = backup([], [category('shared', '復元する名前'), category('old')]);
+  // 画面のキャッシュは古い状態にして、Firestoreから取得することを確認する。
+  h.run("categories=[];notes=[normalizeNote('recent-note',{content:'本文',categoryId:'recent'})];pendingBackup=validateBackup(input)");
+  await h.run('restorePendingBackup()');
+  const restored = h.store.get(settingsPath).categories;
+  assert.deepEqual(restored.map(c => c.id), ['recent', 'shared', 'old']);
+  assert.equal(restored.find(c => c.id === 'shared').name, '復元する名前');
+  h.context.remoteCategories = restored;
+  h.run("applyRemoteCategories(remoteCategories);selectedCategory='recent';renderNotes()");
+  assert.equal(h.element('noteCount').textContent, '1件');
+});
+
+test('すでに参照先がなくなったメモも未分類で検索できる', () => {
+  const h = harness();
+  h.run("categories=[];notes=[normalizeNote('n1',{content:'本文',categoryId:'missing'})];selectedCategory='';renderNotes()");
+  assert.equal(h.element('noteCount').textContent, '1件');
+});
+
+test('復元のバッチ失敗時も個別書込みで同じ保存先へ再試行する', async () => {
+  const h = harness([[settingsPath, { categories: [category('recent')] }]]);
+  h.beforeBatch = async () => { throw new Error('batch failed'); };
+  h.context.input = backup([{ id: 'n1', note: { content: '復元する本文' } }], [category('old')]);
+  h.run('pendingBackup=validateBackup(input)');
+  await h.run('restorePendingBackup()');
+  assert.equal(h.store.get(notePath('n1')).content, '復元する本文');
+  assert.deepEqual(h.store.get(settingsPath).categories.map(c => c.id), ['recent', 'old']);
+});
+
+test('カテゴリー統合に失敗した場合はメモの復元を開始しない', async () => {
+  const h = harness();
+  h.beforeWrite = async ref => { if (ref === settingsPath) throw new Error('offline'); };
+  h.context.input = backup([{ id: 'n1', note: { content: '本文', categoryId: 'restored' } }], [category('restored')]);
+  h.run('pendingBackup=validateBackup(input)');
+  await h.run('restorePendingBackup()');
+  assert.equal(h.store.has(notePath('n1')), false);
+  assert.match(h.element('backupStatus').textContent, /失敗/);
+});
+
+for (const withIds of [true, false]) {
+  test(`途中失敗した移行の再試行で重複・上書きしない（旧ID${withIds ? 'あり' : 'なし'}）`, async () => {
+    const h = harness();
+    const legacy = ['一つ目', '二つ目'].map((content, index) => ({ content, ...(withIds ? { id: `legacy-${index}` } : {}) }));
+    h.context.localStorage = { getItem: () => JSON.stringify(legacy) };
+    let failOnce = true;
+    h.beforeWrite = async (ref, data) => {
+      if (ref.includes('/iroiroNotes/') && data.content === '二つ目' && failOnce) {
+        failOnce = false; throw new Error('simulated offline');
+      }
+    };
+    try { await h.run('migrateLegacy()'); } catch { /* 修正前の未処理エラーも検査対象 */ }
+    const first = [...h.store].find(([ref]) => ref.includes('/iroiroNotes/'));
+    assert.ok(first);
+    h.store.set(first[0], { ...first[1], content: '移行後に編集した内容' });
+    h.context.loadedNotes = [...h.store].filter(([ref]) => ref.includes('/iroiroNotes/')).map(([ref, data]) => ({ id: ref.split('/').at(-1), ...data }));
+    h.run('notes=loadedNotes');
+    await h.run('migrateLegacy()');
+    const savedNotes = [...h.store].filter(([ref]) => ref.includes('/iroiroNotes/'));
+    assert.equal(savedNotes.length, 2);
+    assert.equal(h.store.get(first[0]).content, '移行後に編集した内容');
+    assert.ok(h.store.has('users/test-user/iroiroMigrations/localStorageV1'));
+    assert.equal(h.element('migrateLocalButton').disabled, false);
+  });
+}
+
+test('通常の新規保存と空メモの破棄は維持する', async () => {
+  const h = harness();
+  h.run('openEditor(createNote())');
+  h.element('noteContentInput').value = '通常の新規メモ';
+  h.run('syncEditingNoteFromForm();scheduleSave()');
+  await h.run('closeEditor()');
+  assert.equal(h.writes.length, 1);
+  assert.equal(h.writes[0].data.content, '通常の新規メモ');
+  h.run('openEditor(createNote())');
+  await h.run('closeEditor()');
+  assert.equal(h.writes.length, 1);
+});
