@@ -3,9 +3,9 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/fireba
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
-import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.22-3';
+import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.22-4';
 
-const VERSION='2026.10.22-3'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=2; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026.10.22-4'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=2; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -276,6 +276,11 @@ function renderNotes(){
   document.querySelectorAll('.note-card:not(.task-card)').forEach(card=>{
     const open=()=>{const note=notes.find(n=>n.id===card.dataset.id);if(note)openEditor(note)};
     card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}};
+  });
+  document.querySelectorAll('.task-card').forEach(card=>card.onclick=e=>{
+    // 完了チェックと題名ボタンは、それぞれの操作だけを実行する。
+    if(e.target.closest('.task-complete-control,[data-open-note]'))return;
+    const note=notes.find(n=>n.id===card.dataset.id);if(note)openEditor(note);
   });
   document.querySelectorAll('[data-open-note]').forEach(button=>button.onclick=()=>{const note=notes.find(n=>n.id===button.dataset.openNote);if(note)openEditor(note)});
   document.querySelectorAll('[data-task-complete]').forEach(input=>input.onchange=()=>toggleTaskComplete(input.dataset.taskComplete,input.checked));
