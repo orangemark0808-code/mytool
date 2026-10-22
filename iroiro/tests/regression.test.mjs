@@ -8,6 +8,69 @@ const backup = (notes = [], categories = []) => ({ app: 'iroiro', backupFormatVe
   data: { notes, settings: { categories } } });
 const category = (id, name = id) => ({ id, name, color: '#FF7F00', order: 0 });
 
+test('どのカテゴリーのカードでも、未設定の星と詳細ボタンを別々に操作できる', () => {
+  const h=harness();
+  h.run("categories=[{id:'tasks',name:'タスク'},{id:'manga',name:'漫画'}]");
+  for(const categoryId of ['', 'tasks', 'manga']){
+    h.context.categoryId=categoryId;
+    const html=h.run("renderNoteCard(normalizeNote('pin-1',{title:'作業 <確認>',categoryId}))");
+    assert.match(html, /<button[^>]+data-pin-note="pin-1"[^>]+aria-pressed="false"[^>]*>☆<\/button>/);
+    assert.match(html, /data-open-note="pin-1"/);
+    assert.doesNotMatch(html, /<article[^>]+role="button"/);
+    assert.doesNotMatch(html, /作業 <確認>/);
+  }
+});
+
+test('一覧からピン留めと解除を保存し、本文・タスク・更新日を保持する', async () => {
+  const original={title:'作業',content:'残す本文',isPinned:false,updatedAt:'2026-01-01',task:{status:'doing',priority:'high'}};
+  const h=harness([[notePath('pin-1'),original]]);h.context.original=original;
+  h.run("notes=[normalizeNote('pin-1',original)]");
+  const update=h.context.updateDoc,patches=[];
+  h.context.updateDoc=(ref,patch)=>{patches.push(structuredClone(patch));return update(ref,patch)};
+  assert.equal(await h.run("toggleNotePin('pin-1')"),true);
+  assert.equal(h.store.get(notePath('pin-1')).isPinned,true);
+  assert.equal(h.run('notes[0].isPinned'),true);
+  assert.match(h.element('notesGrid').innerHTML,/aria-pressed="true"/);
+  assert.equal(h.element('editorDialog').open,false);
+  assert.equal(await h.run("toggleNotePin('pin-1')"),true);
+  assert.deepEqual(patches,[{isPinned:true},{isPinned:false}]);
+  assert.deepEqual(h.store.get(notePath('pin-1')),original);
+});
+
+test('ピン留めの保存中は連打を防ぎ、失敗したら元の表示へ戻す', async () => {
+  const h=harness();h.run("notes=[normalizeNote('pin-1',{title:'作業'})]");
+  let reject;h.context.updateDoc=()=>new Promise((resolve,fail)=>{reject=fail});
+  const pending=h.run("toggleNotePin('pin-1')");
+  assert.match(h.element('notesGrid').innerHTML, /data-pin-note="pin-1"[^>]+disabled/);
+  assert.equal(await h.run("toggleNotePin('pin-1')"),false);
+  reject(new Error('offline'));assert.equal(await pending,false);
+  assert.equal(h.run('notes[0].isPinned'),false);
+  assert.match(h.element('syncStatus').textContent,/ピン留めの状態を保存できませんでした/);
+  assert.doesNotMatch(h.element('notesGrid').innerHTML,/data-pin-note="pin-1"[^>]+disabled/);
+});
+
+test('ピン留めの保存中に詳細を開いても、保存後の状態を引き継ぐ', async () => {
+  const h=harness();h.run("notes=[normalizeNote('pin-1',{title:'作業'})]");
+  let resolve;h.context.updateDoc=()=>new Promise(done=>{resolve=done});
+  const pending=h.run("toggleNotePin('pin-1')"),opening=h.run("openCardNote('pin-1')");
+  assert.equal(h.element('editorDialog').open,false);
+  resolve();await pending;await opening;
+  assert.equal(h.element('editorDialog').open,true);
+  assert.equal(h.run('editingNote.isPinned'),true);
+});
+
+test('保存途中にアカウントが変わっても別ユーザーのカードや状態を変更しない', async () => {
+  const h=harness();h.run("notes=[normalizeNote('pin-1',{title:'以前の作業'})]");
+  let reject;h.context.updateDoc=()=>new Promise((resolve,fail)=>{reject=fail});
+  const pending=h.run("toggleNotePin('pin-1')"),opening=h.run("openCardNote('pin-1')");
+  h.run("currentUser={uid:'another-user'};notes=[normalizeNote('pin-1',{title:'別ユーザーの作業',isPinned:true})]");
+  h.element('syncStatus').textContent='同期済み';
+  reject(new Error('offline'));await pending;await opening;
+  assert.equal(h.run('notes[0].isPinned'),true);
+  assert.equal(h.element('syncStatus').textContent,'同期済み');
+  assert.equal(h.element('editorDialog').open,false);
+});
+
 test('閉じる途中の追加入力も保存完了まで待つ', async () => {
   const h = harness();
   const pending = [];

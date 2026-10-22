@@ -3,11 +3,11 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/fireba
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
-import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.22-8';
-import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.22-8';
-import { createMangaEditor } from './manga-editor.mjs?v=2026.10.22-8';
+import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.23-1';
+import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.23-1';
+import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026.10.22-8'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026.10.23-1'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -15,6 +15,7 @@ const DEFAULT_CATEGORIES=[['app','アプリ','#FF7F00'],['manga','漫画','#FFD4
 const $=id=>document.getElementById(id); const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random().toString(16).slice(2)}`; const config=window.IROIRO_FIREBASE_CONFIG||{};
 let app,auth,db,currentUser=null,notes=[],categories=[],selectedCategory='all',editingNote=null,saveTimer=null,unsubscribeNotes=null,unsubscribeSettings=null,settingsCreatingForUid='',closingEditor=false,deletingNote=false,pendingCategoryId='',pendingType='',categoryDragState=null,itemDragState=null,editRevision=0,savedRevision=0,requestedRevision=0,saveInProgress=false,savePromise=Promise.resolve(true),editorSession='',backupBusy=false,pendingBackup=null,migrationBusy=false,regularSort='updated-desc';
 const pendingTaskWrites=new Set();
+const pendingPinWrites=new Map();
 let pendingNetaImport=null,netaImportBusy=false;
 const mangaEditor=createMangaEditor({element:$,getNote:()=>editingNote,isMangaNote,ensureManga,onChange:()=>{syncEditingNoteFromForm();renderLinks();scheduleSave()},syncNote:()=>syncEditingNoteFromForm(),escapeHtml});
 function scheduleTaskDayRefresh(){
@@ -249,22 +250,57 @@ function taskDueLabel(task){
   const formatted=new Intl.DateTimeFormat('ja-JP',{year:year!==new Date().getFullYear()?'numeric':undefined,month:'numeric',day:'numeric'}).format(date);
   return`${taskIsOverdue(task,today)?'期限切れ：':'期限：'}${formatted}`;
 }
+function cardPinButton(note){
+  const action=note.isPinned?'ピン留めを解除':'ピン留めする',busy=pendingPinWrites.has(`${currentUser?.uid}:${note.id}`);
+  const label=`${displayTitle(note)}${note.isPinned?'のピン留めを解除':'をピン留め'}`;
+  return`<button type="button" class="card-pin ${note.isPinned?'is-pinned':''}" data-pin-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(label)}" aria-pressed="${Boolean(note.isPinned)}" title="${action}" ${busy?'disabled':''}>${note.isPinned?'★':'☆'}</button>`;
+}
+async function openCardNote(id){
+  const activeUid=currentUser?.uid;
+  const pending=pendingPinWrites.get(`${activeUid}:${id}`);
+  if(pending)await pending.promise;
+  if(currentUser?.uid!==activeUid)return;
+  const note=notes.find(item=>item.id===id);if(note)openEditor(note);
+}
+function toggleNotePin(id){
+  const note=notes.find(item=>item.id===id);
+  if(!currentUser||!note)return Promise.resolve(false);
+  const activeUid=currentUser.uid,key=`${activeUid}:${id}`;
+  if(pendingPinWrites.has(key))return Promise.resolve(false);
+  const previous=note.isPinned,next=!previous,target=doc(refs().notes,id),operation={promise:null};
+  pendingPinWrites.set(key,operation);note.isPinned=next;renderAll();
+  operation.promise=(async()=>{
+    try{
+      // 本文や更新日を上書きせず、ピン留めの状態だけを保存する。
+      await updateDoc(target,{isPinned:next});
+      if(currentUser?.uid===activeUid){const current=notes.find(item=>item.id===id);if(current)current.isPinned=next}
+      return true;
+    }catch(error){
+      if(currentUser?.uid===activeUid){
+        const current=notes.find(item=>item.id===id);if(current?.isPinned===next)current.isPinned=previous;
+        setStatus(`ピン留めの状態を保存できませんでした: ${error.message}`);
+      }
+      return false;
+    }finally{pendingPinWrites.delete(key);if(currentUser?.uid===activeUid)renderAll()}
+  })();
+  return operation.promise;
+}
 function renderTaskCard(note){
   const task=taskForNote(note),category=getCategory(note.categoryId)||{name:'未分類',color:'#6B7280'},title=displayTitle(note),progress=taskProgress(task);
   const description=note.content.trim()||task.items.filter(item=>item.text.trim()).slice(0,3).map(item=>`${item.checked?'☑':'□'} ${item.text}`).join(' / ');
   const busy=pendingTaskWrites.has(`${currentUser?.uid}:${note.id}`);
-  return`<article class="note-card task-card ${task.status==='done'?'task-done':''}" data-id="${escapeHtml(note.id)}"><div class="task-card-main"><label class="task-complete-control"><input type="checkbox" class="task-card-checkbox" data-task-complete="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}を${task.status==='done'?'未着手に戻す':'完了にする'}" ${task.status==='done'?'checked':''} ${busy?'disabled':''}></label><button type="button" class="task-card-open" data-open-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}の詳細を開く"><span class="task-card-title">${escapeHtml(title)}</span>${description?`<span class="task-card-description">${escapeHtml(description)}</span>`:''}</button></div><div class="task-card-badges"><span class="task-status-badge status-${task.status}">${TASK_STATUS_LABELS[task.status]}</span><span class="task-priority priority-${task.priority}">優先度：${TASK_PRIORITY_LABELS[task.priority]}</span></div><footer class="task-card-footer"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span class="task-due ${taskIsOverdue(task)?'overdue':''}" title="${escapeHtml(taskDueLabel(task))}">${escapeHtml(taskDueLabel(task))}</span>${progress.total||note.isPinned?`<div class="card-footer-right">${progress.total?`<span class="task-card-progress">${progress.done}/${progress.total}完了</span>`:''}${note.isPinned?'<span class="card-pin" aria-label="ピン留め">★</span>':''}</div>`:''}</footer></article>`;
+  return`<article class="note-card task-card ${task.status==='done'?'task-done':''}" data-id="${escapeHtml(note.id)}"><div class="task-card-main"><label class="task-complete-control"><input type="checkbox" class="task-card-checkbox" data-task-complete="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}を${task.status==='done'?'未着手に戻す':'完了にする'}" ${task.status==='done'?'checked':''} ${busy?'disabled':''}></label><button type="button" class="task-card-open" data-open-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}の詳細を開く"><span class="task-card-title">${escapeHtml(title)}</span>${description?`<span class="task-card-description">${escapeHtml(description)}</span>`:''}</button></div><div class="task-card-badges"><span class="task-status-badge status-${task.status}">${TASK_STATUS_LABELS[task.status]}</span><span class="task-priority priority-${task.priority}">優先度：${TASK_PRIORITY_LABELS[task.priority]}</span></div><footer class="task-card-footer"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span class="task-due ${taskIsOverdue(task)?'overdue':''}" title="${escapeHtml(taskDueLabel(task))}">${escapeHtml(taskDueLabel(task))}</span><div class="card-footer-right">${progress.total?`<span class="task-card-progress">${progress.done}/${progress.total}完了</span>`:''}${cardPinButton(note)}</div></footer></article>`;
 }
 function renderMangaCard(note){
   const manga=mangaForNote(note),category=getCategory(note.categoryId)||{name:'漫画',color:'#FFD400'};
   const preview=note.content.trim()||manga.pages.flatMap(page=>page.rows).map(row=>[row.actor,row.detail,row.reference].filter(Boolean).join('：')).find(text=>text.trim())||'ページ・コマごとにネタを記録できます。';
-  return`<article class="note-card manga-card" data-id="${escapeHtml(note.id)}" tabindex="0" role="button"><div class="card-top"><span class="type-icon">▦</span><h3 class="card-title">${escapeHtml(displayTitle(note))}</h3></div><div class="manga-card-summary"><span>${escapeHtml(manga.status)} · ${escapeHtml(manga.genre)}</span><p class="card-preview">${escapeHtml(preview)}</p></div><footer class="card-footer"><div class="card-footer-left"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span>更新 ${shortDate(note.updatedAt)}</span></div><div class="card-footer-right"><span>${manga.pages.length}ページ</span>${note.isPinned?'<span class="card-pin" aria-label="ピン留め">★</span>':''}</div></footer></article>`;
+  return`<article class="note-card manga-card" data-id="${escapeHtml(note.id)}"><div class="card-top"><span class="type-icon">▦</span><h3 class="card-title"><button type="button" class="card-open" data-open-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(displayTitle(note))}の詳細を開く">${escapeHtml(displayTitle(note))}</button></h3></div><div class="manga-card-summary"><span>${escapeHtml(manga.status)} · ${escapeHtml(manga.genre)}</span><p class="card-preview">${escapeHtml(preview)}</p></div><footer class="card-footer"><div class="card-footer-left"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span>更新 ${shortDate(note.updatedAt)}</span></div><div class="card-footer-right"><span>${manga.pages.length}ページ</span>${cardPinButton(note)}</div></footer></article>`;
 }
 function renderNoteCard(n){
   if(isTaskNote(n))return renderTaskCard(n);
   if(isMangaNote(n))return renderMangaCard(n);
   const c=getCategory(n.categoryId)||{name:'未分類',color:'#6B7280'},color=categoryColor(c.color),progress=n.type==='checklist'?`${n.items.filter(i=>i.checked).length}/${n.items.length}完了`:'',linkInfo=n.urls.length?`🔗 ${n.urls.length}件`:'';
-  return`<article class="note-card" data-id="${escapeHtml(n.id)}" tabindex="0" role="button"><div class="card-top"><span class="type-icon">${n.type==='text'?'▤':n.type==='bullet'?'☷':'☑'}</span><h3 class="card-title">${escapeHtml(displayTitle(n))}</h3></div>${cardPreviewHtml(n)}<footer class="card-footer"><div class="card-footer-left"><span class="category-pill" style="background:${color};color:${categoryTextColor(color)}">${escapeHtml(c.name)}</span><span>更新 ${shortDate(n.updatedAt)}</span>${linkInfo?`<span>${linkInfo}</span>`:''}</div>${progress||n.isPinned?`<div class="card-footer-right">${progress?`<span class="card-progress">${progress}</span>`:''}${n.isPinned?'<span class="card-pin">★</span>':''}</div>`:''}</footer></article>`;
+  return`<article class="note-card" data-id="${escapeHtml(n.id)}"><div class="card-top"><span class="type-icon">${n.type==='text'?'▤':n.type==='bullet'?'☷':'☑'}</span><h3 class="card-title"><button type="button" class="card-open" data-open-note="${escapeHtml(n.id)}" aria-label="${escapeHtml(displayTitle(n))}の詳細を開く">${escapeHtml(displayTitle(n))}</button></h3></div>${cardPreviewHtml(n)}<footer class="card-footer"><div class="card-footer-left"><span class="category-pill" style="background:${color};color:${categoryTextColor(color)}">${escapeHtml(c.name)}</span><span>更新 ${shortDate(n.updatedAt)}</span>${linkInfo?`<span>${linkInfo}</span>`:''}</div><div class="card-footer-right">${progress?`<span class="card-progress">${progress}</span>`:''}${cardPinButton(n)}</div></footer></article>`;
 }
 function renderNotes(){
   const term=$('searchInput').value.trim().toLowerCase(),taskView=isTaskCategory(selectedCategory),mangaView=isMangaCategory(selectedCategory);
@@ -294,16 +330,13 @@ function renderNotes(){
   $('emptyStateTitle').textContent=term?'検索条件に合うメモがありません':taskView?'まだタスクがありません':mangaView?'まだ漫画ネタがありません':'まだメモがありません';
   $('emptyStateMessage').textContent=term?'検索語やカテゴリーを変更してください。':taskView?'右下の＋から、タスクを追加できます。':mangaView?'右下の＋から、漫画ネタを追加できます。':'右下の＋から、思いつきをすぐ残せます。';
   const createLabel=taskView?'新しいタスク':mangaView?'新しい漫画ネタ':'新しいメモ';$('createNoteButton').setAttribute('aria-label',`${createLabel}を作成`);$('createNoteButton').title=createLabel;
-  document.querySelectorAll('.note-card:not(.task-card)').forEach(card=>{
-    const open=()=>{const note=notes.find(n=>n.id===card.dataset.id);if(note)openEditor(note)};
-    card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}};
+  document.querySelectorAll('.note-card').forEach(card=>card.onclick=e=>{
+    // 個別の操作ボタンから詳細画面を開かない。
+    if(e.target.closest('.task-complete-control,[data-open-note],[data-pin-note]'))return;
+    return openCardNote(card.dataset.id);
   });
-  document.querySelectorAll('.task-card').forEach(card=>card.onclick=e=>{
-    // 完了チェックと題名ボタンは、それぞれの操作だけを実行する。
-    if(e.target.closest('.task-complete-control,[data-open-note]'))return;
-    const note=notes.find(n=>n.id===card.dataset.id);if(note)openEditor(note);
-  });
-  document.querySelectorAll('[data-open-note]').forEach(button=>button.onclick=()=>{const note=notes.find(n=>n.id===button.dataset.openNote);if(note)openEditor(note)});
+  document.querySelectorAll('[data-open-note]').forEach(button=>button.onclick=()=>openCardNote(button.dataset.openNote));
+  document.querySelectorAll('[data-pin-note]').forEach(button=>button.onclick=e=>{e.stopPropagation();return toggleNotePin(button.dataset.pinNote)});
   document.querySelectorAll('[data-task-complete]').forEach(input=>input.onchange=()=>toggleTaskComplete(input.dataset.taskComplete,input.checked));
 }
 async function toggleTaskComplete(id,completed){

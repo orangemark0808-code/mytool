@@ -2,6 +2,8 @@
 
 カード型メモアプリです。公開時の想定URLは `https://orangemark0808-code.github.io/mytool/iroiro/` です。
 
+一覧のカード右下の星から、詳細画面を開かずにピン留め・解除できます。未設定は☆、設定済みは★です。保存中は連打を防ぎ、失敗時は元の表示へ戻します。ピン留めの変更で本文・タスク状態・更新日は書き換えません。
+
 ## Firebase設定
 
 `firebase-config.example.js` を参考に `firebase-config.local.js` へFirebase Web設定を入れてください。実値はGitに含めません。公開時はGitHub ActionsがSecretsから `firebase-config.js` を生成します。

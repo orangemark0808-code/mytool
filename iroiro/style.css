@@ -4,6 +4,12 @@ html,body{width:100%;max-width:100%;margin:0;overflow-x:hidden;-webkit-text-size
 .backup-panel{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}.backup-panel h3{margin:0;font-size:15px}.backup-panel p{margin:6px 0 10px;color:var(--muted);font-size:12px;line-height:1.5}.backup-panel>div{display:flex;flex-wrap:wrap;gap:7px}.backup-panel .quiet-button{font-size:13px}.backup-panel .form-error{margin:8px 0 0}.confirm-dialog #backupRestoreSummary{white-space:pre-line}
 
 body [hidden]{display:none!important}
+.card-open{border:0;padding:0;background:transparent;color:inherit;font:inherit;text-align:left}
+.note-card .card-pin{display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;margin:0;border:0;border-radius:8px;padding:0;background:transparent;color:var(--muted);font-size:22px;line-height:1}
+.note-card .card-pin.is-pinned{color:var(--orange)}
+.note-card .card-pin:hover{background:var(--orange-soft);color:var(--orange-dark)}
+.note-card .card-pin:disabled{cursor:wait;opacity:.55}
+.note-card .card-pin:focus-visible{outline-offset:-3px}
 .editor-content>.category-select-label{margin-top:16px}
 .task-fields{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:20px}
 .task-field{display:flex;flex-direction:column;gap:7px;min-width:0;font-size:13px;font-weight:600}

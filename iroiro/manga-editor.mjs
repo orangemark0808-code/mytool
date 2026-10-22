@@ -1,4 +1,4 @@
-import { MANGA_STATUSES, MANGA_GENRES, MANGA_TYPES, mangaTags, normalizeMangaRow, buildMangaCsv } from './manga-core.mjs?v=2026.10.22-8';
+import { MANGA_STATUSES, MANGA_GENRES, MANGA_TYPES, mangaTags, normalizeMangaRow, buildMangaCsv } from './manga-core.mjs?v=2026.10.23-1';
 
 // 共通の保存処理は呼び出し側に任せ、漫画フォームの表示と入力を担当する。
 export function createMangaEditor({element:$,getNote,isMangaNote,ensureManga,onChange,syncNote,escapeHtml}){
