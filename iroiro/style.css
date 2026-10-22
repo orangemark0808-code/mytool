@@ -40,6 +40,42 @@ body [hidden]{display:none!important}
 .task-card-progress{flex:0 0 auto;color:var(--muted)}
 .task-card .category-pill{flex:0 0 auto;background:var(--category-color);color:var(--category-text)}
 .task-card.task-done .task-card-title{text-decoration:line-through;color:var(--muted)}
+.manga-fields{margin-top:20px}
+.manga-basic-grid{display:grid;grid-template-columns:90px minmax(0,1fr) minmax(0,1fr);gap:12px}
+.manga-basic-grid label,.manga-row label{display:flex;flex-direction:column;gap:7px;min-width:0;font-size:13px;font-weight:600}
+.manga-tags-field{grid-column:1/-1}
+.manga-basic-grid input,.manga-basic-grid select,.manga-row input,.manga-row select,.manga-row textarea{width:100%;min-width:0;min-height:44px;border:1px solid rgba(58,42,26,.5);border-radius:9px;padding:9px;background:#fff;color:var(--ink);font-size:14px;font-weight:400}
+.manga-basic-grid input[readonly]{background:#f7f5f3;color:var(--muted)}
+.manga-mode #noteContentInput{min-height:85px}
+.manga-rows-section{margin-top:25px}
+.manga-section-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.manga-section-heading h3{margin:0;font-size:15px}
+.manga-toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.manga-toolbar button,.manga-row-actions button,.manga-page-body>.add-item-button{min-height:44px}
+.manga-add-toolbar{margin-bottom:14px}
+.manga-hint{color:var(--muted);font-size:12px;line-height:1.6;margin:10px 0 0}
+.manga-page{border:1px solid var(--line);border-radius:12px;margin-top:12px;overflow:hidden}
+.manga-page>summary{padding:13px;font-size:14px;font-weight:700;background:#fff8ed;cursor:pointer}
+.manga-page>summary span{margin-left:12px;font-size:12px;font-weight:400;color:var(--muted)}
+.manga-page-body{padding:12px}
+.manga-row{display:grid;gap:12px;padding:0 0 15px;margin-bottom:15px;border-bottom:1px solid var(--line)}
+.manga-row-basic{display:grid;grid-template-columns:64px minmax(0,1fr) 100px;gap:10px}
+.manga-row textarea{resize:vertical;line-height:1.6}
+.manga-row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.manga-row-actions button{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff;color:var(--ink);font-size:12px}
+.manga-row-actions button:disabled{opacity:.4;cursor:default}
+.manga-row-actions [data-manga-action=remove]{color:#a23a30}
+.manga-card-summary{margin-top:8px;min-width:0}
+.manga-card-summary>span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--orange-dark)}
+.manga-card-summary .card-preview{margin-top:6px;-webkit-line-clamp:1}
+.manga-card .category-pill{background:var(--category-color);color:var(--category-text)}
+@media(max-width:700px){
+  .manga-basic-grid{grid-template-columns:80px minmax(0,1fr)}
+  .manga-basic-grid label:nth-child(3){grid-column:1/-1}
+  .manga-row-basic{grid-template-columns:60px minmax(0,1fr)}
+  .manga-row-basic label:last-child{grid-column:1/-1}
+  .manga-basic-grid input,.manga-basic-grid select,.manga-row input,.manga-row select,.manga-row textarea{font-size:16px}
+}
 .completed-tasks{margin-top:24px}
 .completed-tasks>summary{font-size:14px;font-weight:700;cursor:pointer;padding:12px 0;color:var(--muted)}
 .completed-tasks .notes-grid{margin-top:8px}

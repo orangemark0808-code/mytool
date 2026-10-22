@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 import * as taskCore from '../task-core.mjs';
+import * as mangaCore from '../manga-core.mjs';
+import { createMangaEditor } from '../manga-editor.mjs';
 
 const source = await readFile(new URL('../script.js', import.meta.url), 'utf8');
 const executable = source.replace(/^import .*;\n/gm, '').replace(/initialize\(\);\s*$/, '');
@@ -38,7 +40,7 @@ export function harness(initial = []) {
   const context = vm.createContext({
     window: {}, document: { getElementById: element, querySelectorAll: () => [],
       body: { dataset: {}, classList: { add() {}, remove() {} } } },
-    ...taskCore, crypto: webcrypto, TextEncoder, structuredClone, URL, Date, Intl,
+    ...taskCore, ...mangaCore, createMangaEditor, crypto: webcrypto, TextEncoder, structuredClone, URL, Date, Intl,
     setTimeout: (cb, ms) => { timers.set(++timerId, { cb, ms }); return timerId; },
     clearTimeout: id => timers.delete(id),
     serverTimestamp: () => new Date('2026-10-22T00:00:00Z'),
