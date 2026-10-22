@@ -3,11 +3,11 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/fireba
 import { GoogleAuthProvider, getAuth, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
-import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.22-7';
-import { normalizeManga, mangaSearchText, mangaHasContent } from './manga-core.mjs?v=2026.10.22-7';
-import { createMangaEditor } from './manga-editor.mjs?v=2026.10.22-7';
+import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.22-8';
+import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.22-8';
+import { createMangaEditor } from './manga-editor.mjs?v=2026.10.22-8';
 
-const VERSION='2026.10.22-7'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026.10.22-8'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -15,6 +15,7 @@ const DEFAULT_CATEGORIES=[['app','アプリ','#FF7F00'],['manga','漫画','#FFD4
 const $=id=>document.getElementById(id); const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random().toString(16).slice(2)}`; const config=window.IROIRO_FIREBASE_CONFIG||{};
 let app,auth,db,currentUser=null,notes=[],categories=[],selectedCategory='all',editingNote=null,saveTimer=null,unsubscribeNotes=null,unsubscribeSettings=null,settingsCreatingForUid='',closingEditor=false,deletingNote=false,pendingCategoryId='',pendingType='',categoryDragState=null,itemDragState=null,editRevision=0,savedRevision=0,requestedRevision=0,saveInProgress=false,savePromise=Promise.resolve(true),editorSession='',backupBusy=false,pendingBackup=null,migrationBusy=false,regularSort='updated-desc';
 const pendingTaskWrites=new Set();
+let pendingNetaImport=null,netaImportBusy=false;
 const mangaEditor=createMangaEditor({element:$,getNote:()=>editingNote,isMangaNote,ensureManga,onChange:()=>{syncEditingNoteFromForm();renderLinks();scheduleSave()},syncNote:()=>syncEditingNoteFromForm(),escapeHtml});
 function scheduleTaskDayRefresh(){
   const now=new Date(),next=new Date(now);next.setHours(24,0,0,500);
@@ -135,6 +136,7 @@ function hasMeaningfulContent(note){return Boolean(note.title.trim()||note.conte
 function setStatus(message){$('syncStatus').textContent=message}
 function initialize(){document.body.dataset.appVersion=VERSION;bindEvents();scheduleTaskDayRefresh();if(!configured()){$('syncStatus').textContent='Firebase設定が未設定です';$('loginButton').disabled=true;renderAll();return}app=initializeApp(config);auth=getAuth(app);db=getFirestore(app);onAuthStateChanged(auth,handleAuth)}
 function bindEvents(){
+  $('prepareNetaImportButton').onclick=prepareNetaImport;$('confirmNetaImportButton').onclick=importNetaRecords;
   mangaEditor.bind();
   bindTaskEvents();
   $('createNoteButton').onclick=()=>currentUser&&openEditor(createNote()); $('loginButton').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>setStatus(`ログイン失敗: ${e.message}`)); $('logoutButton').onclick=()=>signOut(auth);
@@ -322,6 +324,75 @@ async function toggleTaskComplete(id,completed){
 }
 function renderLinks(){$('relatedLinks').innerHTML=editingNote.urls.length?editingNote.urls.map(link=>`<a class="link-card" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"><span>🌐</span><div><strong>${escapeHtml(link.title||link.domain||link.url)}</strong><small>${escapeHtml(link.domain||link.url)}</small></div><span>↗</span></a>`).join(''):'<p class="form-error">本文内のURLがここに表示されます。</p>'}
 function openCategoryManager(){$('categoryError').textContent='';renderCategoryManagement();$('categoryDialog').showModal()}
+function setNetaImportStatus(message){$('netaImportStatus').textContent=message}
+async function netakirokuTargetId(sourceId){
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(sourceId));
+  return`netakiroku-${Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('')}`;
+}
+function importedNetaData(id,raw,categoryId){
+  const note=normalizeNote(id,{title:String(raw.title||'無題のネタ'),type:'text',content:String(raw.memo||''),items:[],categoryId,manga:mangaFromNeta(raw)});
+  const timestamp=value=>{const date=toDate(value);return date?(typeof value?.toDate==='function'?value:Timestamp.fromDate(date)):Timestamp.fromDate(new Date())};
+  return{...noteData(note),createdAt:timestamp(raw.createdAt),updatedAt:timestamp(raw.updatedAt)};
+}
+async function prepareNetaImport(){
+  if(!currentUser){setNetaImportStatus('ログイン後に利用できます。');return}
+  if(netaImportBusy)return;
+  const activeUid=currentUser.uid;netaImportBusy=true;pendingNetaImport=null;
+  $('prepareNetaImportButton').disabled=true;$('confirmNetaImportButton').hidden=true;
+  setNetaImportStatus('ネタキロクの保存済み記録を確認中…');
+  try{
+    const [source,targets]=await Promise.all([getDocs(collection(db,'users',activeUid,'netakiroku')),getDocs(collection(db,'users',activeUid,'iroiroNotes'))]);
+    requireActiveUser(activeUid);
+    const existingIds=new Set(targets.docs.map(item=>item.id)),entries=[];let existing=0,pages=0,rows=0;
+    for(const item of source.docs){
+      const id=await netakirokuTargetId(item.id),manga=mangaFromNeta(item.data());
+      entries.push({sourceId:item.id,id});if(existingIds.has(id))existing++;
+      pages+=manga.pages.length;rows+=manga.pages.reduce((total,page)=>total+page.rows.length,0);
+    }
+    requireActiveUser(activeUid);pendingNetaImport={uid:activeUid,entries};
+    setNetaImportStatus(`保存済み${entries.length}件（${pages}ページ・${rows}コマ行）。未取り込み${entries.length-existing}件、取り込み済み${existing}件。元の記録と既存メモはそのまま残します。`);
+    $('confirmNetaImportButton').textContent=`${entries.length-existing}件を「漫画」に取り込む`;
+    $('confirmNetaImportButton').hidden=entries.length===existing;
+  }catch(error){pendingNetaImport=null;setNetaImportStatus(`確認できませんでした: ${error.message}`)}
+  finally{netaImportBusy=false;$('prepareNetaImportButton').disabled=false}
+}
+async function importNetaRecords(){
+  if(netaImportBusy||!pendingNetaImport||!currentUser)return;
+  const plan=pendingNetaImport,activeUid=plan.uid;if(currentUser.uid!==activeUid){pendingNetaImport=null;$('confirmNetaImportButton').hidden=true;setNetaImportStatus('ログイン中のアカウントが変わりました。取り込み内容を再確認してください。');return}
+  netaImportBusy=true;$('prepareNetaImportButton').disabled=true;$('confirmNetaImportButton').disabled=true;
+  const noteRefs=collection(db,'users',activeUid,'iroiroNotes'),sourceRefs=collection(db,'users',activeUid,'netakiroku'),settingsRef=doc(db,'users',activeUid,'iroiroSettings','main'),newCategoryId=uid();
+  let imported=0,skipped=0,verified=0,verificationFailed=0;const errors=[];
+  try{
+    for(const entry of plan.entries){
+      requireActiveUser(activeUid);setNetaImportStatus(`取り込み中… ${imported+skipped}/${plan.entries.length}件`);
+      const target=doc(noteRefs,entry.id);
+      try{
+        const result=await runTransaction(db,async transaction=>{
+          const existing=await transaction.get(target);requireActiveUser(activeUid);
+          if(existing.exists())return null;
+          const [source,settings]=await Promise.all([transaction.get(doc(sourceRefs,entry.sourceId)),transaction.get(settingsRef)]);
+          requireActiveUser(activeUid);if(!source.exists())throw new Error('確認後に移行元の記録が削除されています。');
+          const list=orderedCategories(Array.isArray(settings.data()?.categories)?settings.data().categories:[]),category=list.find(item=>String(item.name).trim()==='漫画');
+          const categoryId=category?.id||newCategoryId,data=importedNetaData(entry.id,source.data(),categoryId);
+          if(!category)transaction.set(settingsRef,{categories:[...list,{id:categoryId,name:'漫画',color:'#FFD400',order:list.length}],schemaVersion:SCHEMA_VERSION,updatedAt:serverTimestamp()},{merge:true});
+          transaction.set(target,data);return data;
+        });
+        requireActiveUser(activeUid);
+        if(!result){skipped++;continue}
+        imported++;
+        const saved=await getDoc(target);requireActiveUser(activeUid);const actual=saved.data();
+        if(saved.exists()&&actual.title===result.title&&actual.content===result.content&&actual.categoryId===result.categoryId&&JSON.stringify(normalizeManga(actual.manga))===JSON.stringify(normalizeManga(result.manga))&&dateMillis(actual.createdAt)===dateMillis(result.createdAt)&&dateMillis(actual.updatedAt)===dateMillis(result.updatedAt))verified++;
+        else{verificationFailed++;errors.push('保存後の内容照合が一致しませんでした。')}
+      }catch(error){errors.push(error.message)}
+    }
+    const settings=await getDoc(settingsRef);requireActiveUser(activeUid);
+    if(settings.exists()&&Array.isArray(settings.data().categories)){categories=orderedCategories(settings.data().categories);renderAll();renderCategoryManagement()}
+    setNetaImportStatus(`${imported}件を取り込み、${verified}件の内容を照合しました。取り込み済み${skipped}件、失敗${errors.length}件。${errors.length?` ${errors.join(' / ')} 再確認して再試行できます。`:' 元のネタキロクの記録は残っています。'}`);
+    $('confirmNetaImportButton').hidden=true;pendingNetaImport=null;
+    return{imported,skipped,verified,failed:errors.length,verificationFailed};
+  }catch(error){setNetaImportStatus(`取り込みを中断しました（新規${imported}件、照合${verified}件）: ${error.message} 再確認して再試行できます。`);return{imported,skipped,verified,failed:errors.length+1,verificationFailed}}
+  finally{netaImportBusy=false;$('prepareNetaImportButton').disabled=false;$('confirmNetaImportButton').disabled=false}
+}
 function bindNewCategoryColorPalette(){const color=$('newCategoryColor'),palette=$('newCategoryColorPalette'),render=()=>{palette.innerHTML=colorChoices(color.value);palette.querySelectorAll('[data-color-choice]').forEach(button=>button.onclick=()=>{color.value=button.dataset.colorChoice;render()})};color.oninput=render;render()}
 function renderCategoryManagement(){$('categoryManagementList').innerHTML=categories.map(c=>`<div class="manage-category-row draggable-category-row" data-id="${escapeHtml(c.id)}"><input type="color" value="${categoryColor(c.color)}"/><input type="text" value="${escapeHtml(c.name)}"/><span class="drag-handle" aria-hidden="true">≡</span><button type="button" data-delete aria-label="${escapeHtml(c.name)}を削除">削除</button><div class="category-color-palette" aria-label="${escapeHtml(c.name)}の色候補">${colorChoices(c.color)}</div></div>`).join('');document.querySelectorAll('.manage-category-row').forEach(row=>{const category=getCategory(row.dataset.id),color=row.querySelector('input[type=color]'),name=row.querySelector('input[type=text]'),del=row.querySelector('[data-delete]'),setColor=value=>{category.color=categoryColor(value);color.value=category.color;saveCategories().then(ok=>ok&&renderCategoryManagement())};color.oninput=()=>setColor(color.value);row.querySelectorAll('[data-color-choice]').forEach(button=>button.onclick=()=>setColor(button.dataset.colorChoice));name.onchange=()=>renameCategory(category,name.value);del.onclick=()=>confirmCategoryDelete(category);bindCategoryDrag(row)});bindNewCategoryColorPalette()}
 function categoryDragAllowedTarget(target){return!target.closest('input[type="color"],button')}

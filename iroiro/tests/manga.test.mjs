@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeManga, mangaHasContent, mangaTags, buildMangaCsv } from '../manga-core.mjs';
+import { normalizeManga, mangaHasContent, mangaTags, buildMangaCsv, mangaFromNeta } from '../manga-core.mjs';
 import { harness, tick } from './harness.mjs';
 
 const categories="categories=[{id:'manga',name:'漫画',color:'#FFD400'},{id:'app',name:'アプリ',color:'#FF7F00'},{id:'tasks',name:'タスク',color:'#FFD400'}]";
@@ -89,4 +89,71 @@ test('CSVはネタキロクと同じ7列とページ番号の出力順を保ち�
 test('CSVで入力内容が表計算ソフトの数式にならない',()=>{
   const csv=buildMangaCsv('=SUM(A1)',{pages:[{rows:[{actor:'@人物',detail:'+内容',reference:'-参考'}]}]});
   assert.equal(csv,"'=SUM(A1),1,1,'@人物,,'+内容,'-参考");
+});
+
+const settingsPath='users/test-user/iroiroSettings/main';
+const sourcePath=id=>`users/test-user/netakiroku/${id}`;
+const importedPath=id=>`users/test-user/iroiroNotes/${id}`;
+const originalNeta={title:'以前の作品',memo:'制作メモ\n2行目',status:'完成',category:'仕事',tags:['タグA','タグB'],rows:[{pageNumber:1,panel:'1',person:'主人公',type:'(心)',detail:'セリフ',reference:'https://example.com/'},{pageNumber:2,panel:'1',actor:'PC説明',type:'(M)',detail:'通知',reference:''}],createdAt:'2025-04-05T12:30:00.000Z',updatedAt:'2026-05-06T01:02:03.000Z'};
+function importHarness(initial=[]){
+  const h=harness([[settingsPath,{categories:[{id:'manga',name:'漫画',color:'#FFD400'},{id:'other',name:'仕事',color:'#FF7F00'}]}],...initial]);
+  h.run(categories);
+  h.context.getDocs=async path=>({docs:[...h.store.entries()].filter(([key])=>key.startsWith(path+'/')&&!key.slice(path.length+1).includes('/')).map(([key,value])=>({id:key.split('/').at(-1),data:()=>structuredClone(value)}))});
+  return h;
+}
+
+test('ネタキロクの旧形式・旧ステータスと新しいページ形式を変換する',()=>{
+  const manga=mangaFromNeta(originalNeta);
+  assert.equal(manga.status,'漫画作成済み');assert.equal(manga.genre,'仕事');assert.equal(manga.pages.length,2);
+  assert.equal(manga.pages[0].rows[0].actor,'主人公');assert.equal(manga.pages[1].rows[0].actor,'PC通知');assert.equal(manga.pages[1].rows[0].type,'(PC)');
+  const newer=mangaFromNeta({pages:[{rows:[{actor:'人物',type:'(叫)',detail:'新形式',reference:'参照'}]}]});
+  assert.equal(newer.pages[0].rows[0].detail,'新形式');assert.equal(mangaFromNeta({rows:[null]}).pages.length,1);
+});
+
+test('取り込み先IDは元IDから一意に決まり不正なパスにならない',async()=>{
+  const h=importHarness();const id=await h.run("netakirokuTargetId('unsafe/id<name>')");
+  assert.match(id,/^netakiroku-[a-f0-9]{64}$/);assert.equal(id,await h.run("netakirokuTargetId('unsafe/id<name>')"));
+  assert.notEqual(id,await h.run("netakirokuTargetId('other')"));
+});
+
+test('取り込みは元記録・既存メモを残し、全項目と元の日時を保存して照合する',async()=>{
+  const h=importHarness([[sourcePath('source-1'),originalNeta],[importedPath('existing'),{title:'既存メモ'}]]);
+  await h.run('prepareNetaImport()');assert.equal(h.writes.length,0);assert.match(h.element('netaImportStatus').textContent,/保存済み1件（2ページ・2コマ行）/);
+  const result=await h.run('importNetaRecords()');assert.equal(result.imported,1);assert.equal(result.verified,1);assert.equal(result.failed,0);
+  const targetId=await h.run("netakirokuTargetId('source-1')"),saved=h.store.get(importedPath(targetId));
+  assert.equal(saved.categoryId,'manga');assert.equal(saved.title,originalNeta.title);assert.equal(saved.content,originalNeta.memo);assert.equal(saved.manga.tags[1],'タグB');assert.equal(saved.manga.genre,'仕事');
+  assert.equal(saved.manga.pages[0].rows[0].reference,'https://example.com/');assert.equal(saved.createdAt.toISOString(),originalNeta.createdAt);assert.equal(saved.updatedAt.toISOString(),originalNeta.updatedAt);
+  assert.deepEqual(h.store.get(sourcePath('source-1')),originalNeta);assert.equal(h.store.get(importedPath('existing')).title,'既存メモ');assert.equal(h.writes.some(item=>item.ref.includes('/netakiroku/')),false);
+});
+
+test('取り込み後に編集した記録や途中成功した記録を再試行で上書きしない',async()=>{
+  const h=importHarness([[sourcePath('one'),originalNeta],[sourcePath('two'),{...originalNeta,title:'2件目'}]]);
+  const second=await h.run("netakirokuTargetId('two')");let failedOnce=false;
+  h.beforeWrite=async ref=>{if(ref===importedPath(second)&&!failedOnce){failedOnce=true;throw Error('一時的なエラー')}};
+  await h.run('prepareNetaImport()');const first=await h.run('importNetaRecords()');assert.equal(first.imported,1);assert.equal(first.failed,1);
+  const firstId=await h.run("netakirokuTargetId('one')");h.store.get(importedPath(firstId)).content='取り込み後の編集';
+  await h.run('prepareNetaImport()');const retry=await h.run('importNetaRecords()');assert.equal(retry.imported,1);assert.equal(retry.skipped,1);assert.equal(retry.verified,1);
+  assert.equal(h.store.get(importedPath(firstId)).content,'取り込み後の編集');assert.equal([...h.store.keys()].filter(path=>path.includes('/iroiroNotes/')).length,2);
+});
+
+test('漫画カテゴリーがない場合は最新のカテゴリーを残して漫画を追加する',async()=>{
+  const h=importHarness([[sourcePath('one'),originalNeta],[settingsPath,{categories:[{id:'fresh',name:'最新カテゴリー',color:'#FF7F00'}]}]]);
+  await h.run('prepareNetaImport()');const result=await h.run('importNetaRecords()');assert.equal(result.failed,0);
+  const categories=h.store.get(settingsPath).categories;assert.equal(categories[0].name,'最新カテゴリー');assert.equal(categories[1].name,'漫画');
+  const id=await h.run("netakirokuTargetId('one')");assert.equal(h.store.get(importedPath(id)).categoryId,categories[1].id);
+});
+
+test('確認後にアカウントが変わった場合や記録が消えた場合は取り込まない',async()=>{
+  const h=importHarness([[sourcePath('one'),originalNeta]]);await h.run('prepareNetaImport()');h.run("currentUser={uid:'different-user'}");
+  await h.run('importNetaRecords()');assert.equal(h.writes.length,0);assert.match(h.element('netaImportStatus').textContent,/アカウントが変わりました/);
+  const other=importHarness([[sourcePath('one'),originalNeta]]);await other.run('prepareNetaImport()');other.store.delete(sourcePath('one'));const result=await other.run('importNetaRecords()');assert.equal(result.imported,0);assert.equal(result.failed,1);
+});
+
+test('取り込み元が空ならカテゴリーもメモも変更しない',async()=>{
+  const h=importHarness();await h.run('prepareNetaImport()');assert.equal(h.element('confirmNetaImportButton').hidden,true);assert.equal(h.writes.length,0);
+});
+
+test('日時のない古い記録にも取り込み日時を設定して照合できる',async()=>{
+  const h=importHarness([[sourcePath('undated'),{title:'日時なし',rows:[{panel:'1',detail:'内容'}]}]]);
+  await h.run('prepareNetaImport()');const result=await h.run('importNetaRecords()');assert.equal(result.imported,1);assert.equal(result.verified,1);assert.equal(result.failed,0);
 });

@@ -5,12 +5,14 @@ import { fileURLToPath } from 'node:url';
 
 const root=new URL('../',import.meta.url);
 const sdk=String.raw`
-const key='iroiro-manga-preview-v1';
+const key='iroiro-neta-import-preview-v1';
 const date=new Date(),today=[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
 const initial={
   'users/preview-user/iroiroSettings/main':{categories:[{id:'app',name:'アプリ',color:'#FF7F00',order:0},{id:'tasks',name:'タスク',color:'#FFD400',order:1},{id:'blog',name:'ブログ',color:'#3A86D4',order:2},{id:'manga',name:'漫画',color:'#FFD400',order:3}]},
   'users/preview-user/iroiroNotes/sample-task':{title:'記事の下書きを作る',type:'text',categoryId:'tasks',content:'先週の出来事をテーマにする。',items:[],task:{status:'doing',priority:'normal',dueDate:today,items:[{id:'x',text:'見出しを考える',checked:true},{id:'y',text:'本文を書く',checked:false}]},createdAt:date.toISOString(),updatedAt:date.toISOString()},
   'users/preview-user/iroiroNotes/done-task':{title:'資料を整理する',type:'text',categoryId:'tasks',content:'確認済みの作業。',items:[],task:{status:'done',priority:'low',dueDate:'',items:[]},createdAt:date.toISOString(),updatedAt:date.toISOString()},
+  'users/preview-user/netakiroku/old-record':{title:'【架空】以前の漫画案',status:'完成',category:'仕事',tags:['旧データ'],memo:'自分用のメモ',rows:[{pageNumber:1,panel:'1',actor:'主人公',type:'(心)',detail:'架空のセリフ',reference:'https://example.com/'},{pageNumber:2,panel:'1',actor:'ナレーション',type:'(状)',detail:'場面転換',reference:''}],createdAt:'2025-01-02T03:04:05.000Z',updatedAt:'2026-05-06T07:08:09.000Z'},
+  'users/preview-user/netakiroku/new-record':{title:'【架空】新形式の漫画案',status:'ネタ作成中',category:'日常',tags:['新形式'],memo:'補足',pages:[{rows:[{panel:'1',actor:'主人公',type:'(叫)',detail:'もう一つの案',reference:''}]}],createdAt:'2026-01-01T00:00:00.000Z',updatedAt:'2026-02-02T00:00:00.000Z'},
   'users/preview-user/iroiroNotes/normal-note':{title:'通常のメモ',type:'text',categoryId:'blog',content:'架空のプレビューデータです。',items:[],createdAt:date.toISOString(),updatedAt:date.toISOString()},
 };
 let store=JSON.parse(localStorage.getItem(key)||'null')||initial;
@@ -48,7 +50,7 @@ export async function setDoc(ref,data,options){write(ref,data,options);notify()}
 export async function updateDoc(ref,data){write(ref,data,{merge:true});notify()}
 export async function addDoc(ref,data){const id=crypto.randomUUID();write(doc(ref,id),data);notify();return{id}}
 export async function deleteDoc(ref){delete store[ref.path];notify()}
-export async function runTransaction(db,callback){const pending=[];await callback({get:getDoc,set:(...args)=>pending.push(args)});for(const args of pending)write(...args);notify()}
+export async function runTransaction(db,callback){const pending=[];const result=await callback({get:getDoc,set:(...args)=>pending.push(args)});for(const args of pending)write(...args);notify();return result}
 export function writeBatch(){const pending=[];return{set:(...args)=>pending.push(args),update:(ref,data)=>pending.push([ref,data,{merge:true}]),commit:async()=>{for(const args of pending)write(...args);notify()}}}
 `;
 

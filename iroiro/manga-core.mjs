@@ -17,6 +17,25 @@ export function normalizeManga(value={}){
   for(const page of pages)if(!page.rows.length)page.rows.push(normalizeMangaRow());
   return{status:MANGA_STATUSES.includes(raw.status)?raw.status:MANGA_STATUSES[0],genre:String(raw.genre??MANGA_GENRES[0]),tags:mangaTags(raw.tags),pages};
 }
+// ネタキロクの旧形式（ページ番号付きの平坦なrows）と新形式の両方を読む。
+export function mangaFromNeta(value={}){
+  const raw=record(value),groups=new Map();
+  let pages=Array.isArray(raw.pages)&&raw.pages.length?raw.pages:null;
+  if(!pages){
+    for(const row of Array.isArray(raw.rows)?raw.rows:[]){
+      if(!row||typeof row!=='object'||Array.isArray(row))continue;
+      const number=Number(row.pageNumber??row.page??1),page=Number.isSafeInteger(number)&&number>0?number:1;
+      if(!groups.has(page))groups.set(page,[]);groups.get(page).push(row);
+    }
+    pages=[...groups.entries()].sort(([a],[b])=>a-b).map(([,rows])=>({rows}));
+  }
+  const status=String(raw.status||'').trim(),aliases={'未作成':'漫画未作成','作成中':'ネタ作成中','完成':'漫画作成済み','作成済み':'漫画作成済み'};
+  const converted=pages.filter(page=>page&&typeof page==='object').map(page=>({rows:(Array.isArray(page.rows)?page.rows:[]).filter(row=>row&&typeof row==='object').map(row=>{
+    const actor=String(row.actor??row.person??''),type=String(row.type??'');
+    return{...row,panel:String(row.panel??''),actor:actor==='PC説明'&&type==='(M)'?'PC通知':actor,type:actor==='PC説明'&&type==='(M)'?'(PC)':type};
+  })}));
+  return normalizeManga({status:Object.hasOwn(aliases,status)?aliases[status]:status,genre:raw.category??raw.genre??MANGA_GENRES[0],tags:raw.tags,pages:converted});
+}
 export function mangaSearchText(manga){
   const data=manga||normalizeManga();
   return[data.status,data.genre,...data.tags,...data.pages.flatMap(page=>page.rows.flatMap(row=>[row.panel,row.actor,row.type,row.detail,row.reference]))].join('\n');
