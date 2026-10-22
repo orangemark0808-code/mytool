@@ -1017,3 +1017,82 @@ test('trash ignores pins and restoring keeps the pin', () => {
   h.run("restoreDraft('d');state.showTrash=false;renderList();");
   assert.match(h.elements.get('draftList').innerHTML, /pinned/);
 });
+
+test('creation date edits persist locally, reorder the list and sync without altering text', async () => {
+  const h = harness(); connect(h); const server = delayedWrite(h);
+  h.run('openCreatedAtEditor()');
+  h.elements.get('createdAtInput').value = '2026-09-15T08:30';
+  h.run('saveCreatedAt({preventDefault(){}})');
+  const expected = new Date('2026-09-15T08:30').toISOString();
+  const edited = h.run('currentDraft()');
+  assert.equal(edited.createdAt, expected);
+  assert.equal(edited.body, h.draft.body); assert.equal(edited.title, h.draft.title);
+  assert.notEqual(edited.updatedAt, h.draft.updatedAt);
+  assert.equal(edited.pendingSync, true);
+  assert.ok([...h.storage.values()].some(value => value.includes(expected)));
+  assert.equal(h.elements.get('createdAtForm').hidden, true);
+  assert.ok(h.elements.get('draftList').innerHTML.includes(h.run('formatDateTime(currentDraft().createdAt)')));
+  const saving = h.run("saveDraftById('d')"); await server.didCommit; server.release(); await saving;
+  assert.equal(server.records.get('d').createdAt, expected);
+  assert.equal(h.run('currentDraft().pendingSync'), false);
+});
+
+test('cancel, empty, invalid and unchanged creation dates keep the original timestamp and revision', () => {
+  const h = harness();
+  h.run('openCreatedAtEditor()');
+  h.elements.get('createdAtInput').value = '2026-09-15T08:30';
+  h.events.get('cancelCreatedAtButton:click')();
+  assert.equal(h.run('currentDraft().createdAt'), h.draft.createdAt);
+  assert.equal(h.elements.get('createdAtForm').hidden, true);
+  for (const value of ['', 'not-a-date', '2026-02-30T10:00']) {
+    h.run('openCreatedAtEditor()'); h.elements.get('createdAtInput').value = value;
+    h.run('saveCreatedAt({preventDefault(){}})');
+    assert.equal(h.run('currentDraft().createdAt'), h.draft.createdAt);
+    assert.equal(h.run('currentDraft().revision'), h.draft.revision);
+    assert.equal(h.elements.get('createdAtForm').hidden, false);
+  }
+  h.run("state.drafts[0].createdAt='2026-10-01T00:00:37.123Z';openCreatedAtEditor();saveCreatedAt({preventDefault(){}})");
+  assert.equal(h.run('currentDraft().createdAt'), '2026-10-01T00:00:37.123Z');
+  assert.equal(h.run('currentDraft().revision'), h.draft.revision);
+});
+
+test('creation date form follows remote dates and cannot edit a hidden, switched or deleted article', () => {
+  const h = harness(); connect(h);
+  h.run('openCreatedAtEditor()');
+  const changed = { ...h.draft, createdAt: '2026-09-20T12:00:00Z', revision: 'remote-date' };
+  h.articleSnapshot([changed]);
+  assert.ok(h.elements.get('createdAtDisplay').textContent.includes(h.run('formatDateTime(currentDraft().createdAt)')));
+  h.run("showView('list')");
+  h.elements.get('createdAtInput').value = '2026-09-10T08:30';
+  h.run('saveCreatedAt({preventDefault(){}})');
+  assert.equal(h.run('currentDraft().createdAt'), changed.createdAt);
+  assert.equal(h.elements.get('createdAtForm').hidden, true);
+  h.run("loadDraft('d');openCreatedAtEditor()");
+  h.articleSnapshot([{ ...changed, deletedAt: '2026-10-22T00:00:00Z', revision: 'deleted' }]);
+  h.run('saveCreatedAt({preventDefault(){}})');
+  assert.equal(h.run('state.view'), 'list');
+});
+
+test('changing creation date moves the article in creation-date order', () => {
+  const h = harness();
+  h.context.second = core.normalizeDraft({ ...h.draft, id: 'second', title: 'Middle article', createdAt: '2026-09-20T00:00:00Z' }, { remote: true });
+  h.run("state.drafts.push(second);renderList();");
+  let html = h.elements.get('draftList').innerHTML;
+  assert.ok(html.indexOf('Synthetic') < html.indexOf('Middle article'));
+  h.run('openCreatedAtEditor()');
+  h.elements.get('createdAtInput').value = '2026-09-10T08:30';
+  h.run('saveCreatedAt({preventDefault(){}})');
+  html = h.elements.get('draftList').innerHTML;
+  assert.ok(html.indexOf('Middle article') < html.indexOf('Synthetic'));
+});
+
+test('creation date save safely stops if finishing IME applies a deferred deletion', () => {
+  const h = harness(); connect(h);
+  h.run('openCreatedAtEditor();state.composing=true;');
+  h.articleSnapshot([{ ...h.draft, deletedAt: '2026-10-22T00:00:00Z', revision: 'deleted' }]);
+  h.elements.get('createdAtInput').value = '2026-09-10T08:30';
+  h.run('saveCreatedAt({preventDefault(){}})');
+  assert.equal(h.run('state.view'), 'list');
+  assert.equal(h.run('state.drafts[0].createdAt'), h.draft.createdAt);
+  assert.ok(h.run('state.drafts[0].deletedAt'));
+});

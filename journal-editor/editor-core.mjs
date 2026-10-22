@@ -25,7 +25,18 @@ export function contentKey(draft) {
 
 export function remoteVersion(draft) {
   // Include content as older open tabs do not update the new revision field.
-  return JSON.stringify([draft.revision || '', draft.updatedAt, contentKey(draft)]);
+  return JSON.stringify([draft.revision || '', draft.updatedAt, contentKey(draft), draft.createdAt]);
+}
+
+// Older offline drafts store a three-field baseline. Revision, update time and
+// content still detect any edits made by the current version.
+function matchesRemoteVersion(draft, baseVersion) {
+  if (remoteVersion(draft) === baseVersion) return true;
+  try {
+    const previous = JSON.parse(baseVersion);
+    return Array.isArray(previous) && previous.length === 3
+      && JSON.stringify([draft.revision || '', draft.updatedAt, contentKey(draft)]) === baseVersion;
+  } catch { return false; }
 }
 
 export function normalizeDraft(raw, { remote = false, id = raw?.id } = {}) {
@@ -106,8 +117,8 @@ export async function writeDraftTransaction(firebase, collectionRef, draft) {
     const current = snapshot.exists() ? normalizeDraft(snapshot.data(), { remote: true, id: snapshot.id || draft.id }) : null;
     // A delayed soft-delete must not recreate an article already purged elsewhere.
     if (!current && draft.deletedAt && draft.baseVersion) return { kind: 'removed', id: draft.id };
-    const unchanged = current && remoteVersion(current) === draft.baseVersion;
-    const sameContent = current && contentKey(current) === contentKey(draft);
+    const unchanged = current && matchesRemoteVersion(current, draft.baseVersion);
+    const sameContent = current && contentKey(current) === contentKey(draft) && current.createdAt === draft.createdAt;
     const conflict = current ? !unchanged && !sameContent : Boolean(draft.baseVersion);
     if (conflict && !draft.deletedAt) {
       const copy = recoveryCopy(draft, current && !current.deletedAt ? '競合コピー' : '復元', copyId);
@@ -148,7 +159,7 @@ export async function permanentlyDeleteDraft(firebase, collectionRef, expected) 
     if (!snapshot.exists()) return { kind: 'missing' };
     const current = normalizeDraft(snapshot.data(), { remote: true, id: snapshot.id || expected.id });
     if (!current.deletedAt) return { kind: 'restored' };
-    if (!expected.deletedAt || remoteVersion(current) !== expected.baseVersion) return { kind: 'changed' };
+    if (!expected.deletedAt || !matchesRemoteVersion(current, expected.baseVersion)) return { kind: 'changed' };
     transaction.delete(ref);
     return { kind: 'deleted' };
   });

@@ -341,3 +341,26 @@ test('pins round-trip through Firestore payloads without changing unpinned basel
   assert.equal(remotePayload(pinned).pinnedAt, '2026-10-16T00:00:00.000Z');
   assert.equal(normalizeDraft(remotePayload(pinned), { remote: true }).pinnedAt, '2026-10-16T00:00:00.000Z');
 });
+
+test('creation date differences count toward remote versions and transaction conflicts', async () => {
+  const original = remote();
+  const latest = remote('server text', { createdAt: '2026-09-01T00:00:00Z', revision: 'changed-date' });
+  assert.notEqual(remoteVersion(original), remoteVersion({ ...original, createdAt: latest.createdAt }));
+  const fs = fakeFirestore(latest);
+  const local = editedDraft(original, { createdAt: '2026-08-01T00:00:00Z' });
+  const result = await writeDraftTransaction(fs.firebase, fs.collection, local);
+  assert.equal(result.kind, 'conflict');
+  assert.equal(fs.data.get(original.id).createdAt, latest.createdAt);
+  assert.equal(fs.data.size, 2);
+});
+
+test('older offline baselines save without creating a false conflict after upgrade', async () => {
+  const original = remote();
+  const legacyBase = JSON.stringify([original.revision || '', original.updatedAt, contentKey(original)]);
+  const fs = fakeFirestore(original);
+  const local = editedDraft({ ...original, baseVersion: legacyBase }, { body: 'offline edit from older version' });
+  const result = await writeDraftTransaction(fs.firebase, fs.collection, local);
+  assert.equal(result.kind, 'saved');
+  assert.equal(fs.data.size, 1);
+  assert.equal(fs.data.get(original.id).body, local.body);
+});

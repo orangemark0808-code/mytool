@@ -744,3 +744,12 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
  .card-list .draft-dates { left: 14px; font-size: 11px; }
  .card-list .draft-actions { right: 12px; }
 }
+
+/* Creation date editing shares the article metadata area on every screen size. */
+.draft-timestamps { align-items: center; }
+.created-at-form { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: end; gap: 10px 12px; min-width: 0; }
+.created-at-form[hidden] { display: none; }
+.created-at-form label { display: grid; gap: 4px; max-width: 100%; font-size: 13px; }
+.created-at-form input { min-height: 44px; max-width: 100%; box-sizing: border-box; font-size: 16px; }
+#createdAtHelp { align-self: center; font-size: 12px; }
+.created-at-actions { display: flex; flex-wrap: wrap; gap: 8px; }

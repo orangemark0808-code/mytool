@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-16-6';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-16-6';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-10-22-1';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-10-22-1';
 
-const VERSION = '2026-10-16-6';
+const VERSION = '2026-10-22-1';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const SORT_KEY = 'orangemania-journal-list-sort-v1';
 const COMPACT_EDITOR_QUERY = '(max-width: 700px), (max-width: 1366px) and (pointer: coarse)';
@@ -9,7 +9,7 @@ const config = window.BLOG_EDITOR_FIREBASE_CONFIG || {};
 const $ = (id) => document.getElementById(id);
 const titleInput = $('titleInput'), bodyInput = $('bodyInput'), categorySelect = $('categorySelect'), noteStatusSelect = $('noteStatusSelect');
 const state = {
-  drafts: [], categories: [], currentId: null, editorDraftId: null, user: null, view: 'list', mode: 'edit',
+  drafts: [], categories: [], currentId: null, editorDraftId: null, createdAtEditorId: null, user: null, view: 'list', mode: 'edit',
   searchQuery: '', categoryFilter: 'all', noteStatusFilter: 'all', showTrash: false, history: [], historyIndex: -1, composing: false,
   listSort: readListSort(),
   pointerType: null,
@@ -353,6 +353,7 @@ function stopSession() {
   state.compositionWaiters.clear();
 }
 async function handleAuth(user) {
+  closeCreatedAtEditor();
   if (state.user) persistLocal();
   stopSession(); state.user = user; state.currentId = state.editorDraftId = null; state.drafts = []; state.categories = []; state.purgedIds.clear();
   state.remoteReady = state.categoriesReady = state.syncError = state.categoryError = state.storageFailed = state.storageReadFailed = false;
@@ -557,7 +558,50 @@ function formatDateTime(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date);
 }
+function localDateTimeValue(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${String(date.getFullYear()).padStart(4, '0')}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+function closeCreatedAtEditor() {
+  state.createdAtEditorId = null;
+  $('createdAtForm').hidden = true;
+  $('editCreatedAtButton').setAttribute('aria-expanded', 'false');
+}
+function openCreatedAtEditor() {
+  const draft = currentDraft();
+  if (!draft || draft.deletedAt || !state.user || state.view !== 'editor' || state.editorDraftId !== draft.id) return;
+  state.createdAtEditorId = draft.id;
+  $('createdAtInput').value = localDateTimeValue(draft.createdAt);
+  $('createdAtForm').hidden = false;
+  $('editCreatedAtButton').setAttribute('aria-expanded', 'true');
+  $('createdAtInput').focus();
+}
+function saveCreatedAt(event) {
+  event.preventDefault();
+  let draft = currentDraft();
+  if (!draft || draft.deletedAt || !state.user || state.view !== 'editor' || state.editorDraftId !== draft.id || state.createdAtEditorId !== draft.id) return;
+  const value = $('createdAtInput').value;
+  const date = new Date(value);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) || localDateTimeValue(value) !== value || Number.isNaN(date.getTime())) {
+    toast('有効な作成日時を入力してください'); $('createdAtInput').focus(); return;
+  }
+  // Opening and saving without a change preserves existing seconds/milliseconds.
+  if (value === localDateTimeValue(draft.createdAt)) { closeCreatedAtEditor(); return; }
+  const id = draft.id;
+  finishComposition(); scheduleSave(); draft = currentDraft();
+  if (!draft || draft.id !== id || draft.deletedAt || state.view !== 'editor' || state.createdAtEditorId !== id) return;
+  const changed = editedDraft(draft, { createdAt: date.toISOString() });
+  state.drafts = state.drafts.map((item) => item.id === draft.id ? changed : item);
+  const saved = persistLocal([draft.id]);
+  closeCreatedAtEditor(); updateDraftTimestamps(); renderList(); refreshSyncStatus();
+  if (saved) queueSave(draft.id);
+  $('editCreatedAtButton').focus();
+  toast(saved ? '作成日時を変更しました' : '端末に保存できません。同期せず変更を保持しています');
+}
 function updateDraftTimestamps(draft = currentDraft()) {
+  if (state.createdAtEditorId && (state.createdAtEditorId !== draft?.id || draft?.deletedAt)) closeCreatedAtEditor();
   for (const [id, text] of [['createdAtDisplay', `作成日 ${formatDateTime(draft?.createdAt)}`], ['updatedAtDisplay', `更新日 ${formatDateTime(draft?.updatedAt)}`]]) {
     if ($(id).textContent !== text) $(id).textContent = text;
   }
@@ -601,7 +645,7 @@ function setEditorMode(mode, persist = true) {
 function showView(view) {
   if (!state.user || state.bulkAssigning || state.bulkPurging) return;
   if (view !== 'editor') finishComposition();
-  state.listTagEditor = null;
+  state.listTagEditor = null; closeCreatedAtEditor();
   $('bulkDiaryConfirmation').classList.add('hidden');
   state.view = view; for (const name of ['editor', 'list', 'settings']) $(`${name}View`).classList.toggle('hidden', name !== view);
   $('draftsButton').classList.toggle('active', view === 'list'); $('settingsButton').classList.toggle('active', view === 'settings');
@@ -971,6 +1015,10 @@ $('draftList').addEventListener('click', (event) => {
 for (const [id, mode] of [['editTab', 'edit'], ['previewTab', 'preview'], ['splitTab', 'split']]) $(id).addEventListener('click', () => setEditorMode(mode));
 categorySelect.addEventListener('change', () => { updateNoteStatusControls(); scheduleSave(); });
 noteStatusSelect.addEventListener('change', scheduleSave);
+$('editCreatedAtButton').addEventListener('click', openCreatedAtEditor);
+$('createdAtForm').addEventListener('submit', saveCreatedAt);
+$('cancelCreatedAtButton').addEventListener('click', () => { closeCreatedAtEditor(); $('editCreatedAtButton').focus(); });
+$('createdAtForm').addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.preventDefault(); closeCreatedAtEditor(); $('editCreatedAtButton').focus(); } });
 $('searchInput').addEventListener('input', (event) => { if (state.bulkPurging) return; state.searchQuery = event.target.value; state.listTagEditor = null; state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = ''; renderList(); });
 $('draftList').addEventListener('change', (event) => {
   const select = event.target.closest('[data-list-tag-select]');
