@@ -89,6 +89,8 @@ jobs:
           cp "MITAMONO/index.html" "dist/MITAMONO/index.html"
           cp "MITAMONO/README.md" "dist/MITAMONO/README.md"
           cp "iroiro/index.html" "dist/iroiro/index.html"
+          cp "iroiro/dashboard-sync.html" "dist/iroiro/dashboard-sync.html"
+          cp "iroiro/dashboard-sync.mjs" "dist/iroiro/dashboard-sync.mjs"
           cp "iroiro/style.css" "dist/iroiro/style.css"
           cp "iroiro/script.js" "dist/iroiro/script.js"
           cp "iroiro/task-core.mjs" "dist/iroiro/task-core.mjs"
