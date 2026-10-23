@@ -44,7 +44,9 @@ async function readTasks() {
   const notes = result.docs.map(document => {
     const data = document.data();
     const task = taskModule.normalizeTask(data.task || { items: data.type === "text" ? [] : data.items });
+    const updatedAt = data.updatedAt?.toDate?.();
     return { title: String(data.title || ""), status: task.status, priority: task.priority, dueDate: task.dueDate,
+      updatedAt: updatedAt instanceof Date && Number.isFinite(updatedAt.getTime()) ? updatedAt.toISOString() : null,
       items: task.items.map(item => ({ text: item.text, checked: item.checked })) };
   });
   if (new TextEncoder().encode(JSON.stringify({ fetchedAt, notes })).byteLength > 490000) throw new Error("too-large");
