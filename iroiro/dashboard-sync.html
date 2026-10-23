@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>タスクを更新｜イロイロキロク</title>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:28px;background:#faf8f4;color:#3a2a1a;font:15px/1.8 system-ui,sans-serif}main{max-width:440px;margin:24px auto;padding:24px;border:1px solid #e9e8e5;border-radius:14px;background:#fff}h1{font-size:20px;font-weight:500;margin:0 0 16px}p{margin:10px 0}button{font:inherit;padding:8px 16px;border:1px solid #ff7f00;border-radius:14px;background:#ff7f00;color:#fff;cursor:pointer}button:disabled{opacity:.6;cursor:wait}button:focus-visible{outline:2px solid #3a2a1a;outline-offset:3px}.help{color:#6b5a48;font-size:13px}[hidden]{display:none!important}
+</style>
+<main>
+<h1>タスクを更新</h1>
+<p id="status" role="status">ログイン状態を確認しています…</p>
+<button id="login" type="button" hidden>ログインして取得</button>
+<p class="help">「タスク」カテゴリーだけを読み取り、今日のお知らせに反映します。イロイロキロクの保存内容やMemoは変更しません。</p>
+<button type="button" id="close">閉じる</button>
+</main>
+<script src="firebase-config.js"></script>
+<script type="module" src="dashboard-sync.mjs"></script>
+</html>
