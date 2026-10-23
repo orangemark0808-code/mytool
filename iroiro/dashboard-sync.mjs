@@ -1,23 +1,17 @@
-// Read-only bridge. Ship alongside iroiro/index.html; keep the existing app intact.
+// Same-origin browser-only authentication bridge. No Firebase credentials are
+// sent to the dashboard origin or its server; only selected task fields leave.
 const targetOrigin = "https://daily-notice.ohana888.chatgpt.site";
-const parameters = new URLSearchParams(location.hash.slice(1));
-const requestId = parameters.get("requestId");
+const params = new URLSearchParams(location.hash.slice(1));
+const mode = params.get("mode") || "legacy";
+const requestId = params.get("requestId");
+const validId = value => typeof value === "string" && /^[a-f0-9-]{36}$/.test(value);
 const status = document.getElementById("status");
 const login = document.getElementById("login");
 document.getElementById("close").onclick = () => window.close();
+let clientPromise;
 
-async function main() {
-  if (!window.opener || parameters.get("targetOrigin") !== targetOrigin ||
-      !/^[a-f0-9-]{36}$/.test(requestId || "")) {
-    status.textContent = "今日のお知らせの「更新」ボタンから開いてください。";
-    return;
-  }
-  history.replaceState(null, "", location.pathname);
-  const fail = () => {
-    status.textContent = "取得できませんでした。イロイロキロクのログイン状態とインターネット接続を確認して、もう一度更新してください。";
-    window.opener?.postMessage({ type: "iroiro-tasks-result", requestId, error: true }, targetOrigin);
-  };
-  try {
+function client() {
+  if (!clientPromise) clientPromise = (async () => {
     const config = window.IROIRO_FIREBASE_CONFIG;
     if (!config?.apiKey || !config?.projectId || !config?.appId) throw new Error("missing-config");
     const [appModule, authModule, firestore, taskModule] = await Promise.all([
@@ -28,57 +22,162 @@ async function main() {
     ]);
     const app = appModule.initializeApp(config);
     const auth = authModule.getAuth(app);
-    const db = firestore.getFirestore(app);
-    let reading = false;
-    const read = async () => {
-      if (reading || !auth.currentUser) return;
-      reading = true; login.hidden = true;
-      status.textContent = "最新のタスクを取得しています…";
-      const uid = auth.currentUser.uid;
-      const fetchedAt = new Date().toISOString();
-      const settings = await firestore.getDocFromServer(firestore.doc(db, "users", uid, "iroiroSettings", "main"));
-      const categories = settings.exists() ? settings.data().categories : null;
-      const matches = Array.isArray(categories) ? categories.filter(item => typeof item?.name === "string" && item.name.trim() === "タスク" && typeof item.id === "string") : [];
-      if (matches.length !== 1) throw new Error("task-category-not-unique");
-      // Do not load any notes from other categories or allow cache-only success.
-      const result = await firestore.getDocsFromServer(firestore.query(
-        firestore.collection(db, "users", uid, "iroiroNotes"),
-        firestore.where("categoryId", "==", matches[0].id), firestore.limit(501),
-      ));
-      if (result.size > 500 || auth.currentUser?.uid !== uid) throw new Error("invalid-result");
-      const notes = result.docs.map(document => {
-        const data = document.data();
-        const task = taskModule.normalizeTask(data.task || { items: data.type === "text" ? [] : data.items });
-        return { title: String(data.title || ""), status: task.status, priority: task.priority, dueDate: task.dueDate,
-          items: task.items.map(item => ({ text: item.text, checked: item.checked })) };
-      });
-      if (new TextEncoder().encode(JSON.stringify({ fetchedAt, notes })).byteLength > 490000) throw new Error("too-large");
-      status.textContent = "今日のお知らせへ反映しています…";
-      window.opener.postMessage({ type: "iroiro-tasks-result", requestId, fetchedAt, notes }, targetOrigin);
-    };
-    window.addEventListener("message", event => {
-      if (event.origin !== targetOrigin || event.source !== window.opener || event.data?.requestId !== requestId) return;
-      if (event.data.type === "iroiro-tasks-failed") {
-        status.textContent = "反映できませんでした。この画面を閉じ、今日のお知らせからもう一度更新してください。";
-        return;
-      }
-      if (event.data.type !== "iroiro-tasks-saved") return;
-      status.textContent = "タスクを更新しました。この画面を閉じて戻れます。";
-      window.close();
-    });
     await auth.authStateReady();
-    if (auth.currentUser) await read();
-    else {
-      status.textContent = "イロイロキロクで使用しているアカウントでログインしてください。";
-      login.hidden = false;
-      login.onclick = async () => {
-        login.disabled = true;
-        try { await authModule.signInWithPopup(auth, new authModule.GoogleAuthProvider()); await read(); }
-        catch { fail(); }
-        finally { login.disabled = false; }
-      };
+    return { auth, authModule, firestore, taskModule, db: firestore.getFirestore(app) };
+  })().catch(error => { clientPromise = null; throw error; });
+  return clientPromise;
+}
+
+async function readTasks() {
+  const { auth, firestore, taskModule, db } = await client();
+  if (!auth.currentUser) throw Object.assign(new Error("auth-required"), { code: "auth/no-current-user" });
+  const uid = auth.currentUser.uid, fetchedAt = new Date().toISOString();
+  const settings = await firestore.getDocFromServer(firestore.doc(db, "users", uid, "iroiroSettings", "main"));
+  const categories = settings.exists() ? settings.data().categories : null;
+  const matches = Array.isArray(categories) ? categories.filter(item => typeof item?.name === "string" && item.name.trim() === "タスク" && typeof item.id === "string") : [];
+  if (matches.length !== 1) throw new Error("task-category-not-unique");
+  const result = await firestore.getDocsFromServer(firestore.query(
+    firestore.collection(db, "users", uid, "iroiroNotes"),
+    firestore.where("categoryId", "==", matches[0].id), firestore.limit(501),
+  ));
+  if (result.size > 500 || auth.currentUser?.uid !== uid) throw new Error("invalid-result");
+  const notes = result.docs.map(document => {
+    const data = document.data();
+    const task = taskModule.normalizeTask(data.task || { items: data.type === "text" ? [] : data.items });
+    return { title: String(data.title || ""), status: task.status, priority: task.priority, dueDate: task.dueDate,
+      items: task.items.map(item => ({ text: item.text, checked: item.checked })) };
+  });
+  if (new TextEncoder().encode(JSON.stringify({ fetchedAt, notes })).byteLength > 490000) throw new Error("too-large");
+  return { fetchedAt, notes };
+}
+const authError = error => String(error?.code || "").startsWith("auth/") || ["permission-denied", "unauthenticated"].includes(error?.code);
+
+function background() {
+  const cancelled = new Set();
+  let reading = false, authorizing = false;
+  const send = (id, value) => {
+    if (!cancelled.has(id)) window.parent.postMessage({ type: "iroiro-tasks-result", requestId: id, ...value }, targetOrigin);
+  };
+  const read = async id => {
+    if (reading || authorizing) { send(id, { error: "busy" }); return; }
+    reading = true;
+    try { send(id, await readTasks()); }
+    catch (error) { send(id, { error: authError(error) ? "auth-required" : "read-failed" }); }
+    finally { reading = false; }
+  };
+  window.addEventListener("message", event => {
+    if (event.origin !== targetOrigin || event.source !== window.parent || !validId(event.data?.requestId)) return;
+    const id = event.data.requestId;
+    if (event.data.type === "iroiro-cancel") {
+      cancelled.add(id); if (cancelled.size > 30) cancelled.delete(cancelled.values().next().value);
+      return;
     }
+    if (cancelled.has(id)) return;
+    if (event.data.type === "iroiro-tasks-request") { void read(id); return; }
+    if (event.data.type !== "iroiro-auth-channel" || !event.ports[0]) return;
+    const port = event.ports[0]; let used = false;
+    port.onmessage = async message => {
+      if (used || cancelled.has(id)) { port.close(); return; }
+      used = true;
+      const credential = message.data;
+      if (reading || authorizing || credential?.type !== "google-credential" || credential.requestId !== id ||
+          typeof credential.idToken !== "string" || credential.idToken.length > 20000 ||
+          typeof credential.uid !== "string" || credential.uid.length > 128) {
+        port.postMessage({ type: "failed", requestId: id }); port.close(); return;
+      }
+      authorizing = true;
+      try {
+        const { auth, authModule } = await client();
+        if (cancelled.has(id)) return;
+        const result = await authModule.signInWithCredential(auth, authModule.GoogleAuthProvider.credential(credential.idToken));
+        if (result.user.uid !== credential.uid) { await authModule.signOut(auth); throw new Error("account-mismatch"); }
+        if (cancelled.has(id)) return;
+        port.postMessage({ type: "authorized", requestId: id });
+        authorizing = false;
+        await read(id);
+      } catch {
+        port.postMessage({ type: "failed", requestId: id }); send(id, { error: "auth-required" });
+      } finally { authorizing = false; port.close(); }
+    };
+    port.start();
+  });
+}
+
+async function authorize() {
+  let port = null, ready = false;
+  login.hidden = false; login.disabled = true; login.textContent = "Googleで接続する";
+  status.textContent = "バックグラウンド更新のために、イロイロキロクのアカウントを確認します。";
+  const fail = () => {
+    status.textContent = "接続できませんでした。閉じて、今日のお知らせからもう一度接続してください。";
+    window.opener?.postMessage({ type: "iroiro-auth-error", requestId }, targetOrigin);
+  };
+  window.addEventListener("message", event => {
+    if (event.origin !== targetOrigin || event.source !== window.opener || event.data?.type !== "iroiro-auth-channel" ||
+        event.data.requestId !== requestId || !event.ports[0] || port) return;
+    port = event.ports[0]; login.disabled = !ready;
+    port.onmessage = event => {
+      if (event.data?.requestId !== requestId) return;
+      if (event.data.type === "authorized") {
+        window.opener?.postMessage({ type: "iroiro-auth-complete", requestId }, targetOrigin);
+        status.textContent = "接続しました。これからはバックグラウンドで更新します。";
+        port.close(); window.close();
+      } else if (event.data.type === "failed") fail();
+    };
+    port.start();
+  });
+  window.opener.postMessage({ type: "iroiro-auth-ready", requestId }, targetOrigin);
+  try {
+    const { auth, authModule } = await client();
+    ready = true; login.disabled = !port;
+    login.onclick = async () => {
+      if (!port) return;
+      login.disabled = true;
+      try {
+        const provider = new authModule.GoogleAuthProvider();
+        if (auth.currentUser?.email) provider.setCustomParameters({ login_hint: auth.currentUser.email });
+        // Confirm the existing source account instead of silently switching it.
+        const result = auth.currentUser
+          ? await authModule.reauthenticateWithPopup(auth.currentUser, provider)
+          : await authModule.signInWithPopup(auth, provider);
+        const credential = authModule.GoogleAuthProvider.credentialFromResult(result);
+        if (!credential?.idToken) throw new Error("missing-credential");
+        // Only the two same-GitHub-origin pages see this port payload. The Site
+        // receives no token and cannot access the transferred endpoints.
+        port.postMessage({ type: "google-credential", requestId, idToken: credential.idToken, uid: result.user.uid });
+        status.textContent = "接続しています…";
+      } catch { fail(); }
+    };
   } catch { fail(); }
 }
 
-void main();
+async function legacy() {
+  const send = async () => {
+    status.textContent = "最新のタスクを取得しています…";
+    window.opener.postMessage({ type: "iroiro-tasks-result", requestId, ...await readTasks() }, targetOrigin);
+  };
+  try {
+    const { auth, authModule } = await client();
+    window.addEventListener("message", event => {
+      if (event.origin === targetOrigin && event.source === window.opener && event.data?.requestId === requestId && event.data.type === "iroiro-tasks-saved") window.close();
+    });
+    if (auth.currentUser) await send();
+    else {
+      status.textContent = "イロイロキロクのアカウントでログインしてください。";
+      login.hidden = false;
+      login.onclick = async () => {
+        try { await authModule.signInWithPopup(auth, new authModule.GoogleAuthProvider()); await send(); }
+        catch { window.opener?.postMessage({ type: "iroiro-tasks-result", requestId, error: true }, targetOrigin); }
+      };
+    }
+  } catch { window.opener?.postMessage({ type: "iroiro-tasks-result", requestId, error: true }, targetOrigin); }
+}
+
+if (params.get("targetOrigin") !== targetOrigin ||
+    (mode === "background" ? window.parent === window : !window.opener || !validId(requestId))) {
+  status.textContent = "今日のお知らせの「更新」ボタンから開いてください。";
+} else {
+  history.replaceState(null, "", location.pathname);
+  if (mode === "background") background();
+  else if (mode === "authorize") void authorize();
+  else void legacy();
+}
