@@ -101,6 +101,7 @@ function background() {
     };
     port.start();
   });
+  window.parent.postMessage({ type: "iroiro-background-ready" }, targetOrigin);
 }
 
 async function authorize() {
