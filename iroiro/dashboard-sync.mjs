@@ -1,4 +1,4 @@
-import { appendTask } from './task-add.mjs?v=2026-10-25-02';
+import { appendTask } from './task-add.mjs?v=2026-10-25-03';
 // Same-origin browser-only authentication bridge. No Firebase credentials are
 // sent to the dashboard origin or its server; only selected task fields leave.
 const targetOrigin = "https://daily-notice.ohana888.chatgpt.site";
@@ -182,7 +182,11 @@ async function legacy() {
   } catch { window.opener?.postMessage({ type: "iroiro-tasks-result", requestId, error: true }, targetOrigin); }
 }
 
-if (params.get("targetOrigin") !== targetOrigin ||
+// Restored iframe history can omit the startup hash. Embedded documents still
+// accept requests only from the exact parent origin/window and a valid ID.
+if (window.parent !== window) {
+  background();
+} else if (params.get("targetOrigin") !== targetOrigin ||
     (mode === "background" ? window.parent === window : !window.opener || !validId(requestId))) {
   status.textContent = "今日のお知らせの「更新」ボタンから開いてください。";
 } else {
