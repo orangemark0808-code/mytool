@@ -136,3 +136,25 @@ test('旧チェックリストの編集と別端末からの専用タスク追�
  assert.equal(await h.run('requestSave()'),true);
  assert.equal(h.store.get(path('n')).task.items.length,2);assert.equal(h.store.get(path('n')).task.items[0].checked,true);
 });
+
+test('通常取得とトランザクションでフィールド順が変わっても同じ設定として追加する',async()=>{
+ const a=adapter([[path('n'),note()]]),get=a.firestore.getDocFromServer;
+ const reorder=value=>Array.isArray(value)?value.map(reorder):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).reverse().map(([k,v])=>[k,reorder(v)])):value;
+ a.firestore.getDocFromServer=async ref=>{const snap=await get(ref);return{...snap,data:()=>reorder(snap.data())};};
+ await appendTask(a,{group:'グループ',text:'🥕する',operationId:id1});
+ assert.equal(a.store.get(path('n')).task.items.at(-1).text,'🥕する');
+});
+
+test('本当に設定が変わった場合は、項目順の修正後も書き込みを停止する',async()=>{
+ for(const field of ['categories','updatedAt']) {
+  const a=adapter([[path('n'),note()]]),run=a.firestore.runTransaction;let change=0;
+  a.firestore.runTransaction=async(db,callback)=>{
+   const current=a.store.get(settings);
+   if(field==='categories')current.categories=[{id:'tasks',name:'タスク',order:++change}];
+   else current.updatedAt={seconds:100,nanoseconds:++change};
+   return run(db,callback);
+  };
+  await assert.rejects(appendTask(a,{group:'グループ',text:'作業',operationId:id1}),/retry-addition/);
+  assert.equal(a.writes.length,0);assert.equal(a.store.get(path('n')).task.items.length,1);
+ }
+});

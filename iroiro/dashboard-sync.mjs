@@ -1,4 +1,4 @@
-import { appendTask } from './task-add.mjs?v=2026-10-25-01';
+import { appendTask } from './task-add.mjs?v=2026-10-25-02';
 // Same-origin browser-only authentication bridge. No Firebase credentials are
 // sent to the dashboard origin or its server; only selected task fields leave.
 const targetOrigin = "https://daily-notice.ohana888.chatgpt.site";

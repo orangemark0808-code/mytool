@@ -6,7 +6,16 @@ export function validateAddition(value) {
   if(!group||!text||group.length>200||text.length>2000)throw new Error('invalid-input');
   return{group,text,operationId:value.operationId};
 }
-const same = (a,b) => JSON.stringify(a)===JSON.stringify(b);
+// Firestore maps have no field order: Listen and BatchGet may serialize the
+// same snapshot differently. Keep array order and exact Timestamp precision.
+const same = (a,b) => {
+  if(a===b)return true;
+  if(!a||!b||typeof a!=='object'||typeof b!=='object')return false;
+  if(typeof a.isEqual==='function')return a.isEqual(b);
+  if(Array.isArray(a)||Array.isArray(b))return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((value,i)=>same(value,b[i]));
+  const keys=Object.keys(a);
+  return keys.length===Object.keys(b).length&&keys.every(key=>Object.hasOwn(b,key)&&same(a[key],b[key]));
+};
 const millis = value => value?.toMillis?.() ?? (Date.parse(value)||0);
 const hasChecklist = data => data.type==='checklist'||Array.isArray(data.task?.items);
 
