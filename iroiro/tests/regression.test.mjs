@@ -75,12 +75,14 @@ test('閉じる途中の追加入力も保存完了まで待つ', async () => {
   const h = harness();
   const pending = [];
   h.context.updateDoc = (ref, data) => new Promise(resolve => {
-    h.writes.push({ ref, data }); pending.push(resolve);
+    h.writes.push({ ref, data }); pending.push(()=>{h.store.set(ref,{...h.store.get(ref),...structuredClone(data)});resolve();});
   });
+  h.store.set(notePath('note-1'),{content:'初期値'});
   h.run("openEditor(normalizeNote('note-1',{content:'初期値'}))");
   h.element('noteContentInput').value = '最初の変更';
   h.run('syncEditingNoteFromForm();scheduleSave()');
   const closing = h.run('closeEditor()');
+  await tick();
   h.element('noteContentInput').value = '保存待ち中の追加変更';
   h.run('syncEditingNoteFromForm();scheduleSave()');
   pending.shift()();
@@ -96,6 +98,7 @@ test('閉じる途中の追加入力も保存完了まで待つ', async () => {
 
 test('保存失敗時は編集内容を残し、再試行で保存できる', async () => {
   const h = harness();
+  h.store.set(notePath('note-1'),{content:'初期値'});
   h.run("openEditor(normalizeNote('note-1',{content:'初期値'}))");
   h.element('noteContentInput').value = '未保存の内容';
   h.run('syncEditingNoteFromForm();scheduleSave()');
@@ -114,7 +117,7 @@ test('新規メモの保存待ち中に編集してもメモを重複作成し�
   const h = harness();
   let release;
   h.context.addDoc = (ref, data) => new Promise(resolve => {
-    h.writes.push({ ref, data }); release = () => resolve({ id: 'new-id' });
+    h.writes.push({ ref, data }); release = () => {h.store.set(`${ref}/new-id`,structuredClone(data));resolve({ id: 'new-id' });};
   });
   h.run('openEditor(createNote())');
   h.element('noteContentInput').value = '最初の本文';

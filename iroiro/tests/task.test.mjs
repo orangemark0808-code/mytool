@@ -94,10 +94,10 @@ test('タスク名がない作業は保存せず、空の新規タスクは閉�
 });
 
 test('保存待ち中のタスク設定変更も閉じる前に保存する',async()=>{
-  const h=harness();h.run(`${taskCategory};openEditor(normalizeNote('task-1',{categoryId:'tasks',title:'作業',task:{}}))`);
-  const pending=[];h.context.updateDoc=(ref,data)=>new Promise(resolve=>{h.writes.push({ref,data});pending.push(resolve)});
+  const h=harness([[notePath('task-1'),{categoryId:'tasks',title:'作業',task:{}}]]);h.run(`${taskCategory};openEditor(normalizeNote('task-1',{categoryId:'tasks',title:'作業',task:{}}))`);
+  const pending=[];h.context.updateDoc=(ref,data)=>new Promise(resolve=>{h.writes.push({ref,data});pending.push(()=>{h.store.set(ref,{...h.store.get(ref),...structuredClone(data)});resolve();})});
   h.element('taskStatusSelect').value='doing';h.run('syncEditingNoteFromForm();scheduleSave()');
-  const closing=h.run('closeEditor()');h.element('taskPrioritySelect').value='high';h.run('syncEditingNoteFromForm();scheduleSave()');
+  const closing=h.run('closeEditor()');await tick();h.element('taskPrioritySelect').value='high';h.run('syncEditingNoteFromForm();scheduleSave()');
   pending.shift()();await tick();assert.equal(h.writes.length,2);assert.equal(h.writes[1].data.task.priority,'high');
   pending.shift()();await closing;assert.equal(h.element('editorDialog').open,false);
 });

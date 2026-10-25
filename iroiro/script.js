@@ -5,14 +5,16 @@ import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFire
 
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.23-1';
 import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.23-1';
+import { mergeNoteData } from './note-concurrency.mjs?v=2026-10-25-01';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026.10.23-1'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-25-01'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
 const DEFAULT_CATEGORIES=[['app','アプリ','#FF7F00'],['manga','漫画','#FFD400'],['blog','ブログ','#3A86D4'],['cooking','料理','#38A169'],['shopping','買い物','#7E5FC4'],['research','あとで調べる','#1E9A8A']].map(([id,name,color],order)=>({id,name,color,order}));
 const $=id=>document.getElementById(id); const uid=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random().toString(16).slice(2)}`; const config=window.IROIRO_FIREBASE_CONFIG||{};
+let editorBaseData=null;
 let app,auth,db,currentUser=null,notes=[],categories=[],selectedCategory='all',editingNote=null,saveTimer=null,unsubscribeNotes=null,unsubscribeSettings=null,settingsCreatingForUid='',closingEditor=false,deletingNote=false,pendingCategoryId='',pendingType='',categoryDragState=null,itemDragState=null,editRevision=0,savedRevision=0,requestedRevision=0,saveInProgress=false,savePromise=Promise.resolve(true),editorSession='',backupBusy=false,pendingBackup=null,migrationBusy=false,regularSort='updated-desc';
 const pendingTaskWrites=new Set();
 const pendingPinWrites=new Map();
@@ -152,7 +154,7 @@ function clearRealtimeListeners(){if(unsubscribeNotes){unsubscribeNotes();unsubs
 async function handleAuth(user){clearRealtimeListeners();settingsCreatingForUid='';currentUser=user;if(!user){notes=[];categories=[];$('loginButton').hidden=false;$('logoutButton').hidden=true;setStatus(configured()?'ログインすると同期できます':'Firebase設定が未設定です');renderAll();return}const activeUid=user.uid;$('loginButton').hidden=true;$('logoutButton').hidden=false;setStatus('同期中…');const activeSettings=doc(db,'users',activeUid,'iroiroSettings','main');const activeNotes=collection(db,'users',activeUid,'iroiroNotes');unsubscribeSettings=onSnapshot(activeSettings,snap=>{if(currentUser?.uid!==activeUid)return;if(snap.exists()&&Array.isArray(snap.data().categories)){applyRemoteCategories(snap.data().categories);return}if(settingsCreatingForUid!==activeUid){settingsCreatingForUid=activeUid;setDoc(activeSettings,{categories:structuredClone(DEFAULT_CATEGORIES),schemaVersion:SCHEMA_VERSION,updatedAt:serverTimestamp()}).catch(e=>setStatus(`カテゴリー初期化失敗: ${e.message}`)).finally(()=>{if(settingsCreatingForUid===activeUid)settingsCreatingForUid=''})}},err=>setStatus(`カテゴリー同期失敗: ${err.message}`));unsubscribeNotes=onSnapshot(query(activeNotes,orderBy('updatedAt','desc')),snap=>{if(currentUser?.uid!==activeUid)return;notes=snap.docs.map(x=>normalizeNote(x.id,x.data()));setStatus('同期済み');renderAll()},err=>setStatus(`同期失敗: ${err.message}`));try{await checkLegacy()}catch(e){setStatus(`移行状態の確認失敗: ${e.message}`)}}
 function applyRemoteCategories(nextCategories){let migrated=false;const prepared=nextCategories.map(category=>{const legacy=LEGACY_DEFAULT_CATEGORY_COLORS[category.id],standard=STANDARD_CATEGORY_COLOR_MIGRATIONS[category.id],savedColor=String(category.color||'').toLowerCase();if(legacy&&(savedColor===legacy[0]||standard&&savedColor===standard[0])){migrated=true;return{...category,color:standard?.[1]||legacy[1]}}return category});categories=orderedCategories(prepared);notes.forEach(note=>note.urls=extractUrls(note));renderAll();refreshEditorCategoryOptions();if(migrated)saveCategories(categories)}
 function refreshEditorCategoryOptions(){if(!editingNote||!$('editorDialog').open)return;const select=$('noteCategorySelect');const current=editingNote.categoryId;select.innerHTML=`<option value="">未分類</option>${categories.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}`;if(current===''||categories.some(c=>c.id===current)){select.value=current;updateEditorMode();return}editingNote.categoryId='';select.value='';updateEditorMode();scheduleSave()}
-function openEditor(note){editingNote=structuredClone(note);ensureFormatStores(editingNote);editorSession=uid();editRevision=0;savedRevision=0;requestedRevision=0;saveInProgress=false;savePromise=Promise.resolve(true);updateEditor();$('editorDialog').showModal();setTimeout(()=>$('noteTitleInput').focus(),40)}
+function openEditor(note){editingNote=structuredClone(note);ensureFormatStores(editingNote);editorBaseData=editorNoteData(note);editorSession=uid();editRevision=0;savedRevision=0;requestedRevision=0;saveInProgress=false;savePromise=Promise.resolve(true);updateEditor();$('editorDialog').showModal();setTimeout(()=>$('noteTitleInput').focus(),40)}
 function syncEditingNoteFromForm(readSpecialFields=true){
   if(!editingNote)return;
   const note=editingNote;
@@ -198,27 +200,66 @@ function requestTypeChange(type){if(!editingNote||deletingNote||isTaskNote(editi
 function applyTypeChange(type,mode='replace'){if(!type||!editingNote)return;syncEditingNoteFromForm();if(mode==='previous')showStoredTypeContent(editingNote,type);else{const converted=convertCurrentContent(editingNote,type);editingNote.type=type;if(type==='text'){editingNote.content=converted;editingNote.contentByType.text=converted}else{editingNote.items=converted;editingNote.itemsByType[type]=copyItems(converted)}}editingNote.urls=extractUrls(editingNote);pendingType='';updateEditor();scheduleSave()}
 function scheduleSave(){if(deletingNote||!editingNote)return;editRevision++;$('saveStatus').textContent='保存中…';clearTimeout(saveTimer);saveTimer=setTimeout(()=>requestSave(),550)}
 function noteData(note){rememberCurrentFormat(note);return{title:note.title,type:note.type,content:note.content,items:note.items,contentByType:note.contentByType,itemsByType:note.itemsByType,categoryId:note.categoryId,task:note.task?normalizeTask(note.task):null,manga:note.manga?normalizeManga(note.manga):null,urls:extractUrls(note),isPinned:note.isPinned,schemaVersion:SCHEMA_VERSION}}
-function captureSaveSnapshot(){syncEditingNoteFromForm();return{note:structuredClone(editingNote),session:editorSession,revision:editRevision}}
+function editorNoteData(note){const copy=structuredClone(note);if(isTaskNote(copy))ensureTask(copy);return noteData(copy)}
+function captureSaveSnapshot(){syncEditingNoteFromForm();return{note:structuredClone(editingNote),base:structuredClone(editorBaseData),uid:currentUser?.uid,session:editorSession,revision:editRevision}}
 function requestSave(){requestedRevision=Math.max(requestedRevision,editRevision);if(saveInProgress)return savePromise;if(requestedRevision<=savedRevision)return Promise.resolve(true);savePromise=drainSaveQueue();return savePromise}
 async function drainSaveQueue(){saveInProgress=true;try{while(savedRevision<requestedRevision){const revision=requestedRevision;const snapshot=captureSaveSnapshot();const result=await persistSnapshot(snapshot);if(!result.ok)return false;savedRevision=revision}return true}finally{saveInProgress=false}}
 async function persistSnapshot(snapshot){
-  if(!currentUser||!snapshot.note)return{ok:false};
+  if(!currentUser||currentUser.uid!==snapshot.uid||!snapshot.note)return{ok:false};
   if(!noteTitleValid(snapshot.note))return{ok:false};
   const isNew=!snapshot.note.id;
   if(isNew&&!hasMeaningfulContent(snapshot.note)){$('saveStatus').textContent='未保存（空のメモ）';return{ok:true,skipped:true}}
   $('saveStatus').textContent='保存中…';
   try{
+    let savedData=noteData(snapshot.note);
     if(isNew){
       const created=await addDoc(refs().notes,{...noteData(snapshot.note),createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
       if(editingNote&&editorSession===snapshot.session&&!editingNote.id)editingNote.id=created.id;
-    }else await updateDoc(doc(refs().notes,snapshot.note.id),{...noteData(snapshot.note),updatedAt:serverTimestamp()});
+    }else {
+      const target=doc(db,'users',snapshot.uid,'iroiroNotes',snapshot.note.id);
+      savedData=await runTransaction(db,async transaction=>{
+        const latest=await transaction.get(target);
+        requireActiveUser(snapshot.uid);
+        if(!latest.exists())throw new Error('別の端末で削除されたメモです。入力は保持しています。');
+        const remote=editorNoteData(normalizeNote(snapshot.note.id,latest.data()));
+        const merged=mergeNoteData(snapshot.base,noteData(snapshot.note),remote);
+        merged.urls=extractUrls(merged);
+        transaction.update(target,{...merged,updatedAt:serverTimestamp()});
+        return merged;
+      });
+    }
+    requireActiveUser(snapshot.uid);
     if(editingNote&&editorSession===snapshot.session){
+      // Rebase any typing that happened while this transaction was in flight.
+      syncEditingNoteFromForm();
+      const current=noteData(structuredClone(editingNote));
+      try {
+        const rebased=mergeNoteData(noteData(snapshot.note),current,savedData);
+        const changed=Object.keys(rebased).some(key=>JSON.stringify(rebased[key])!==JSON.stringify(current[key]));
+        const focused=document.activeElement,fieldId=focused?.id;
+        const taskItemId=focused?.dataset?.taskItem!==undefined?current.task?.items[Number(focused.dataset.taskItem)]?.id:null;
+        const itemId=focused?.dataset?.item!==undefined?current.items[Number(focused.dataset.item)]?.id:null;
+        const selection=[focused?.selectionStart,focused?.selectionEnd];
+        editingNote={...editingNote,...rebased};
+        editorBaseData=structuredClone(savedData);
+        if(changed){
+          updateEditor();
+          const input=taskItemId?$('taskItemsList').querySelector(`[data-task-item="${editingNote.task.items.findIndex(item=>item.id===taskItemId)}"]`)
+            :itemId?$('itemsList').querySelector(`[data-item="${editingNote.items.findIndex(item=>item.id===itemId)}"]`):fieldId?$(fieldId):null;
+          input?.focus();
+          if(selection.every(Number.isInteger))input?.setSelectionRange?.(...selection);
+        }
+      } catch(error) {
+        // The remote save succeeded, but newer local typing conflicts: keep it.
+        editorBaseData=structuredClone(noteData(snapshot.note));
+        throw error;
+      }
       $('saveStatus').textContent=editRevision>snapshot.revision?'保存中…':'保存済み';
       editingNote.urls=extractUrls(editingNote);
       renderLinks();
     }
     return{ok:true};
-  }catch(e){$('saveStatus').textContent='保存できませんでした';setStatus(`保存失敗: ${e.message}`);return{ok:false,error:e}}
+  }catch(e){$('saveStatus').textContent=e.code==='edit-conflict'?e.message:'保存できませんでした';setStatus(`保存失敗: ${e.message}`);return{ok:false,error:e}}
 }
 async function closeEditor(){
   if(closingEditor||!editingNote)return;

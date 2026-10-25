@@ -60,7 +60,7 @@ test('漫画タイトルなしでは保存せず、空の新規フォームは�
 
 test('漫画の保存待ち中に追加したページも閉じる前に保存する',async()=>{
   const h=setup();h.element('noteTitleInput').value='作業中';
-  const pending=[];h.context.addDoc=(ref,data)=>new Promise(resolve=>{h.writes.push({ref,data});pending.push(()=>resolve({id:'created'}))});
+  const pending=[];h.context.addDoc=(ref,data)=>new Promise(resolve=>{h.writes.push({ref,data});pending.push(()=>{h.store.set(`${ref}/created`,structuredClone(data));resolve({id:'created'})})});
   h.context.updateDoc=(ref,data)=>new Promise(resolve=>{h.writes.push({ref,data});pending.push(resolve)});
   h.run('syncEditingNoteFromForm();scheduleSave()');const closing=h.run('closeEditor()');
   h.run("editingNote.manga.pages.push({pageNumber:2,rows:[{panel:'1',actor:'',type:'',detail:'追加',reference:''}]});scheduleSave()");

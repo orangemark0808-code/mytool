@@ -1,3 +1,4 @@
+import { appendTask } from './task-add.mjs?v=2026-10-25-01';
 // Same-origin browser-only authentication bridge. No Firebase credentials are
 // sent to the dashboard origin or its server; only selected task fields leave.
 const targetOrigin = "https://daily-notice.ohana888.chatgpt.site";
@@ -60,11 +61,16 @@ function background() {
   const send = (id, value) => {
     if (!cancelled.has(id)) window.parent.postMessage({ type: "iroiro-tasks-result", requestId: id, ...value }, targetOrigin);
   };
-  const read = async id => {
+  const read = async (id,addition=null) => {
     if (reading || authorizing) { send(id, { error: "busy" }); return; }
     reading = true;
-    try { send(id, await readTasks()); }
-    catch (error) { send(id, { error: authError(error) ? "auth-required" : "read-failed" }); }
+    let added=false;
+    try {
+      if(addition){await appendTask(await client(),addition);added=true;}
+      const tasks=await readTasks();
+      send(id,{...tasks,added,operationId:addition?.operationId});
+    }
+    catch (error) { send(id, { added,operationId:addition?.operationId,error: authError(error) ? "auth-required" : addition ? error.message : "read-failed" }); }
     finally { reading = false; }
   };
   window.addEventListener("message", event => {
@@ -76,6 +82,7 @@ function background() {
     }
     if (cancelled.has(id)) return;
     if (event.data.type === "iroiro-tasks-request") { void read(id); return; }
+    if (event.data.type === "iroiro-task-add") { void read(id,event.data.addition); return; }
     if (event.data.type !== "iroiro-auth-channel" || !event.ports[0]) return;
     const port = event.ports[0]; let used = false;
     port.onmessage = async message => {

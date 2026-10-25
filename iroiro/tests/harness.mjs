@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
+import { mergeNoteData } from '../note-concurrency.mjs';
 import * as taskCore from '../task-core.mjs';
 import * as mangaCore from '../manga-core.mjs';
 import { createMangaEditor } from '../manga-editor.mjs';
@@ -40,7 +41,7 @@ export function harness(initial = []) {
   const context = vm.createContext({
     window: {}, document: { getElementById: element, querySelectorAll: () => [],
       body: { dataset: {}, classList: { add() {}, remove() {} } } },
-    ...taskCore, ...mangaCore, createMangaEditor, crypto: webcrypto, TextEncoder, structuredClone, URL, Date, Intl,
+    mergeNoteData, ...taskCore, ...mangaCore, createMangaEditor, crypto: webcrypto, TextEncoder, structuredClone, URL, Date, Intl,
     setTimeout: (cb, ms) => { timers.set(++timerId, { cb, ms }); return timerId; },
     clearTimeout: id => timers.delete(id),
     serverTimestamp: () => new Date('2026-10-22T00:00:00Z'),
@@ -61,8 +62,12 @@ export function harness(initial = []) {
     runTransaction: async (_db, callback) => {
       const pending = [];
       const result = await callback({ get: async ref => snapshot(ref),
-        set: (ref, data, options) => pending.push([ref, data, options]) });
-      for (const args of pending) await write(...args);
+        set: (ref, data, options) => pending.push([ref, data, options]),
+        update: (ref, patch) => pending.push([ref, patch, {transactionUpdate:true}]) });
+      for (const args of pending) {
+        if(args[2]?.transactionUpdate) await api.context.updateDoc(args[0],args[1]);
+        else await write(...args);
+      }
       return result;
     },
     writeBatch: () => {
