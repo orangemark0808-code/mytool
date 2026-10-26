@@ -129,7 +129,7 @@ body{padding-top:12px}.hero{position:relative;padding:16px 14px;margin-bottom:18
 const SUPABASE_URL="https://vwfzlcgfgffknpmselzy.supabase.co";const SUPABASE_PUBLISHABLE_KEY="sb_publishable_0LpdSdGbLIcC0P5rkVXgpg_1SN3sR-p";const TABLE="nazoiki_calendar_posts";
 const TAG_LABELS={intro:"紹介",mimamori:"見守り・シュール",seikaku:"性格紹介",kankei:"関係性",kisetsu:"季節ネタ",sanka:"参加型"};
 const STATUS_LABELS={"":"　",done:"作成済み",scheduled:"予約済み"};
-const TYPE_LABELS=["自己紹介","のぞく・出てくる","確認する","物を増やす","世話を焼く","距離がおかしい","勘違い・うまくいかない","日常のひとこま","参加型","応援する"];
+const TYPE_LABELS=["自己紹介","のぞく・出てくる","確認する","物を増やす","世話を焼く","距離がおかしい","勘違い・うまくいかない","日常のひとこま","参加型","応援する","立場が逆になる","真似をする","見守り報告"];
 function typeOptions(cur){const list=TYPE_LABELS.includes(cur)||!cur?TYPE_LABELS:[...TYPE_LABELS,cur];return `<option value="" ${cur?"":"selected"}>型：未分類</option>`+list.map(v=>`<option value="${escapeHtml(v)}" ${v===cur?"selected":""}>型：${escapeHtml(v)}</option>`).join("")}
 const REEL_LABELS={high:"リール適性：高",mid:"リール適性：中",low:"リール適性：低"};
 const WEEKDAY_LABELS=["日","月","火","水","木","金","土"];
