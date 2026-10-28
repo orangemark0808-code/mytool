@@ -135,3 +135,27 @@ body [hidden]{display:none!important}
 .food-next{width:100%;padding:12px;font-size:14px}
 .food-mode #noteContentInput{min-height:100px}
 @media(max-width:700px){.food-row{gap:8px;padding:10px}.food-card-name{font-size:14px}.food-card-grams{font-size:17px}.food-card-open{gap:4px 8px}.food-card-actions{gap:2px}.food-card-actions .quiet-button{font-size:11px;padding:8px 6px;min-height:36px}.food-consume-controls{gap:8px}.food-consume-controls .quiet-button{font-size:12px;padding:10px}.food-basic-grid{gap:10px}}
+.food-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.food-toolbar .add-item-button{margin:0}
+#foodItemCount{font-size:13px;color:var(--muted)}
+.food-item-form{padding:16px;border:1px solid #d7cfc6;border-radius:12px;background:#faf9f6;margin:12px 0 20px}
+.food-item-form>.food-field{margin:12px 0}
+.food-amount-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.6fr);gap:12px;margin:14px 0}
+.food-form-actions,.food-delete-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
+.food-item-form textarea{width:100%;box-sizing:border-box;min-height:70px;resize:vertical;border:1px solid #a49a90;border-radius:9px;padding:10px;font:inherit;font-size:16px;background:#fff}
+.food-memo-field{margin-top:14px}
+.food-checklist{border:1px solid #d7cfc6;border-radius:12px;overflow:hidden}
+.food-checklist:empty{display:none}
+.food-check-row{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:10px 12px;background:#fff}
+.food-check-row:last-child{border-bottom:0}
+.food-check-control{display:flex;align-items:center;justify-content:center;width:36px;min-height:42px;flex:0 0 36px;cursor:pointer}
+.food-check-control input{width:22px;height:22px;accent-color:var(--orange);cursor:pointer}
+.food-item-open{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;flex:1;min-width:0;border:0;background:none;padding:4px 0;text-align:left;color:inherit;font:inherit;cursor:pointer}
+.food-item-name{font-size:15px;font-weight:650;overflow-wrap:anywhere}
+.food-item-quantity{font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;max-width:160px}
+.food-item-meta{grid-column:1/-1;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.food-item-memo{white-space:pre-line}
+.food-check-row.is-checked .food-item-name{color:#999;text-decoration:line-through}
+.food-check-row.is-checked{background:#f6f5f3}
+.food-delete-actions button:disabled{opacity:.5;cursor:default}
+@media(max-width:700px){.food-check-row{padding:8px;gap:4px}.food-item-form{padding:12px}.food-item-quantity{max-width:110px}.food-form-actions .quiet-button{font-size:12px}.food-amount-grid{gap:8px}}
