@@ -5,6 +5,8 @@ import { mergeNoteData } from '../note-concurrency.mjs';
 import * as taskCore from '../task-core.mjs';
 import * as mangaCore from '../manga-core.mjs';
 import { createMangaEditor } from '../manga-editor.mjs';
+import * as foodCore from '../food-core.mjs';
+import { createFoodEditor } from '../food-editor.mjs';
 
 const source = await readFile(new URL('../script.js', import.meta.url), 'utf8');
 const executable = source.replace(/^import .*;\n/gm, '').replace(/initialize\(\);\s*$/, '');
@@ -41,7 +43,7 @@ export function harness(initial = []) {
   const context = vm.createContext({
     window: {}, document: { getElementById: element, querySelectorAll: () => [],
       body: { dataset: {}, classList: { add() {}, remove() {} } } },
-    mergeNoteData, ...taskCore, ...mangaCore, createMangaEditor, crypto: webcrypto, TextEncoder, structuredClone, URL, Date, Intl,
+    mergeNoteData, ...taskCore, ...mangaCore, ...foodCore, createMangaEditor, createFoodEditor, crypto: webcrypto, TextEncoder, structuredClone, URL, Date, Intl,
     setTimeout: (cb, ms) => { timers.set(++timerId, { cb, ms }); return timerId; },
     clearTimeout: id => timers.delete(id),
     serverTimestamp: () => new Date('2026-10-22T00:00:00Z'),
