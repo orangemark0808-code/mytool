@@ -30,7 +30,7 @@ jobs:
         run: node --test journal-editor/tests/core.test.mjs journal-editor/tests/integration.test.mjs journal-editor/tests/publish.test.mjs
 
       - name: Test Iroiro
-        run: node --test iroiro/tests/regression.test.mjs iroiro/tests/task.test.mjs iroiro/tests/manga.test.mjs iroiro/tests/concurrency.test.mjs
+        run: node --test iroiro/tests/*.test.mjs
 
       - name: Validate Firebase secrets
         shell: bash
@@ -96,6 +96,8 @@ jobs:
           cp "iroiro/note-concurrency.mjs" "dist/iroiro/note-concurrency.mjs"
           cp "iroiro/task-add.mjs" "dist/iroiro/task-add.mjs"
           cp "iroiro/task-core.mjs" "dist/iroiro/task-core.mjs"
+          cp "iroiro/food-core.mjs" "dist/iroiro/food-core.mjs"
+          cp "iroiro/food-editor.mjs" "dist/iroiro/food-editor.mjs"
           cp "iroiro/manga-core.mjs" "dist/iroiro/manga-core.mjs"
           cp "iroiro/manga-editor.mjs" "dist/iroiro/manga-editor.mjs"
           cp "iroiro/README.md" "dist/iroiro/README.md"

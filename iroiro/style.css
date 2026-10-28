@@ -94,3 +94,36 @@ body [hidden]{display:none!important}
   .task-card-main{grid-template-columns:44px minmax(0,1fr)}
   .task-complete-control{min-width:44px;min-height:44px}
 }
+/* 食材は残量を比較しやすい行形式で表示する。 */
+.food-list{display:flex;flex-direction:column;gap:10px}
+.food-list-hint,.food-form-hint{font-size:13px;color:#766f69;line-height:1.6}
+.food-card{display:flex;align-items:center;gap:12px;padding:14px 16px;min-width:0;height:auto}
+.food-card-open{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;text-align:left;background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer}
+.food-card-name{font-weight:700;overflow-wrap:anywhere}
+.food-card-grams{font-size:20px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.food-card-grams small{font-size:13px;margin-left:3px;font-weight:400}
+.food-card-details{grid-column:1/-1;font-size:12px;color:#766f69;overflow-wrap:anywhere;line-height:1.6}
+.food-card-actions{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+.food-card-actions .quiet-button{font-size:12px;padding:8px}
+.food-depleted{background:#f6f4f1}
+.food-mode .title-input{font-size:24px}
+.food-fields{margin:14px 0 20px}
+.food-basic-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.food-field{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:600;min-width:0}
+.food-field input,.food-field select,.food-grams-input input{min-width:0;width:100%;box-sizing:border-box;border:1px solid #a49a90;background:#fff;border-radius:9px;padding:12px;color:#2d2926;font:inherit;font-size:16px}
+.food-grams-input{display:flex;align-items:center;gap:8px;min-width:0;font-weight:400}
+.food-use-soon{display:flex;align-items:center;gap:8px;margin:16px 0;font-size:14px;cursor:pointer}
+.food-use-soon input{width:20px;height:20px;accent-color:#ef7d22}
+.food-details{border-top:1px solid #e3ddd6;padding:14px 0}
+.food-details summary{cursor:pointer;font-size:13px;color:#66594f}
+.food-details .food-basic-grid{margin-top:14px}
+.food-consume{background:#f7f5f0;border:1px solid #e3ddd6;border-radius:12px;padding:16px;margin:12px 0 18px}
+.food-consume h3{font-size:14px;margin:0 0 6px}
+.food-consume p{font-size:13px;color:#766f69;margin:0 0 12px}
+.food-consume-controls{display:flex;align-items:center;gap:12px}
+.food-consume-controls .food-grams-input{flex:1}
+.food-consume-controls button{flex:0 0 auto}
+.food-consume-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.food-next{width:100%;padding:12px;font-size:14px}
+.food-mode #noteContentInput{min-height:100px}
+@media(max-width:700px){.food-card{flex-wrap:wrap;padding:14px}.food-card-open{flex-basis:100%}.food-card-actions{margin-left:auto}.food-consume-controls{gap:8px}.food-consume-controls .quiet-button{font-size:12px;padding:10px}.food-basic-grid{gap:10px}}
