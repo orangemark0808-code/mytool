@@ -113,3 +113,33 @@ test('保存して次の食材へ進むと前の食材を保存し、新しい�
   const h=harness();start(h);fill(h);h.run('foodEditor.bind()');await h.element('foodNextButton').onclick();
   assert.equal(h.writes.length,1);assert.equal(h.writes[0].data.food.remainingGrams,250);assert.equal(h.run('editingNote.title'),'');assert.equal(h.run('editingNote.categoryId'),'food');assert.equal(h.element('editorDialog').open,true);
 });
+
+test('食材が100件あっても全体一覧では1枚にまとまり、他のメモと登録データを保持する',()=>{
+  const h=harness();h.run(`${categories};notes=Array.from({length:100},(_,i)=>normalizeNote('food-'+i,{title:'食材'+i,categoryId:'food',food:{remainingGrams:100+i}}));notes.push(normalizeNote('memo',{title:'通常のメモ',categoryId:'app'}));selectCategory('all')`);
+  const html=h.element('notesGrid').innerHTML;
+  assert.equal((html.match(/<article /g)||[]).length,2);
+  assert.equal((html.match(/data-open-food-list=/g)||[]).length,1);
+  assert.match(html,/在庫 100件/);assert.match(html,/通常のメモ/);
+  assert.match(h.element('noteCount').textContent,/2件/);
+  assert.equal(h.run('notes.length'),101);assert.equal(h.writes.length,0);
+  h.run("selectCategory('food')");
+  assert.equal((h.element('notesGrid').innerHTML.match(/class="food-row /g)||[]).length,100);
+  assert.equal(h.element('notesGrid').innerHTML.includes('class="note-card'),false);
+  assert.equal(h.run('notes[99].food.remainingGrams'),199);assert.equal(h.writes.length,0);
+});
+
+test('全体検索も一致した食材を1枚にまとめ、食材一覧へ検索条件を引き継ぐ',()=>{
+  const h=harness();h.run(`${categories};notes=[normalizeNote('a',{title:'豚こま',categoryId:'food',food:{remainingGrams:250,storage:'frozen'}}),normalizeNote('b',{title:'キャベツ',categoryId:'food',food:{remainingGrams:500,storage:'chilled'}})]`);
+  h.element('searchInput').value='冷凍';h.run("selectCategory('all')");
+  assert.equal((h.element('notesGrid').innerHTML.match(/<article /g)||[]).length,1);
+  assert.match(h.element('notesGrid').innerHTML,/豚こま/);assert.equal(h.element('notesGrid').innerHTML.includes('キャベツ'),false);
+  h.run("selectCategory('food')");assert.equal(h.element('searchInput').value,'冷凍');
+  assert.match(h.element('notesGrid').innerHTML,/豚こま/);assert.equal(h.element('notesGrid').innerHTML.includes('キャベツ'),false);
+  h.element('searchInput').value='該当なし';h.run('renderNotes()');assert.equal(h.element('notesGrid').innerHTML,'');assert.equal(h.element('emptyState').hidden,false);
+});
+
+test('集約カードの在庫数とプレビューは使い切った食材を除き、未計量を区別する',()=>{
+  const h=harness();h.run(`${categories};notes=[normalizeNote('done',{title:'使い切り',categoryId:'food',food:{remainingGrams:0,useSoon:true}}),normalizeNote('unknown',{title:'未計量の豆腐',categoryId:'food'})];selectCategory('all')`);
+  const html=h.element('notesGrid').innerHTML;assert.match(html,/在庫 1件/);assert.match(html,/未計量/);assert.equal(html.includes('使い切り'),false);assert.equal(html.includes('早めに使いたい'),false);
+  h.run("selectCategory('food')");assert.match(h.element('completedFoodsGrid').innerHTML,/使い切り/);assert.match(h.element('notesGrid').innerHTML,/未計量/);
+});
