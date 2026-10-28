@@ -6,11 +6,11 @@ import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFire
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.23-1';
 import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.23-1';
 import { mergeNoteData } from './note-concurrency.mjs?v=2026-10-25-03';
-import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, consumeFood, foodSearchText } from './food-core.mjs?v=2026-10-28-01';
-import { createFoodEditor } from './food-editor.mjs?v=2026-10-28-01';
+import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, consumeFood, foodSearchText } from './food-core.mjs?v=2026-10-28-02';
+import { createFoodEditor } from './food-editor.mjs?v=2026-10-28-02';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026-10-28-01'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-28-02'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -364,11 +364,17 @@ function renderNoteCard(n){
   const c=getCategory(n.categoryId)||{name:'未分類',color:'#6B7280'},color=categoryColor(c.color),progress=n.type==='checklist'?`${n.items.filter(i=>i.checked).length}/${n.items.length}完了`:'',linkInfo=n.urls.length?`🔗 ${n.urls.length}件`:'';
   return`<article class="note-card" data-id="${escapeHtml(n.id)}"><div class="card-top"><span class="type-icon">${n.type==='text'?'▤':n.type==='bullet'?'☷':'☑'}</span><h3 class="card-title"><button type="button" class="card-open" data-open-note="${escapeHtml(n.id)}" aria-label="${escapeHtml(displayTitle(n))}の詳細を開く">${escapeHtml(displayTitle(n))}</button></h3></div>${cardPreviewHtml(n)}<footer class="card-footer"><div class="card-footer-left"><span class="category-pill" style="background:${color};color:${categoryTextColor(color)}">${escapeHtml(c.name)}</span><span>更新 ${shortDate(n.updatedAt)}</span>${linkInfo?`<span>${linkInfo}</span>`:''}</div><div class="card-footer-right">${progress?`<span class="card-progress">${progress}</span>`:''}${cardPinButton(n)}</div></footer></article>`;
 }
+function renderFoodSummaryCard(list){
+  const categoryId=list[0].categoryId,available=list.filter(note=>foodForNote(note).remainingGrams!==0);
+  const soon=available.filter(note=>foodForNote(note).useSoon).length;
+  const preview=available.slice(0,3).map(note=>{const grams=foodForNote(note).remainingGrams;return `${displayTitle(note)} ${grams===null?'未計量':`${grams}g`}`}).join(' / ');
+  return `<article class="note-card food-summary-card" data-food-category="${escapeHtml(categoryId)}"><div class="card-top"><span class="type-icon" aria-hidden="true">🥬</span><h3 class="card-title"><button type="button" class="card-open" data-open-food-list="${escapeHtml(categoryId)}" aria-label="食材の一覧を開く">食材</button></h3></div><p class="food-summary-count">在庫 ${available.length}件${soon?` · 早めに使いたい ${soon}件`:''}</p><p class="card-preview">${escapeHtml(preview||'在庫のある食材はありません。')}${available.length>3?' …':''}</p><footer class="card-footer"><span>開いて食材をまとめて管理</span><span aria-hidden="true">→</span></footer></article>`;
+}
 function renderFoodCard(note){
   const food=foodForNote(note),title=displayTitle(note),depleted=food.remainingGrams===0;
   const busy=pendingFoodWrites.has(`${currentUser?.uid}:${note.id}`);
   const expiry=food.expiryDate?`${FOOD_EXPIRY_LABELS[food.expiryKind]||'期限'} ${food.expiryDate}`:'';
-  return `<article class="note-card food-card ${depleted?'food-depleted':''}" data-id="${escapeHtml(note.id)}">
+  return `<article class="food-row ${depleted?'food-depleted':''}" data-id="${escapeHtml(note.id)}">
     <button type="button" class="food-card-open" data-open-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}の詳細を開く">
       <span class="food-card-name">${escapeHtml(title)}</span><span class="food-card-grams">${food.remainingGrams===null?'未計量':`${food.remainingGrams}<small>g</small>`}</span>
       <span class="food-card-details">${escapeHtml([FOOD_STORAGE_LABELS[food.storage],food.useSoon&&!depleted?'★ 早めに使いたい':'',expiry].filter(Boolean).join(' · '))||'タップして量や保存場所を編集'}</span>
@@ -417,8 +423,15 @@ function renderNotes(){
   $('listTitle').textContent=selectedCategory==='all'?'すべてのメモ':selectedCategory===''?'未分類':getCategory(selectedCategory)?.name||'カテゴリー';
   $('completedFoods').hidden=!depleted.length;$('completedFoodsSummary').textContent=`使い切った食材（${depleted.length}件）`;$('completedFoodsGrid').innerHTML=depleted.map(renderFoodCard).join('');
   $('foodListHint').hidden=!foodView;$('foodEmptyState').hidden=!foodView||active.length>0||shown.length===0;
-  $('noteCount').textContent=foodView?`${active.length}件（使い切り${depleted.length}件）`:taskView?`${shown.length}件（未完了${active.length}件）`:`${shown.length}件`;
-  $('notesGrid').innerHTML=active.map(renderNoteCard).join('');$('completedTasksGrid').innerHTML=complete.map(renderTaskCard).join('');
+  const groupedFoods=selectedCategory==='all'?active.filter(isFoodNote):[];
+  const cards=[];let foodSummaryAdded=false;
+  for(const note of active){
+    if(groupedFoods.length&&isFoodNote(note)){
+      if(!foodSummaryAdded){cards.push(renderFoodSummaryCard(groupedFoods));foodSummaryAdded=true}
+    }else cards.push(renderNoteCard(note));
+  }
+  $('noteCount').textContent=foodView?`在庫 ${active.length}件（使い切り${depleted.length}件）`:taskView?`${shown.length}件（未完了${active.length}件）`:groupedFoods.length?`${cards.length}件（食材${groupedFoods.length}件を1枚に集約）`:`${shown.length}件`;
+  $('notesGrid').innerHTML=cards.join('');$('completedTasksGrid').innerHTML=complete.map(renderTaskCard).join('');
   $('completedTasks').hidden=!complete.length;$('completedTasksSummary').textContent=`完了したタスク（${complete.length}件）`;
   $('taskEmptyState').hidden=!taskView||active.length>0||shown.length===0;
   $('emptyState').hidden=shown.length>0;
@@ -427,9 +440,11 @@ function renderNotes(){
   const createLabel=taskView?'新しいタスク':mangaView?'新しい漫画ネタ':foodView?'新しい食材':'新しいメモ';$('createNoteButton').setAttribute('aria-label',`${createLabel}を作成`);$('createNoteButton').title=createLabel;
   document.querySelectorAll('.note-card').forEach(card=>card.onclick=e=>{
     // 個別の操作ボタンから詳細画面を開かない。
-    if(e.target.closest('.task-complete-control,[data-open-note],[data-pin-note],[data-food-action]'))return;
+    if(e.target.closest('.task-complete-control,[data-open-note],[data-pin-note],[data-food-action],[data-open-food-list]'))return;
+    if(card.dataset.foodCategory)return selectCategory(card.dataset.foodCategory);
     return openCardNote(card.dataset.id);
   });
+  document.querySelectorAll('[data-open-food-list]').forEach(button=>button.onclick=()=>selectCategory(button.dataset.openFoodList));
   document.querySelectorAll('[data-open-note]').forEach(button=>button.onclick=()=>openCardNote(button.dataset.openNote));
   document.querySelectorAll('[data-pin-note]').forEach(button=>button.onclick=e=>{e.stopPropagation();return toggleNotePin(button.dataset.pinNote)});
   document.querySelectorAll('[data-food-action]').forEach(button=>button.onclick=e=>{e.stopPropagation();return changeFoodStock(button.dataset.foodAction,button.dataset.foodUndo==='true')});
