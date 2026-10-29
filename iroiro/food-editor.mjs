@@ -1,7 +1,7 @@
 import { FOOD_UNITS, FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFoodItem, normalizeFoodList, parseFoodQuantity, formatFoodQuantity } from './food-core.mjs?v=2026-10-28-03';
 import { validTaskDate } from './task-core.mjs';
 
-import { defaultFoodPresets } from './food-presets.mjs?v=2026-10-29-07';
+import { defaultFoodPresets } from './food-presets.mjs?v=2026-10-29-08';
 const FOOD_PRESETS={
   '肉・魚・卵':['豚こま','豚バラ肉','豚ロース肉','豚ひき肉','鶏もも肉','鶏むね肉','鶏ささみ','鶏ひき肉','牛こま','牛ひき肉','合いびき肉','鮭','さば','ぶり','たら','えび','卵'],
   '野菜・きのこ':['キャベツ','白菜','レタス','玉ねぎ','にんじん','じゃがいも','大根','長ねぎ','小ねぎ','きゅうり','トマト','なす','ピーマン','ブロッコリー','ほうれん草','小松菜','もやし','かぼちゃ','しめじ','えのき','しいたけ'],
