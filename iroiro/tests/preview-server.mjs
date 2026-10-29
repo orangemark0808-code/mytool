@@ -67,7 +67,7 @@ const server=http.createServer(async(req,res)=>{
     if(name==='firebase-config.js'||name==='firebase-config.local.js'){
       res.setHeader('Content-Type','text/javascript');res.end(name==='firebase-config.js'?"window.IROIRO_FIREBASE_CONFIG={apiKey:'preview',projectId:'preview',appId:'preview'};":'');return;
     }
-    if(!['index.html','script.js','style.css','task-core.mjs','manga-core.mjs','manga-editor.mjs','note-concurrency.mjs','food-core.mjs','food-editor.mjs'].includes(name)){res.writeHead(404);res.end('Not found');return}
+    if(!['index.html','script.js','style.css','task-core.mjs','manga-core.mjs','manga-editor.mjs','note-concurrency.mjs','food-core.mjs','food-editor.mjs','food-presets.mjs','food-preset-manager.mjs'].includes(name)){res.writeHead(404);res.end('Not found');return}
     let content=await readFile(new URL(name,root),'utf8');
     if(name==='script.js')content=content.replace(/from 'https:\/\/www\.gstatic\.com\/firebasejs\/[^']+'/g,"from './mock-firebase.mjs'");
     res.setHeader('Content-Type',name.endsWith('.html')?'text/html; charset=utf-8':name.endsWith('.css')?'text/css':'text/javascript');
