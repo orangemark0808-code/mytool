@@ -6,11 +6,13 @@ import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFire
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.23-1';
 import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.23-1';
 import { mergeNoteData } from './note-concurrency.mjs?v=2026-10-25-03';
-import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-29-06';
-import { createFoodEditor } from './food-editor.mjs?v=2026-10-29-06';
+import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-29-07';
+import { createFoodEditor } from './food-editor.mjs?v=2026-10-29-07';
+import { defaultFoodPresets, readFoodPresets, validateFoodPresets } from './food-presets.mjs?v=2026-10-29-07';
+import { createFoodPresetManager } from './food-preset-manager.mjs?v=2026-10-29-07';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026-10-29-06'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-29-07'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -19,7 +21,25 @@ const $=id=>document.getElementById(id); const uid=()=>crypto.randomUUID?.()||`$
 let editorBaseData=null;
 let app,auth,db,currentUser=null,notes=[],categories=[],selectedCategory='all',editingNote=null,saveTimer=null,unsubscribeNotes=null,unsubscribeSettings=null,settingsCreatingForUid='',closingEditor=false,deletingNote=false,pendingCategoryId='',pendingType='',categoryDragState=null,itemDragState=null,editRevision=0,savedRevision=0,requestedRevision=0,saveInProgress=false,savePromise=Promise.resolve(true),editorSession='',backupBusy=false,pendingBackup=null,migrationBusy=false,regularSort='updated-desc';
 const pendingTaskWrites=new Set();
-const foodEditor=createFoodEditor({element:$,getNote:()=>editingNote,isFoodNote,onChange:()=>{refreshRelatedLinks();scheduleSave()},escapeHtml,uid});
+let foodPresets=defaultFoodPresets(),foodPresetsReady=false;
+const foodEditor=createFoodEditor({element:$,getNote:()=>editingNote,isFoodNote,onChange:()=>{refreshRelatedLinks();scheduleSave()},escapeHtml,uid,getPresets:()=>foodPresets,presetsReady:()=>foodPresetsReady,getActiveElement:()=>document.activeElement});
+const foodPresetManager=createFoodPresetManager({element:$,getPresets:()=>foodPresets,getOwner:()=>foodPresetsReady?currentUser?.uid:null,savePresets:saveFoodPresets,escapeHtml,uid,onSaved:()=>foodEditor.render()});
+function applyRemoteFoodPresets(settings={}){
+  try{foodPresets=readFoodPresets(settings.foodPresets);foodPresetsReady=true;$('foodManagePresetsButton').disabled=false;if(isFoodNote(editingNote))foodEditor.render()}
+  catch(error){foodPresetsReady=false;$('foodManagePresetsButton').disabled=true;setStatus(`定番設定を読み込めませんでした: ${error.message}`)}
+}
+async function saveFoodPresets(next,base,activeUid){
+  if(!foodPresetsReady)throw new Error('定番設定の読み込み完了をお待ちください。');
+  const validated=validateFoodPresets(next),expected=validateFoodPresets(base),target=doc(db,'users',activeUid,'iroiroSettings','main');
+  requireActiveUser(activeUid);
+  await runTransaction(db,async transaction=>{
+    const latest=await transaction.get(target);requireActiveUser(activeUid);
+    const remote=readFoodPresets(latest.exists()?latest.data().foodPresets:undefined);
+    if(!sameNoteContent(expected,remote))throw new Error('別の端末で定番設定が変更されました。入力内容を控え、管理画面を開き直してください。');
+    transaction.set(target,{foodPresets:validated},{merge:true});
+  });
+  requireActiveUser(activeUid);foodPresets=validated;
+}
 const pendingPinWrites=new Map();
 let pendingNetaImport=null,netaImportBusy=false;
 const mangaEditor=createMangaEditor({element:$,getNote:()=>editingNote,isMangaNote,ensureManga,onChange:()=>{syncEditingNoteFromForm();renderLinks();scheduleSave()},syncNote:()=>syncEditingNoteFromForm(),escapeHtml});
@@ -180,7 +200,7 @@ function initialize(){document.body.dataset.appVersion=VERSION;bindEvents();sche
 function bindEvents(){
   $('prepareNetaImportButton').onclick=prepareNetaImport;$('confirmNetaImportButton').onclick=importNetaRecords;
   mangaEditor.bind();
-  bindTaskEvents();foodEditor.bind();
+  bindTaskEvents();foodEditor.bind();foodPresetManager.bind();
   $('createNoteButton').onclick=()=>{if(!currentUser)return;if(isFoodCategory(selectedCategory))return openFoodInventory(selectedCategory);openEditor(createNote())}; $('loginButton').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>setStatus(`ログイン失敗: ${e.message}`)); $('logoutButton').onclick=()=>signOut(auth);
   $('searchInput').oninput=renderNotes;$('sortSelect').onchange=()=>{if(!isTaskCategory(selectedCategory))regularSort=$('sortSelect').value;renderNotes()};$('noteTitleInput').oninput=()=>{syncEditingNoteFromForm();scheduleSave()};$('noteContentInput').oninput=()=>{syncEditingNoteFromForm();renderLinks();scheduleSave()};$('noteCategorySelect').onchange=handleCategoryChange;
   $('closeEditorButton').onclick=e=>{e.preventDefault();closeEditor()}; $('editorDialog').addEventListener('cancel',e=>{e.preventDefault();closeEditor()});$('editorDialog').addEventListener('close',cancelItemDrag);
@@ -190,10 +210,10 @@ function bindEvents(){
   $('migrateLocalButton').onclick=migrateLegacy; $('exportBackupButton').onclick=exportBackup; $('importBackupButton').onclick=()=>{if(requireBackupUser())$('backupFileInput').click()}; $('backupFileInput').onchange=readBackupFile; $('confirmBackupRestoreButton').onclick=restorePendingBackup; $('backupConfirmDialog').addEventListener('close',()=>{pendingBackup=null});
 }
 function clearRealtimeListeners(){if(unsubscribeNotes){unsubscribeNotes();unsubscribeNotes=null}if(unsubscribeSettings){unsubscribeSettings();unsubscribeSettings=null}}
-async function handleAuth(user){clearRealtimeListeners();settingsCreatingForUid='';currentUser=user;if(!user){notes=[];categories=[];$('loginButton').hidden=false;$('logoutButton').hidden=true;setStatus(configured()?'ログインすると同期できます':'Firebase設定が未設定です');renderAll();return}const activeUid=user.uid;$('loginButton').hidden=true;$('logoutButton').hidden=false;setStatus('同期中…');const activeSettings=doc(db,'users',activeUid,'iroiroSettings','main');const activeNotes=collection(db,'users',activeUid,'iroiroNotes');unsubscribeSettings=onSnapshot(activeSettings,snap=>{if(currentUser?.uid!==activeUid)return;if(snap.exists()&&Array.isArray(snap.data().categories)){applyRemoteCategories(snap.data().categories);return}if(settingsCreatingForUid!==activeUid){settingsCreatingForUid=activeUid;setDoc(activeSettings,{categories:structuredClone(DEFAULT_CATEGORIES),schemaVersion:SCHEMA_VERSION,updatedAt:serverTimestamp()}).catch(e=>setStatus(`カテゴリー初期化失敗: ${e.message}`)).finally(()=>{if(settingsCreatingForUid===activeUid)settingsCreatingForUid=''})}},err=>setStatus(`カテゴリー同期失敗: ${err.message}`));unsubscribeNotes=onSnapshot(query(activeNotes,orderBy('updatedAt','desc')),snap=>{if(currentUser?.uid!==activeUid)return;notes=snap.docs.map(x=>normalizeNote(x.id,x.data()));setStatus('同期済み');renderAll()},err=>setStatus(`同期失敗: ${err.message}`));try{await checkLegacy()}catch(e){setStatus(`移行状態の確認失敗: ${e.message}`)}}
+async function handleAuth(user){clearRealtimeListeners();if(currentUser?.uid!==user?.uid){foodPresetManager.reset();foodPresets=defaultFoodPresets();foodPresetsReady=false;$('foodManagePresetsButton').disabled=true}settingsCreatingForUid='';currentUser=user;if(!user){notes=[];categories=[];$('loginButton').hidden=false;$('logoutButton').hidden=true;setStatus(configured()?'ログインすると同期できます':'Firebase設定が未設定です');renderAll();return}const activeUid=user.uid;$('loginButton').hidden=true;$('logoutButton').hidden=false;setStatus('同期中…');const activeSettings=doc(db,'users',activeUid,'iroiroSettings','main');const activeNotes=collection(db,'users',activeUid,'iroiroNotes');unsubscribeSettings=onSnapshot(activeSettings,snap=>{if(currentUser?.uid!==activeUid)return;applyRemoteFoodPresets(snap.exists()?snap.data():{});if(snap.exists()&&Array.isArray(snap.data().categories)){applyRemoteCategories(snap.data().categories);return}if(settingsCreatingForUid!==activeUid){settingsCreatingForUid=activeUid;setDoc(activeSettings,{categories:structuredClone(DEFAULT_CATEGORIES),schemaVersion:SCHEMA_VERSION,updatedAt:serverTimestamp()},{merge:true}).catch(e=>setStatus(`カテゴリー初期化失敗: ${e.message}`)).finally(()=>{if(settingsCreatingForUid===activeUid)settingsCreatingForUid=''})}},err=>setStatus(`カテゴリー同期失敗: ${err.message}`));unsubscribeNotes=onSnapshot(query(activeNotes,orderBy('updatedAt','desc')),snap=>{if(currentUser?.uid!==activeUid)return;notes=snap.docs.map(x=>normalizeNote(x.id,x.data()));setStatus('同期済み');renderAll()},err=>setStatus(`同期失敗: ${err.message}`));try{await checkLegacy()}catch(e){setStatus(`移行状態の確認失敗: ${e.message}`)}}
 function applyRemoteCategories(nextCategories){let migrated=false;const prepared=nextCategories.map(category=>{const legacy=LEGACY_DEFAULT_CATEGORY_COLORS[category.id],standard=STANDARD_CATEGORY_COLOR_MIGRATIONS[category.id],savedColor=String(category.color||'').toLowerCase();if(legacy&&(savedColor===legacy[0]||standard&&savedColor===standard[0])){migrated=true;return{...category,color:standard?.[1]||legacy[1]}}return category});categories=orderedCategories(prepared);notes.forEach(note=>note.urls=extractUrls(note));renderAll();refreshEditorCategoryOptions();if(migrated)saveCategories(categories)}
 function refreshEditorCategoryOptions(){if(!editingNote||!$('editorDialog').open)return;const select=$('noteCategorySelect');const current=editingNote.categoryId;select.innerHTML=`<option value="">未分類</option>${categories.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}`;if(current===''||categories.some(c=>c.id===current)){select.value=current;updateEditorMode();return}editingNote.categoryId='';select.value='';updateEditorMode();scheduleSave()}
-function openEditor(note){foodEditor.reset();editingNote=structuredClone(note);ensureFormatStores(editingNote);editorBaseData=editorNoteData(note);editorSession=uid();editRevision=0;savedRevision=0;requestedRevision=0;saveInProgress=false;savePromise=Promise.resolve(true);updateEditor();$('editorDialog').showModal();setTimeout(()=>{if(!editingNote)return;if(isFoodNote(editingNote))($('foodItemForm').hidden?$('foodAddItemButton'):$('foodItemNameInput')).focus({preventScroll:true});else $('noteTitleInput').focus()},40)}
+function openEditor(note){foodPresetManager.reset();foodEditor.reset();editingNote=structuredClone(note);ensureFormatStores(editingNote);editorBaseData=editorNoteData(note);editorSession=uid();editRevision=0;savedRevision=0;requestedRevision=0;saveInProgress=false;savePromise=Promise.resolve(true);updateEditor();$('editorDialog').showModal();setTimeout(()=>{if(!editingNote)return;if(isFoodNote(editingNote))($('foodItemForm').hidden?$('foodAddItemButton'):$('foodItemNameInput')).focus({preventScroll:true});else $('noteTitleInput').focus()},40)}
 function syncEditingNoteFromForm(readSpecialFields=true){
   if(!editingNote)return;
   const note=editingNote;
@@ -327,7 +347,7 @@ async function persistSnapshot(snapshot){
 }
 async function closeEditor(){
   if(closingEditor||deletingNote||!editingNote)return;
-  if(!foodEditor.canClose())return;
+  if(!foodPresetManager.canClose()||!foodEditor.canClose())return;
   syncEditingNoteFromForm();if(!noteTitleValid(editingNote))return;
   closingEditor=true;
   try{
@@ -595,6 +615,7 @@ function confirmCategoryDelete(category){if(!category||category.id===''||categor
 async function deletePendingCategory(){const category=getCategory(pendingCategoryId);if(!category)return;const used=notes.filter(note=>note.categoryId===category.id);try{if(used.length){const batch=writeBatch(db);used.forEach(note=>batch.update(doc(refs().notes,note.id),{categoryId:'',updatedAt:serverTimestamp()}));await batch.commit()}const next=categories.filter(c=>c.id!==category.id);const saved=await saveCategories(next);if(!saved)throw new Error('カテゴリー設定を保存できませんでした');$('categoryConfirmDialog').close();pendingCategoryId='';renderCategoryManagement()}catch(e){$('categoryError').textContent=`削除に失敗しました: ${e.message}`}}
 function confirmDelete(){
   if(closingEditor||deletingNote||!editingNote)return;
+  if(!foodPresetManager.canClose()||!foodEditor.canClose())return;
   const food=isFoodNote(editingNote);
   $('deleteConfirmTitle').textContent=food?'この食材カードを削除しますか？':'このメモを削除しますか？';
   $('deleteConfirmMessage').textContent=food?'カード内の食材をすべて削除します。削除した内容は元に戻せません。カテゴリー「食材」は残ります。':'削除したメモは元に戻せません。';
@@ -680,7 +701,7 @@ function backupDate(value){const date=toDate(value);return date?date.toISOString
 function backupNote(id,data){const note=normalizeNote(id,data);return{id,note:{...noteData(note),createdAt:backupDate(data.createdAt),updatedAt:backupDate(data.updatedAt)}}}
 function timestampFromBackup(value){if(value===null||value===undefined||value==='')return null;const date=toDate(value);if(!date)throw new Error('日時の形式が不正です。');return Timestamp.fromDate(date)}
 function downloadJson(filename,data){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),0)}
-async function exportBackup(){if(!requireBackupUser()||backupBusy)return;backupBusy=true;$('exportBackupButton').disabled=true;setBackupStatus('バックアップを書き出し中…');try{const [noteSnap,settingsSnap]=await Promise.all([getDocs(refs().notes),getDoc(refs().settings)]),settings=settingsSnap.exists()?settingsSnap.data():{categories:[],schemaVersion:SCHEMA_VERSION},exportedAt=new Date(),backup={app:'iroiro',backupFormatVersion:BACKUP_FORMAT_VERSION,exportedAt:exportedAt.toISOString(),userUid:currentUser.uid,data:{notes:noteSnap.docs.map(item=>backupNote(item.id,item.data())),settings:{categories:orderedCategories(Array.isArray(settings.categories)?settings.categories:[]),schemaVersion:Number(settings.schemaVersion??SCHEMA_VERSION)||SCHEMA_VERSION,updatedAt:backupDate(settings.updatedAt)}}},stamp=exportedAt.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'');downloadJson(`iroiro-backup-${stamp}.json`,backup);setBackupStatus(`バックアップを書き出しました（メモ${backup.data.notes.length}件）。`)}catch(e){setBackupStatus(`バックアップの書き出しに失敗しました: ${e.message}`)}finally{backupBusy=false;$('exportBackupButton').disabled=false}}
+async function exportBackup(){if(!requireBackupUser()||backupBusy)return;backupBusy=true;$('exportBackupButton').disabled=true;setBackupStatus('バックアップを書き出し中…');try{const [noteSnap,settingsSnap]=await Promise.all([getDocs(refs().notes),getDoc(refs().settings)]),settings=settingsSnap.exists()?settingsSnap.data():{categories:[],schemaVersion:SCHEMA_VERSION},exportedAt=new Date(),backup={app:'iroiro',backupFormatVersion:BACKUP_FORMAT_VERSION,exportedAt:exportedAt.toISOString(),userUid:currentUser.uid,data:{notes:noteSnap.docs.map(item=>backupNote(item.id,item.data())),settings:{categories:orderedCategories(Array.isArray(settings.categories)?settings.categories:[]),schemaVersion:Number(settings.schemaVersion??SCHEMA_VERSION)||SCHEMA_VERSION,...(Object.hasOwn(settings,'foodPresets')?{foodPresets:validateFoodPresets(settings.foodPresets)}:{}),updatedAt:backupDate(settings.updatedAt)}}},stamp=exportedAt.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'');downloadJson(`iroiro-backup-${stamp}.json`,backup);setBackupStatus(`バックアップを書き出しました（メモ${backup.data.notes.length}件）。`)}catch(e){setBackupStatus(`バックアップの書き出しに失敗しました: ${e.message}`)}finally{backupBusy=false;$('exportBackupButton').disabled=false}}
 function validateBackup(raw){
   if(!isRecord(raw)||raw.app!=='iroiro'||raw.backupFormatVersion!==BACKUP_FORMAT_VERSION||!isRecord(raw.data)||!Array.isArray(raw.data.notes)||!isRecord(raw.data.settings))throw new Error('イロイロキロクの対応バックアップ形式ではありません。');
   const ids=new Set(),notes=raw.data.notes.map(entry=>{
@@ -712,7 +733,7 @@ function validateBackup(raw){
     categoryIds.add(category.id);
     return{id:category.id,name:category.name,color:categoryColor(category.color),order:Number.isFinite(Number(category.order))?Number(category.order):index};
   }));
-  return{notes,settings:{categories,schemaVersion:SCHEMA_VERSION,updatedAt:timestampFromBackup(settings.updatedAt)},exportedAt:typeof raw.exportedAt==='string'?raw.exportedAt:'不明',userUid:typeof raw.userUid==='string'?raw.userUid:''};
+  return{notes,settings:{categories,schemaVersion:SCHEMA_VERSION,...(Object.hasOwn(settings,'foodPresets')?{foodPresets:validateFoodPresets(settings.foodPresets)}:{}),updatedAt:timestampFromBackup(settings.updatedAt)},exportedAt:typeof raw.exportedAt==='string'?raw.exportedAt:'不明',userUid:typeof raw.userUid==='string'?raw.userUid:''};
 }
 function mergeBackupCategories(existing,incoming){
   const merged=new Map(orderedCategories(Array.isArray(existing)?existing.filter(isRecord):[]).map(category=>[category.id,category]));

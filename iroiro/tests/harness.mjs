@@ -7,6 +7,8 @@ import * as mangaCore from '../manga-core.mjs';
 import { createMangaEditor } from '../manga-editor.mjs';
 import * as foodCore from '../food-core.mjs';
 import { createFoodEditor } from '../food-editor.mjs';
+import * as foodPresets from '../food-presets.mjs';
+import { createFoodPresetManager } from '../food-preset-manager.mjs';
 
 const source = await readFile(new URL('../script.js', import.meta.url), 'utf8');
 const executable = source.replace(/^import .*;\n/gm, '').replace(/initialize\(\);\s*$/, '');
@@ -43,7 +45,7 @@ export function harness(initial = []) {
   const context = vm.createContext({
     window: {}, document: { getElementById: element, querySelectorAll: () => [],
       body: { dataset: {}, classList: { add() {}, remove() {} } } },
-    mergeNoteData, ...taskCore, ...mangaCore, ...foodCore, createMangaEditor, createFoodEditor, crypto: webcrypto, TextEncoder, structuredClone, URL, Date, Intl,
+    mergeNoteData, ...taskCore, ...mangaCore, ...foodCore, ...foodPresets, createMangaEditor, createFoodEditor, createFoodPresetManager, crypto: webcrypto, TextEncoder, structuredClone, URL, Date, Intl,
     setTimeout: (cb, ms) => { timers.set(++timerId, { cb, ms }); return timerId; },
     clearTimeout: id => timers.delete(id),
     serverTimestamp: () => new Date('2026-10-22T00:00:00Z'),
@@ -91,7 +93,8 @@ export function harness(initial = []) {
   const api = { context, element, timers, store, writes,
     run: code => vm.runInContext(code, context) };
   element('sortSelect').value='updated-desc';
-  api.run("currentUser={uid:'test-user'}");
+  context.initialSettings=store.get('users/test-user/iroiroSettings/main')||{};
+  api.run("currentUser={uid:'test-user'};applyRemoteFoodPresets(initialSettings)");
   return api;
 }
 
