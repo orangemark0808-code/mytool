@@ -98,6 +98,8 @@ jobs:
           cp "iroiro/task-core.mjs" "dist/iroiro/task-core.mjs"
           cp "iroiro/food-core.mjs" "dist/iroiro/food-core.mjs"
           cp "iroiro/food-editor.mjs" "dist/iroiro/food-editor.mjs"
+          cp "iroiro/food-presets.mjs" "dist/iroiro/food-presets.mjs"
+          cp "iroiro/food-preset-manager.mjs" "dist/iroiro/food-preset-manager.mjs"
           cp "iroiro/manga-core.mjs" "dist/iroiro/manga-core.mjs"
           cp "iroiro/manga-editor.mjs" "dist/iroiro/manga-editor.mjs"
           cp "iroiro/README.md" "dist/iroiro/README.md"
