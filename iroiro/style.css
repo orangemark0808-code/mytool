@@ -10,6 +10,11 @@ body [hidden]{display:none!important}
 .note-card .card-pin:hover{background:var(--orange-soft);color:var(--orange-dark)}
 .note-card .card-pin:disabled{cursor:wait;opacity:.55}
 .note-card .card-pin:focus-visible{outline-offset:-3px}
+.note-card .card-delete{position:absolute;top:7px;right:7px;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);z-index:1}
+.note-card .card-delete:hover{background:#fff0ee;color:#a23a30}
+.note-card .card-delete:disabled{cursor:wait;opacity:.45}
+.note-card .card-top,.note-card .task-card-main{padding-right:38px}
+.food-summary-card .category-pill{background:var(--category-color);color:var(--category-text)}
 .editor-content>.category-select-label{margin-top:16px}
 .task-fields{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:20px}
 .task-field{display:flex;flex-direction:column;gap:7px;min-width:0;font-size:13px;font-weight:600}

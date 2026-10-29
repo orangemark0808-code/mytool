@@ -1,4 +1,4 @@
-import { validateFoodPresets } from './food-presets.mjs?v=2026-10-29-07';
+import { validateFoodPresets } from './food-presets.mjs?v=2026-10-29-08';
 import { FOOD_STORAGE_LABELS } from './food-core.mjs';
 
 export function createFoodPresetManager({element:$,getPresets,getOwner,savePresets,escapeHtml:escape,uid,onSaved}){
