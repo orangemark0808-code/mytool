@@ -164,6 +164,57 @@ async function authorize() {
   } catch { fail(); }
 }
 
+// Read/add in a first-party source window when a Home Screen app or browser
+// isolates iframe authentication. Only task fields cross the origin boundary.
+async function tasksWindow() {
+  let requested = false, cancelled = false, busy = false, addition = null;
+  const run = async () => {
+    if (cancelled || busy) return;
+    busy = true; login.disabled = true;
+    let added = false;
+    try {
+      const current = await client();
+      if (cancelled) return;
+      if (!current.auth.currentUser) {
+        login.hidden = false; login.disabled = false;
+        status.textContent = "イロイロキロクのアカウントでログインしてください。";
+        return;
+      }
+      status.textContent = addition ? "タスクを追加しています…" : "最新のタスクを取得しています…";
+      if (addition) { await appendTask(current, addition); added = true; }
+      const data = await readTasks();
+      if (!cancelled) window.opener.postMessage({ type: "iroiro-tasks-result", requestId, ...data, added, operationId: addition?.operationId }, targetOrigin);
+      status.textContent = "今日のお知らせへ反映しています…";
+    } catch (error) {
+      if (!cancelled) window.opener.postMessage({ type: "iroiro-tasks-result", requestId, added, operationId: addition?.operationId, error: authError(error) ? "auth-required" : addition ? error.message : "read-failed" }, targetOrigin);
+      status.textContent = "接続画面を閉じて、今日のお知らせから再試行してください。";
+    } finally { busy = false; }
+  };
+  window.addEventListener("message", event => {
+    if (event.origin !== targetOrigin || event.source !== window.opener || event.data?.requestId !== requestId) return;
+    if (event.data.type === "iroiro-tasks-saved") { window.close(); return; }
+    if (event.data.type === "iroiro-cancel") { cancelled = true; login.disabled = true; return; }
+    if (event.data.type !== "iroiro-tasks-window-request" || requested || cancelled) return;
+    requested = true; addition = event.data.addition ?? null;
+    void run();
+  });
+  login.onclick = async () => {
+    if (!requested || cancelled || busy) return;
+    busy = true; login.disabled = true;
+    try {
+      const { auth, authModule } = await client();
+      if (cancelled) return;
+      if (!auth.currentUser) await authModule.signInWithPopup(auth, new authModule.GoogleAuthProvider());
+      busy = false;
+      await run();
+    } catch {
+      login.disabled = cancelled;
+      status.textContent = "ログインできませんでした。もう一度接続してください。";
+    } finally { busy = false; }
+  };
+  window.opener.postMessage({ type: "iroiro-tasks-window-ready", requestId }, targetOrigin);
+}
+
 async function legacy() {
   const send = async () => {
     status.textContent = "最新のタスクを取得しています…";
@@ -221,5 +272,6 @@ if (window.parent !== window) {
   if (mode === "background") background();
   else if (mode === "authorize") void authorize();
   else if (mode === "foods") void foodsWindow();
+  else if (mode === "tasks") void tasksWindow();
   else void legacy();
 }
