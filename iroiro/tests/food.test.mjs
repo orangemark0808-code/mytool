@@ -8,6 +8,7 @@ function start(sources=[]){const h=harness(sources.map(([id,data])=>[path(id),da
 function add(h,name='豚こま',quantity='150',unit='g',copies=1,extra={}){h.run('foodEditor.openDraft()');h.element('foodItemNameInput').value=name;h.element('foodQuantityInput').value=quantity;h.element('foodUnitInput').value=unit;for(const [id,value]of Object.entries(extra))h.element(id)[typeof value==='boolean'?'checked':'value']=value;return h.run(`foodEditor.commitDraft(${copies})`)}
 function reload(h){h.context.saved=h.store.get(path(rootId));h.run(`notes=notes.filter(note=>note.id!=='${rootId}');notes.push(normalizeNote('${rootId}',saved));openFoodInventory('food')`)}
 function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onchange({target:{dataset:{foodCheck:id},checked:true}})}
+function choosePreset(h,name,checked=true){if(!h.element('foodPresetChoices').onchange)h.run('foodEditor.bind()');h.element('foodPresetChoices').onchange({target:{dataset:{foodPreset:name},checked}})}
 
  test('量は数値・分数・全角を受け付け、0・負数・0除算・式を拒否する',()=>{
   for(const [value,expected]of [['150',150],['1/2',.5],['１／２',.5],['0.5',.5],['1',1]])assert.equal(parseFoodQuantity(value),expected);
@@ -239,17 +240,18 @@ function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onch
   await h.run('deleteCurrentNote()');assert.equal(h.store.has(path('ordinary')),false);assert.equal(h.element('editorDialog').open,false);
 });
 
- test('登録前から定番の候補があり、通常候補は量・単位・保存場所を上書きしない',()=>{
+ test('通常候補のまとめ追加は名前だけ・冷蔵で登録し、手入力の内容を上書きしない',()=>{
   const h=start();h.run('foodEditor.bind();foodEditor.openDraft()');
-  for(const name of ['豚こま','鶏もも肉','鶏むね肉','キャベツ','にんじん','豆腐'])assert.ok(h.element('foodPresetSelect').innerHTML.includes(`value="${name}"`));
-  h.element('foodQuantityInput').value='150';h.element('foodUnitInput').value='g';h.element('foodStorageInput').value='frozen';h.element('foodPresetSelect').value='鮭';h.element('foodPresetSelect').onchange();
-  assert.equal(h.element('foodItemNameInput').value,'鮭');assert.equal(h.element('foodQuantityInput').value,'150');assert.equal(h.element('foodStorageInput').value,'frozen');assert.equal(h.run('foodEditor.canClose()'),false);
-  assert.equal(h.run('foodEditor.commitDraft()'),true);assert.equal(h.run('editingNote.foodList.items[0].name'),'鮭');assert.equal(h.run('editingNote.foodList.items[0].storage'),'frozen');
+  for(const name of ['豚こま','鶏もも肉','鶏むね肉','キャベツ','にんじん','豆腐'])assert.ok(h.element('foodPresetChoices').innerHTML.includes(`data-food-preset="${name}"`));
+  h.element('foodItemNameInput').value='手入力';h.element('foodQuantityInput').value='150';h.element('foodUnitInput').value='g';h.element('foodStorageInput').value='frozen';choosePreset(h,'鮭');
+  assert.equal(h.run('foodEditor.canClose()'),false);assert.equal(h.run('foodEditor.addSelectedPresets()'),true);
+  assert.equal(h.element('foodItemNameInput').value,'手入力');assert.equal(h.element('foodQuantityInput').value,'150');assert.equal(h.element('foodStorageInput').value,'frozen');
+  assert.equal(h.run('editingNote.foodList.items[0].name'),'鮭');assert.equal(h.run('editingNote.foodList.items[0].quantity'),'');assert.equal(h.run('editingNote.foodList.items[0].storage'),'chilled');
 });
 
  test('定番以外の自由入力名も次の候補に追加し、HTMLを実行せずに表示する',()=>{
   const h=start();add(h,'<自家製つくね>','150');
-  assert.match(h.element('foodPresetSelect').innerHTML,/登録済みの食材/);assert.match(h.element('foodPresetSelect').innerHTML,/&lt;自家製つくね&gt;/);assert.equal(h.element('foodPresetSelect').innerHTML.includes('<自家製つくね>'),false);
+  assert.match(h.element('foodPresetChoices').innerHTML,/登録済みの食材/);assert.match(h.element('foodPresetChoices').innerHTML,/&lt;自家製つくね&gt;/);assert.equal(h.element('foodPresetChoices').innerHTML.includes('<自家製つくね>'),false);
 });
 
  test('新しい食材は冷蔵が初期値で、既存の冷凍・常温・未設定は編集しても保持する',()=>{
@@ -312,8 +314,8 @@ function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onch
   assert.match(h.element('foodItemsList').innerHTML,/量未設定/);
 });
 
- test('定番候補を選んでEnterで名前だけ追加でき、日本語の変換確定Enterでは追加しない',()=>{
-  const h=start();h.run('foodEditor.bind()');h.element('foodPresetSelect').value='キャベツ';h.element('foodPresetSelect').onchange();
+ test('自由入力のEnterで名前だけ追加でき、日本語の変換確定Enterでは追加しない',()=>{
+  const h=start();h.run('foodEditor.bind()');h.element('foodItemNameInput').value='キャベツ';
   let prevented=0;const event={key:'Enter',preventDefault(){prevented++},stopPropagation(){}};
   h.element('foodItemNameInput').onkeydown({...event,isComposing:true});h.element('foodItemNameInput').onkeydown({...event,keyCode:229});assert.equal(h.run('editingNote.foodList.items.length'),0);
   h.element('foodItemNameInput').onkeydown(event);assert.equal(prevented,1);assert.equal(h.run('editingNote.foodList.items[0].name'),'キャベツ');assert.equal(h.run('editingNote.foodList.items[0].quantity'),'');
@@ -341,7 +343,7 @@ function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onch
 
  test('名前が空なら追加せず、追加前の入力中は項目切り替えで捨てない',()=>{
   const h=start();assert.equal(h.run('foodEditor.commitDraft()'),false);assert.equal(h.run('editingNote.foodList.items.length'),0);
-  h.run('foodEditor.bind()');h.element('foodPresetSelect').value='卵';h.element('foodPresetSelect').onchange();assert.equal(h.run('foodEditor.openDraft()'),false);assert.equal(h.element('foodItemNameInput').value,'卵');assert.equal(h.run('foodEditor.canClose()'),false);
+  choosePreset(h,'卵');assert.equal(h.run('foodEditor.openDraft()'),false);assert.equal(h.element('foodPresetCount').textContent,'1品選択中');assert.equal(h.run('foodEditor.canClose()'),false);
   h.element('foodItemCancelButton').onclick();assert.equal(h.run('foodEditor.canClose()'),true);
 });
 
@@ -352,40 +354,67 @@ const usualFoods=[
 ];
 
  test('いつもの12品を指定順で先頭に表示し、候補の表示は名前だけで重複しない',()=>{
-  const h=start(),html=h.element('foodPresetSelect').innerHTML;
-  assert.equal(html.match(/<optgroup label="([^"]+)">/)[1],'いつもの食材');
-  const firstGroup=html.match(/<optgroup label="いつもの食材">(.*?)<\/optgroup>/)[1];
-  assert.deepEqual([...firstGroup.matchAll(/<option value="[^"]+">([^<]+)<\/option>/g)].map(match=>match[1]),usualFoods.map(item=>item[0]));
+  const h=start(),html=h.element('foodPresetChoices').innerHTML;
+  assert.equal(html.match(/<legend>([^<]+)<\/legend>/)[1],'いつもの食材');
+  const firstGroup=html.match(/<legend>いつもの食材<\/legend>(.*?)<\/fieldset>/)[1];
+  assert.deepEqual([...firstGroup.matchAll(/<span>([^<]+)<\/span>/g)].map(match=>match[1]),usualFoods.map(item=>item[0]));
   assert.ok(!firstGroup.includes('冷蔵'));assert.ok(!firstGroup.includes('300g'));
-  for(const [name]of usualFoods)assert.equal(html.split(`value="${name}"`).length-1,1);
+  for(const [name]of usualFoods)assert.equal(html.split(`data-food-preset="${name}"`).length-1,1);
 });
 
- test('いつもの12品を選ぶと指定の量・単位・保存場所が入り、追加・再読込後も保持する',async()=>{
+ test('いつもの12品をまとめて追加すると指定の量・単位・保存場所を保持する',async()=>{
   const h=start();h.run('foodEditor.bind()');
-  for(const [name,quantity,unit,storage]of usualFoods){
-    h.element('foodPresetSelect').value=name;h.element('foodPresetSelect').onchange();
-    assert.equal(h.element('foodItemNameInput').value,name);assert.equal(h.element('foodQuantityInput').value,quantity);assert.equal(h.element('foodUnitInput').value,unit);assert.equal(h.element('foodStorageInput').value,storage);
-    assert.equal(h.run('foodEditor.commitDraft()'),true);assert.equal(h.element('foodItemForm').hidden,false);
-  }
+  for(const [name]of usualFoods)choosePreset(h,name);
+  assert.equal(h.run('editingNote.foodList.items.length'),0);assert.equal(h.element('foodPresetCount').textContent,'12品選択中');
+  assert.equal(h.run('foodEditor.addSelectedPresets()'),true);assert.equal(h.element('foodItemForm').hidden,false);
   await h.run('closeEditor()');reload(h);
   assert.deepEqual(Array.from(h.run('editingNote.foodList.items'),item=>[item.name,item.quantity,item.unit,item.storage]),usualFoods);
 });
 
- test('量がある定番から冷凍品へ選び直した場合は量と単位の前の値を引き継がない',()=>{
-  const h=start();h.run('foodEditor.bind()');h.element('foodPresetSelect').value='まいたけ';h.element('foodPresetSelect').onchange();
-  assert.equal(h.element('foodUnitInput').value,'パック');
-  h.element('foodPresetSelect').value='ブロッコリー';h.element('foodPresetSelect').onchange();
-  assert.equal(h.element('foodQuantityInput').value,'');assert.equal(h.element('foodUnitInput').value,'g');assert.equal(h.element('foodStorageInput').value,'frozen');
-  assert.equal(h.writes.length,0);assert.equal(h.run('editingNote.foodList.items.length'),0);
+ test('候補の選択解除を反映し、冷凍品は他の食材の量・単位を引き継がない',()=>{
+  const h=start();choosePreset(h,'まいたけ');choosePreset(h,'まいたけ',false);choosePreset(h,'ブロッコリー');
+  h.element('foodQuantityInput').value='1';h.element('foodUnitInput').value='パック';
+  assert.equal(h.run('foodEditor.addSelectedPresets()'),true);
+  assert.equal(h.run('editingNote.foodList.items.length'),1);assert.equal(h.run('editingNote.foodList.items[0].quantity'),'');assert.equal(h.run('editingNote.foodList.items[0].unit'),'g');assert.equal(h.run('editingNote.foodList.items[0].storage'),'frozen');
 });
 
  test('いつもの食材で入った値も手動変更でき、再描画で戻らずメモや期限を消さない',()=>{
-  const h=start();h.run('foodEditor.bind()');h.element('foodItemMemoInput').value='開封済み';h.element('foodExpiryKindInput').value='useBy';h.element('foodExpiryDateInput').value='2026-11-01';
-  h.element('foodPresetSelect').value='豚こま肉';h.element('foodPresetSelect').onchange();h.element('foodQuantityInput').value='150';h.element('foodStorageInput').value='frozen';h.run('foodEditor.render()');
+  const h=start();choosePreset(h,'豚こま肉');h.run('foodEditor.addSelectedPresets();foodEditor.openDraft(editingNote.foodList.items[0].id)');h.element('foodItemMemoInput').value='開封済み';h.element('foodExpiryKindInput').value='useBy';h.element('foodExpiryDateInput').value='2026-11-01';
+  h.element('foodQuantityInput').value='150';h.element('foodStorageInput').value='frozen';h.run('foodEditor.render()');
   assert.equal(h.element('foodQuantityInput').value,'150');assert.equal(h.element('foodStorageInput').value,'frozen');assert.equal(h.element('foodItemMemoInput').value,'開封済み');
   assert.equal(h.run('foodEditor.commitDraft()'),true);assert.equal(h.run('editingNote.foodList.items[0].quantity'),'150');assert.equal(h.run('editingNote.foodList.items[0].memo'),'開封済み');assert.equal(h.run('editingNote.foodList.items[0].expiryDate'),'2026-11-01');
 });
 
  test('いつもの食材と同じ名前でも自由入力なら名前だけで登録できる',()=>{
   const h=start();h.element('foodItemNameInput').value='卵';assert.equal(h.run('foodEditor.commitDraft()'),true);assert.equal(h.run('editingNote.foodList.items[0].quantity'),'');
+});
+
+ test('いつもの食材と通常候補を混ぜてまとめて追加し、既存項目を変更しない',async()=>{
+  const original={title:'食材',categoryId:'food',foodList:normalizeFoodList({items:[{id:'existing',name:'豚こま肉',quantity:'150',unit:'g',storage:'frozen'}]})},h=start([[rootId,original]]);
+  for(const name of ['にんじん','ブロッコリー','豚こま肉','卵'])choosePreset(h,name);
+  assert.equal(h.run('foodEditor.addSelectedPresets()'),true);assert.equal(h.element('foodPresetCount').textContent,'0品選択中');assert.equal(h.element('foodPresetPicker').open,false);
+  await h.run('closeEditor()');const items=h.store.get(path(rootId)).foodList.items;
+  assert.equal(items.length,5);assert.equal(new Set(items.map(item=>item.id)).size,5);assert.deepEqual(items[0],original.foodList.items[0]);
+  const pork=items.find(item=>item.name==='豚こま肉'&&item.id!=='existing');assert.equal(pork.quantity,'300');assert.equal(pork.storage,'chilled');
+  assert.equal(items.find(item=>item.name==='卵').quantity,'10');assert.equal(items.find(item=>item.name==='ブロッコリー').storage,'frozen');assert.equal(items.find(item=>item.name==='にんじん').quantity,'');
+});
+
+ test('複数候補のチェックを再描画で保持し、選択解除では追加せずに閉じられる',async()=>{
+  const h=start();choosePreset(h,'卵');choosePreset(h,'キャベツ');h.run('foodEditor.render()');
+  assert.match(h.element('foodPresetChoices').innerHTML,/data-food-preset="卵"[^>]* checked/);assert.equal(h.element('foodPresetCount').textContent,'2品選択中');assert.equal(h.run('foodEditor.canClose()'),false);
+  choosePreset(h,'卵',false);assert.equal(h.element('foodPresetCount').textContent,'1品選択中');h.element('foodPresetClearButton').onclick();
+  assert.equal(h.element('foodPresetAddButton').disabled,true);assert.equal(h.run('foodEditor.addSelectedPresets()'),false);assert.equal(h.run('editingNote.foodList.items.length'),0);
+  await h.run('closeEditor()');assert.equal(h.element('editorDialog').open,false);assert.equal(h.writes.length,0);
+});
+
+ test('チェックの重複や追加ボタンの連打では増えず、次の一回分は別IDで追加できる',()=>{
+  const h=start();choosePreset(h,'卵');choosePreset(h,'卵');assert.equal(h.element('foodPresetCount').textContent,'1品選択中');
+  assert.equal(h.run('foodEditor.addSelectedPresets()'),true);assert.equal(h.run('foodEditor.addSelectedPresets()'),false);assert.equal(h.run('editingNote.foodList.items.length'),1);
+  choosePreset(h,'卵');h.run('foodEditor.addSelectedPresets()');assert.equal(h.run('editingNote.foodList.items.length'),2);assert.notEqual(h.run('editingNote.foodList.items[0].id'),h.run('editingNote.foodList.items[1].id'));
+});
+
+ test('まとめ追加後の保存失敗でも全項目を保持し、再試行で同じ項目を重複させない',async()=>{
+  const h=start();choosePreset(h,'豚こま肉');choosePreset(h,'卵');choosePreset(h,'まいたけ');h.run('foodEditor.addSelectedPresets()');
+  const ids=Array.from(h.run('editingNote.foodList.items'),item=>item.id);h.beforeWrite=()=>{throw Error('offline')};assert.equal(await h.run('requestSave()'),false);assert.equal(h.run('editingNote.foodList.items.length'),3);
+  h.beforeWrite=null;assert.equal(await h.run('requestSave()'),true);assert.deepEqual(h.store.get(path(rootId)).foodList.items.map(item=>item.id),ids);assert.equal(h.writes.length,1);
 });

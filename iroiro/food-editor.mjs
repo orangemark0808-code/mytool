@@ -22,18 +22,19 @@ const FOOD_PRESETS={
 };
 
 export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHtml:escape,uid}){
-  let editingId=null,dirty=false,undoItems=[];
+  let editingId=null,dirty=false,undoItems=[],selectedPresets=new Set();
   const list=()=>{const note=getNote();return note.foodList||(note.foodList=normalizeFoodList())};
   const error=message=>{$('foodError').textContent=message;$('foodError').hidden=!message};
   function updateCustomUnit(){$('foodCustomUnitField').hidden=$('foodUnitInput').value!=='custom'}
   function setUnit(unit){$('foodUnitInput').value=FOOD_UNITS.includes(unit)?unit:unit?'custom':'g';$('foodCustomUnitInput').value=FOOD_UNITS.includes(unit)?'':unit;updateCustomUnit()}
   function clearDraft(){
     editingId=null;dirty=false;$('foodItemNameInput').value='';$('foodQuantityInput').value='';setUnit('g');
-    $('foodPresetSelect').value='';$('foodStorageInput').value='chilled';$('foodUseSoonInput').checked=false;$('foodExpiryKindInput').value='';$('foodExpiryDateInput').value='';$('foodItemMemoInput').value='';
+    $('foodStorageInput').value='chilled';$('foodUseSoonInput').checked=false;$('foodExpiryKindInput').value='';$('foodExpiryDateInput').value='';$('foodItemMemoInput').value='';
     $('foodOptions').open=false;$('foodDetails').open=false;$('foodItemSubmitButton').textContent='追加';$('foodDuplicateButton').hidden=false;error('');
   }
   function openDraft(id=null){
     if(dirty){error('入力中の食材を追加・保存するか、キャンセルしてください。');return false}
+    if(selectedPresets.size){error('選択中の食材を追加するか、選択を解除してください。');$('foodPresetPicker').open=true;return false}
     clearDraft();editingId=id;
     if(id){const item=list().items.find(item=>item.id===id);if(!item)return false;
       $('foodItemNameInput').value=item.name;$('foodQuantityInput').value=item.quantity;setUnit(item.unit);
@@ -41,7 +42,7 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
       $('foodOptions').open=true;
       $('foodItemSubmitButton').textContent='変更を保存';$('foodDuplicateButton').hidden=true;
     }
-    $('foodItemForm').hidden=false;$('foodItemNameInput').focus();return true;
+    $('foodPresetPicker').hidden=Boolean(id);$('foodItemForm').hidden=false;$('foodItemNameInput').focus();return true;
   }
   function readDraft(){
     const unit=$('foodUnitInput').value==='custom'?$('foodCustomUnitInput').value.trim():$('foodUnitInput').value;
@@ -60,7 +61,28 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
     const item=readDraft(),wasEditing=Boolean(editingId);if(!validateDraft(item))return false;
     if(editingId){const at=list().items.findIndex(row=>row.id===editingId);if(at<0){error('この項目は別の端末で削除されています。入力を保持しています。');return false}list().items[at]={...item,checked:list().items[at].checked,order:at}}
     else for(let i=0;i<copies;i++)list().items.push({...item,id:uid(),order:list().items.length});
-    clearDraft();$('foodItemForm').hidden=wasEditing;render();onChange();if(!wasEditing)$('foodItemNameInput').focus();return true;
+    clearDraft();$('foodPresetPicker').hidden=false;$('foodItemForm').hidden=wasEditing;render();onChange();if(!wasEditing)$('foodItemNameInput').focus();return true;
+  }
+  function presetGroups(){
+    const usualNames=new Set(USUAL_FOODS.map(item=>item.name)),presets=new Set([...usualNames,...Object.values(FOOD_PRESETS).flat()]);
+    const registered=[...new Set([...list().items.map(item=>item.name),...selectedPresets].filter(name=>name&&!presets.has(name)))];
+    return {'いつもの食材':[...usualNames],...Object.fromEntries(Object.entries(FOOD_PRESETS).map(([label,names])=>[label,names.filter(name=>!usualNames.has(name))])),...(registered.length?{'登録済みの食材':registered}:{})};
+  }
+  function updatePresetControls(){
+    $('foodPresetCount').textContent=`${selectedPresets.size}品選択中`;
+    $('foodPresetAddButton').textContent=`選んだ食材を追加（${selectedPresets.size}件）`;
+    $('foodPresetAddButton').disabled=!selectedPresets.size;$('foodPresetClearButton').disabled=!selectedPresets.size;
+  }
+  function renderPresetChoices(){
+    $('foodPresetChoices').innerHTML=Object.entries(presetGroups()).map(([label,names])=>`<fieldset class="food-preset-group"><legend>${escape(label)}</legend><div class="food-preset-grid">${names.map(name=>`<label class="food-preset-choice"><input type="checkbox" data-food-preset="${escape(name)}" aria-label="${escape(name)}を追加候補に選ぶ" ${selectedPresets.has(name)?'checked':''}><span>${escape(name)}</span></label>`).join('')}</div></fieldset>`).join('');
+    updatePresetControls();
+  }
+  function clearPresetSelection(){selectedPresets.clear();renderPresetChoices();error('')}
+  function addSelectedPresets(){
+    const names=Object.values(presetGroups()).flat().filter(name=>selectedPresets.has(name));
+    if(!names.length)return false;
+    for(const name of names){const defaults=USUAL_FOODS.find(item=>item.name===name)||{name,quantity:'',unit:'g',storage:'chilled'};list().items.push(normalizeFoodItem({...defaults,id:uid()},list().items.length))}
+    selectedPresets.clear();$('foodPresetPicker').open=false;render();onChange();return true;
   }
   function deleteChecked(){
     const rows=list().items;undoItems=rows.map((item,index)=>({item:structuredClone(item),index})).filter(({item})=>item.checked);
@@ -82,10 +104,7 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
       return `<div class="food-check-row ${item.checked?'is-checked':''}"><label class="food-check-control"><input type="checkbox" data-food-check="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}を選択" ${item.checked?'checked':''}></label><button type="button" class="food-item-open" data-food-edit="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}を編集"><span class="food-item-name">${escape(item.name)}</span><span class="food-item-quantity">${escape(formatFoodQuantity(item))}</span>${meta?`<span class="food-item-meta">${escape(meta)}</span>`:''}${item.memo?`<span class="food-item-meta food-item-memo">${escape(item.memo)}</span>`:''}</button></div>`;
     }).join('');
     $('foodItemsEmpty').hidden=rows.length>0;$('foodDeleteCheckedButton').disabled=!checked;$('foodUndoDeleteButton').hidden=!undoItems.length;
-    const usualNames=new Set(USUAL_FOODS.map(item=>item.name)),presets=new Set([...usualNames,...Object.values(FOOD_PRESETS).flat()]),registered=[...new Set(rows.map(item=>item.name).filter(name=>name&&!presets.has(name)))];
-    const groups={'いつもの食材':[...usualNames],...Object.fromEntries(Object.entries(FOOD_PRESETS).map(([label,names])=>[label,names.filter(name=>!usualNames.has(name))])),...(registered.length?{'登録済みの食材':registered}:{})},selected=$('foodPresetSelect').value;
-    $('foodPresetSelect').innerHTML='<option value="">定番の食材から選ぶ（任意）</option>'+Object.entries(groups).map(([label,names])=>`<optgroup label="${escape(label)}">${names.map(name=>`<option value="${escape(name)}">${escape(name)}</option>`).join('')}</optgroup>`).join('');
-    $('foodPresetSelect').value=selected;
+    renderPresetChoices();
   }
   function validate(note){
     if(!isFoodNote(note))return true;
@@ -93,17 +112,12 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
     if($('foodError').textContent==='カードの題名を入力してください。')error('');
     return true;
   }
-  function canClose(){if(isFoodNote(getNote())&&dirty){error('入力中の食材を追加・保存するか、キャンセルしてください。');return false}return true}
+  function canClose(){if(isFoodNote(getNote())){if(dirty){error('入力中の食材を追加・保存するか、キャンセルしてください。');return false}if(selectedPresets.size){error('選択中の食材を追加するか、選択を解除してください。');$('foodPresetPicker').open=true;return false}}return true}
   function bind(){
     $('foodAddItemButton').onclick=()=>openDraft();$('foodItemSubmitButton').onclick=()=>commitDraft();$('foodDuplicateButton').onclick=()=>commitDraft(2);
-    $('foodItemCancelButton').onclick=()=>{clearDraft();$('foodItemForm').hidden=true};$('foodDeleteCheckedButton').onclick=deleteChecked;$('foodUndoDeleteButton').onclick=undoDelete;
-    $('foodPresetSelect').onchange=()=>{
-      const name=$('foodPresetSelect').value;if(!name)return;
-      $('foodItemNameInput').value=name;
-      const usual=USUAL_FOODS.find(item=>item.name===name);
-      if(usual){$('foodQuantityInput').value=usual.quantity;setUnit(usual.unit);$('foodStorageInput').value=usual.storage}
-      dirty=true;error('');$('foodPresetSelect').value='';$('foodItemNameInput').focus();
-    };
+    $('foodItemCancelButton').onclick=()=>{clearDraft();clearPresetSelection();$('foodItemForm').hidden=true};$('foodDeleteCheckedButton').onclick=deleteChecked;$('foodUndoDeleteButton').onclick=undoDelete;
+    $('foodPresetChoices').onchange=event=>{const name=event.target.dataset.foodPreset;if(!Object.values(presetGroups()).flat().includes(name))return;if(event.target.checked)selectedPresets.add(name);else selectedPresets.delete(name);updatePresetControls();error('')};
+    $('foodPresetAddButton').onclick=addSelectedPresets;$('foodPresetClearButton').onclick=clearPresetSelection;
     $('foodItemNameInput').onkeydown=event=>{if(event.key==='Enter'&&!event.isComposing&&event.keyCode!==229){event.preventDefault();event.stopPropagation();commitDraft()}};
     for(const id of ['foodItemNameInput','foodQuantityInput','foodUnitInput','foodCustomUnitInput','foodStorageInput','foodUseSoonInput','foodExpiryKindInput','foodExpiryDateInput','foodItemMemoInput'])$(id).addEventListener(id==='foodUseSoonInput'?'change':'input',()=>{dirty=true;error('');updateCustomUnit()});
     $('foodUnitInput').addEventListener('change',()=>{dirty=true;updateCustomUnit()});
@@ -111,5 +125,5 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
     $('foodItemsList').onchange=event=>{const id=event.target.dataset.foodCheck,item=list().items.find(item=>item.id===id);if(item){item.checked=event.target.checked;render();onChange()}};
     $('editorForm').addEventListener('submit',event=>{if(isFoodNote(getNote())){event.preventDefault();if(!$('foodItemForm').hidden)commitDraft()}});
   }
-  return {bind,render,validate,canClose,openDraft,commitDraft,deleteChecked,undoDelete,sync(){},reset(){clearDraft();undoItems=[];$('foodItemForm').hidden=false}};
+  return {bind,render,validate,canClose,openDraft,commitDraft,deleteChecked,undoDelete,addSelectedPresets,sync(){},reset(){clearDraft();selectedPresets.clear();undoItems=[];$('foodPresetPicker').open=false;$('foodPresetPicker').hidden=false;$('foodItemForm').hidden=false}};
 }
