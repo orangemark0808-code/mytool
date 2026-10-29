@@ -16,7 +16,7 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
   function clearDraft(){
     editingId=null;dirty=false;$('foodItemNameInput').value='';$('foodQuantityInput').value='';setUnit('g');
     $('foodPresetSelect').value='';$('foodStorageInput').value='chilled';$('foodUseSoonInput').checked=false;$('foodExpiryKindInput').value='';$('foodExpiryDateInput').value='';$('foodItemMemoInput').value='';
-    $('foodDetails').open=false;$('foodItemSubmitButton').textContent='追加';$('foodDuplicateButton').hidden=false;error('');
+    $('foodOptions').open=false;$('foodDetails').open=false;$('foodItemSubmitButton').textContent='追加';$('foodDuplicateButton').hidden=false;error('');
   }
   function openDraft(id=null){
     if(dirty){error('入力中の食材を追加・保存するか、キャンセルしてください。');return false}
@@ -24,6 +24,7 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
     if(id){const item=list().items.find(item=>item.id===id);if(!item)return false;
       $('foodItemNameInput').value=item.name;$('foodQuantityInput').value=item.quantity;setUnit(item.unit);
       $('foodStorageInput').value=item.storage;$('foodUseSoonInput').checked=item.useSoon;$('foodExpiryKindInput').value=item.expiryKind;$('foodExpiryDateInput').value=item.expiryDate;$('foodItemMemoInput').value=item.memo;
+      $('foodOptions').open=true;
       $('foodItemSubmitButton').textContent='変更を保存';$('foodDuplicateButton').hidden=true;
     }
     $('foodItemForm').hidden=false;$('foodItemNameInput').focus();return true;
@@ -35,17 +36,17 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
   }
   function validateDraft(item){
     if(!item.name){error('食材名を入力してください。');$('foodItemNameInput').focus();return false}
-    if(parseFoodQuantity(item.quantity)===null){error('量は0より大きい数値または分数で入力してください（例：150、1、1/2）。');$('foodQuantityInput').focus();return false}
-    if(!item.unit||item.unit.length>20){error('単位を選ぶか、20文字以内で入力してください。');$('foodCustomUnitInput').focus();return false}
-    if($('foodExpiryDateInput').validity?.badInput||($('foodExpiryDateInput').value&&!validTaskDate($('foodExpiryDateInput').value))){error('期限に正しい日付を入力してください。');$('foodDetails').open=true;return false}
-    if(item.expiryDate&&!item.expiryKind){error('消費期限または賞味期限を選んでください。');$('foodDetails').open=true;return false}
+    if(item.quantity&&parseFoodQuantity(item.quantity)===null){error('量を入力する場合は0より大きい数値または分数にしてください（例：150、1、1/2）。');$('foodOptions').open=true;$('foodQuantityInput').focus();return false}
+    if(!item.unit||item.unit.length>20){error('単位を選ぶか、20文字以内で入力してください。');$('foodOptions').open=true;$('foodCustomUnitInput').focus();return false}
+    if($('foodExpiryDateInput').validity?.badInput||($('foodExpiryDateInput').value&&!validTaskDate($('foodExpiryDateInput').value))){error('期限に正しい日付を入力してください。');$('foodOptions').open=true;$('foodDetails').open=true;return false}
+    if(item.expiryDate&&!item.expiryKind){error('消費期限または賞味期限を選んでください。');$('foodOptions').open=true;$('foodDetails').open=true;return false}
     return true;
   }
   function commitDraft(copies=1){
-    const item=readDraft();if(!validateDraft(item))return false;
+    const item=readDraft(),wasEditing=Boolean(editingId);if(!validateDraft(item))return false;
     if(editingId){const at=list().items.findIndex(row=>row.id===editingId);if(at<0){error('この項目は別の端末で削除されています。入力を保持しています。');return false}list().items[at]={...item,checked:list().items[at].checked,order:at}}
     else for(let i=0;i<copies;i++)list().items.push({...item,id:uid(),order:list().items.length});
-    clearDraft();$('foodItemForm').hidden=true;render();onChange();return true;
+    clearDraft();$('foodItemForm').hidden=wasEditing;render();onChange();if(!wasEditing)$('foodItemNameInput').focus();return true;
   }
   function deleteChecked(){
     const rows=list().items;undoItems=rows.map((item,index)=>({item:structuredClone(item),index})).filter(({item})=>item.checked);
@@ -82,12 +83,13 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
   function bind(){
     $('foodAddItemButton').onclick=()=>openDraft();$('foodItemSubmitButton').onclick=()=>commitDraft();$('foodDuplicateButton').onclick=()=>commitDraft(2);
     $('foodItemCancelButton').onclick=()=>{clearDraft();$('foodItemForm').hidden=true};$('foodDeleteCheckedButton').onclick=deleteChecked;$('foodUndoDeleteButton').onclick=undoDelete;
-    $('foodPresetSelect').onchange=()=>{const name=$('foodPresetSelect').value;if(!name)return;$('foodItemNameInput').value=name;dirty=true;error('');$('foodPresetSelect').value='';$('foodQuantityInput').focus()};
+    $('foodPresetSelect').onchange=()=>{const name=$('foodPresetSelect').value;if(!name)return;$('foodItemNameInput').value=name;dirty=true;error('');$('foodPresetSelect').value='';$('foodItemNameInput').focus()};
+    $('foodItemNameInput').onkeydown=event=>{if(event.key==='Enter'&&!event.isComposing&&event.keyCode!==229){event.preventDefault();event.stopPropagation();commitDraft()}};
     for(const id of ['foodItemNameInput','foodQuantityInput','foodUnitInput','foodCustomUnitInput','foodStorageInput','foodUseSoonInput','foodExpiryKindInput','foodExpiryDateInput','foodItemMemoInput'])$(id).addEventListener(id==='foodUseSoonInput'?'change':'input',()=>{dirty=true;error('');updateCustomUnit()});
     $('foodUnitInput').addEventListener('change',()=>{dirty=true;updateCustomUnit()});
     $('foodItemsList').onclick=event=>{const id=event.target.closest('[data-food-edit]')?.dataset.foodEdit;if(id)openDraft(id)};
     $('foodItemsList').onchange=event=>{const id=event.target.dataset.foodCheck,item=list().items.find(item=>item.id===id);if(item){item.checked=event.target.checked;render();onChange()}};
     $('editorForm').addEventListener('submit',event=>{if(isFoodNote(getNote())){event.preventDefault();if(!$('foodItemForm').hidden)commitDraft()}});
   }
-  return {bind,render,validate,canClose,openDraft,commitDraft,deleteChecked,undoDelete,sync(){},reset(){clearDraft();undoItems=[];$('foodItemForm').hidden=true}};
+  return {bind,render,validate,canClose,openDraft,commitDraft,deleteChecked,undoDelete,sync(){},reset(){clearDraft();undoItems=[];$('foodItemForm').hidden=false}};
 }
