@@ -179,7 +179,10 @@ body [hidden]{display:none!important}
 .food-inline-amount select{width:75px;flex:0 0 75px}
 .food-inline-storage{display:flex;align-items:center;gap:7px;font-size:12px;min-width:0}
 .food-inline-storage select{max-width:100%;font-size:14px}
-.food-item-details{justify-self:end}
+.food-item-details{justify-self:end;grid-column:2;grid-row:2;margin-right:44px}
+.food-item-delete{grid-column:2;grid-row:2;justify-self:end;align-self:center;display:flex;align-items:center;justify-content:center;width:40px;min-height:44px;border:0;border-radius:8px;background:transparent;color:#a23a30;font-size:26px;line-height:1;padding:0;cursor:pointer}
+.food-item-delete:hover{background:#fff0ed}
+.food-item-delete:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
 .food-inline-error{grid-column:1/-1;margin:0}
 @media(max-width:700px){.food-preset-edit-values{grid-template-columns:1fr 1fr}.food-preset-edit-values label:last-child{grid-column:1/-1}.food-item-inline{grid-template-columns:minmax(0,1fr) minmax(132px,.8fr);gap:8px 5px}.food-inline-amount select{width:65px;flex-basis:65px;padding:7px 3px}.food-inline-amount input{padding:7px}.food-inline-storage{gap:4px}.food-inline-storage select{padding:7px 3px}.food-item-inline>.food-item-name{font-size:14px}}
 .food-amount-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.6fr);gap:12px;margin:14px 0}
