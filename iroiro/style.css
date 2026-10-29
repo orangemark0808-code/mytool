@@ -33,9 +33,14 @@ body [hidden]{display:none!important}
 .task-item-row .remove-item{min-width:44px;min-height:44px}
 .task-description-label{display:block;font-size:14px;font-weight:600;margin:25px 0 10px}
 .task-card{display:flex;flex-direction:column}
-.task-card-main{display:grid;grid-template-columns:38px minmax(0,1fr);gap:6px;align-items:start;min-width:0}
-.task-complete-control{display:flex;align-items:flex-start;justify-content:flex-start;min-width:38px;min-height:44px;padding-top:1px;cursor:pointer}
-.task-card-checkbox{width:22px;height:22px;margin:0;accent-color:var(--orange);cursor:pointer}
+.task-card-main{display:grid;grid-template-columns:44px minmax(0,1fr);gap:6px;align-items:start;min-width:0}
+.task-complete-control{display:flex;align-items:flex-start;justify-content:flex-start;min-width:44px;min-height:44px;padding-top:0;cursor:pointer}
+.task-card-checkbox{-webkit-appearance:none;appearance:none;display:grid;place-content:center;box-sizing:border-box;width:18px;height:18px;min-width:18px;min-height:18px;flex:0 0 18px;margin:3px 0 0;padding:0;border:1.5px solid #8c847c;border-radius:3px;background:#fff;cursor:pointer}
+.task-card-checkbox::after{content:"";width:9px;height:5px;border:solid #fff;border-width:0 0 2px 2px;transform:translateY(-1px) rotate(-45deg);opacity:0}
+.task-card-checkbox:checked{border-color:var(--orange);background:var(--orange)}
+.task-card-checkbox:checked::after{opacity:1}
+.task-card-checkbox:disabled{opacity:.5;cursor:wait}
+@media(forced-colors:active){.task-card-checkbox{-webkit-appearance:auto;appearance:auto}.task-card-checkbox::after{display:none}}
 .task-card-open{border:0;background:transparent;padding:0;text-align:left;color:var(--ink);min-width:0;width:100%;font:inherit}
 .task-card-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-size:16px;font-weight:700;line-height:1.4}
 .task-card-description{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.5;margin-top:6px}
@@ -95,7 +100,6 @@ body [hidden]{display:none!important}
   .task-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
   .task-date-field{grid-column:1/-1}
   .task-field input,.task-field select,.task-item-row input[type=text]{font-size:16px}
-  .task-card-checkbox{width:28px;height:28px}
   .task-card-main{grid-template-columns:44px minmax(0,1fr)}
   .task-complete-control{min-width:44px;min-height:44px}
 }
@@ -193,8 +197,6 @@ body [hidden]{display:none!important}
 .food-checklist:empty{display:none}
 .food-check-row{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:10px 12px;background:#fff}
 .food-check-row:last-child{border-bottom:0}
-.food-check-control{display:flex;align-items:center;justify-content:center;width:36px;min-height:42px;flex:0 0 36px;cursor:pointer}
-.food-check-control input{width:22px;height:22px;accent-color:var(--orange);cursor:pointer}
 .food-item-open{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;flex:1;min-width:0;border:0;background:none;padding:4px 0;text-align:left;color:inherit;font:inherit;cursor:pointer}
 .food-item-name{font-size:15px;font-weight:650;overflow-wrap:anywhere}
 .food-item-quantity{font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;max-width:160px}

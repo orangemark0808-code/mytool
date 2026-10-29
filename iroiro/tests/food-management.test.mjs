@@ -98,7 +98,7 @@ test('一覧の行全体では編集フォームを開かず、明示した詳�
 
 test('一覧の不正な保存場所を拒否し、未確定入力を持つ項目の削除で入力を残さない',()=>{
   const h=setup();stage(h,{storage:'constructor'});assert.equal(h.run("foodEditor.commitInline('a')"),false);assert.equal(h.run('editingNote.foodList.items[0].storage'),'chilled');h.run('foodEditor.cancelInline()');
-  stage(h,{quantity:'abc'});h.run('editingNote.foodList.items[0].checked=true;foodEditor.deleteChecked()');assert.equal(h.run('foodEditor.canClose()'),true);assert.equal(h.run('editingNote.foodList.items.length'),0);
+  stage(h,{quantity:'abc'});h.run("foodEditor.deleteItem('a')");assert.equal(h.run('foodEditor.canClose()'),true);assert.equal(h.run('editingNote.foodList.items.length'),0);
 });
 
 test('定番設定をバックアップで復元でき、旧バックアップでは現在の定番設定を消さない',async()=>{

@@ -7,7 +7,6 @@ const rootId=foodInventoryId('food'),path=id=>`users/test-user/iroiroNotes/${id}
 function start(sources=[]){const h=harness(sources.map(([id,data])=>[path(id),data]));h.context.sources=sources;h.run(`${cats};notes=sources.map(([id,data])=>normalizeNote(id,data));openFoodInventory('food')`);return h}
 function add(h,name='豚こま',quantity='150',unit='g',copies=1,extra={}){h.run('foodEditor.openDraft()');h.element('foodItemNameInput').value=name;h.element('foodQuantityInput').value=quantity;h.element('foodUnitInput').value=unit;for(const [id,value]of Object.entries(extra))h.element(id)[typeof value==='boolean'?'checked':'value']=value;return h.run(`foodEditor.commitDraft(${copies})`)}
 function reload(h){h.context.saved=h.store.get(path(rootId));h.run(`notes=notes.filter(note=>note.id!=='${rootId}');notes.push(normalizeNote('${rootId}',saved));openFoodInventory('food')`)}
-function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onchange({target:{dataset:{foodCheck:id},checked:true}})}
 function choosePreset(h,name,checked=true){if(!h.element('foodPresetChoices').onchange)h.run('foodEditor.bind()');h.element('foodPresetChoices').onchange({target:{dataset:{foodPreset:name},checked}})}
 
  test('量は数値・分数・全角を受け付け、0・負数・0除算・式を拒否する',()=>{
@@ -28,14 +27,14 @@ function choosePreset(h,name,checked=true){if(!h.element('foodPresetChoices').on
   const h=start();add(h,'鮭','2','custom',1,{foodCustomUnitInput:'切れ',foodStorageInput:'frozen',foodUseSoonInput:true,foodExpiryKindInput:'useBy',foodExpiryDateInput:'2026-11-01',foodItemMemoInput:'開封済み https://example.com/'});await h.run('closeEditor()');
   const saved=h.store.get(path(rootId)),item=saved.foodList.items[0];assert.equal(item.unit,'切れ');assert.equal(item.storage,'frozen');assert.equal(item.useSoon,true);assert.equal(item.expiryDate,'2026-11-01');assert.match(item.memo,/開封済み/);assert.equal(saved.urls[0].url,'https://example.com/');
 });
- test('チェックした150gだけを削除し、もう1項目を残して元に戻せる',async()=>{
-  const h=start();add(h,'豚こま','150','g',2);const a=h.run('editingNote.foodList.items[0].id'),b=h.run('editingNote.foodList.items[1].id');select(h,a);
-  assert.equal(h.run('foodEditor.deleteChecked()'),true);assert.equal(h.run('editingNote.foodList.items.length'),1);assert.equal(h.run('editingNote.foodList.items[0].id'),b);
+ test('×で150gだけを削除し、もう1項目を残して元に戻せる',async()=>{
+  const h=start();add(h,'豚こま','150','g',2);const a=h.run('editingNote.foodList.items[0].id'),b=h.run('editingNote.foodList.items[1].id');h.context.removeId=a;
+  assert.equal(h.run('foodEditor.deleteItem(removeId)'),true);assert.equal(h.run('editingNote.foodList.items.length'),1);assert.equal(h.run('editingNote.foodList.items[0].id'),b);
   assert.equal(h.run('foodEditor.undoDelete()'),true);assert.equal(h.run('editingNote.foodList.items[0].id'),a);assert.equal(h.run('editingNote.foodList.items[0].checked'),false);await h.run('closeEditor()');assert.equal(h.store.get(path(rootId)).foodList.items.length,2);
 });
  test('すべて削除しても食材カードは残り、旧170gが再取込されない',async()=>{
   const original={title:'食材',categoryId:'food',food:{remainingGrams:170,storage:'chilled'}};const h=start([['old',original]]);
-  select(h,h.run('editingNote.foodList.items[0].id'));h.run('foodEditor.deleteChecked()');await h.run('closeEditor()');reload(h);
+  h.run('foodEditor.deleteItem(editingNote.foodList.items[0].id)');await h.run('closeEditor()');reload(h);
   assert.equal(h.run('editingNote.foodList.items.length'),0);assert.equal(h.run('editingNote.foodList.importedSources.old'),true);
   assert.deepEqual(h.store.get(path('old')),original);h.run("selectCategory('food')");assert.equal((h.element('notesGrid').innerHTML.match(/<article /g)||[]).length,1);
 });
@@ -60,7 +59,7 @@ function choosePreset(h,name,checked=true){if(!h.element('foodPresetChoices').on
 });
  test('初回取り込みが同時実行されても、手元で削除した旧項目を復活させない',async()=>{
   const old={title:'豚こま',categoryId:'food',food:{remainingGrams:170}},h=start([['old',old]]);
-  select(h,'legacy-old');h.run('foodEditor.deleteChecked()');
+  h.run("foodEditor.deleteItem('legacy-old')");
   h.store.set(path(rootId),{title:'食材',categoryId:'food',foodList:foodInventoryFromSources('food',[{id:'old',...old}]).foodList});
   assert.equal(await h.run('requestSave()'),true);assert.equal(h.store.get(path(rootId)).foodList.items.length,0);assert.equal(h.store.get(path(rootId)).foodList.importedSources.old,true);
 });
@@ -68,7 +67,7 @@ function choosePreset(h,name,checked=true){if(!h.element('foodPresetChoices').on
   const original={title:'食材',categoryId:'food',foodList:normalizeFoodList({items:[{id:'a',name:'豚こま',quantity:'150',unit:'g'}]})};
   const h=start([[rootId,original]]);h.run("foodEditor.openDraft('a')");h.element('foodQuantityInput').value='100';h.run('foodEditor.commitDraft()');h.store.set(path(rootId),{...original,foodList:normalizeFoodList({items:[{...original.foodList.items[0],quantity:'120'}]})});
   assert.equal(await h.run('requestSave()'),false);assert.equal(h.store.get(path(rootId)).foodList.items[0].quantity,'120');assert.equal(h.run('editingNote.foodList.items[0].quantity'),'100');
-  const h2=start([[rootId,original]]);select(h2,'a');h2.run('foodEditor.deleteChecked()');h2.store.set(path(rootId),{...original,foodList:normalizeFoodList({items:[{...original.foodList.items[0],quantity:'120'}]})});assert.equal(await h2.run('requestSave()'),false);
+  const h2=start([[rootId,original]]);h2.run("foodEditor.deleteItem('a')");h2.store.set(path(rootId),{...original,foodList:normalizeFoodList({items:[{...original.foodList.items[0],quantity:'120'}]})});assert.equal(await h2.run('requestSave()'),false);
 });
  test('保存失敗後の再試行でも同じ内容の項目を増やさない',async()=>{
   const h=start();add(h,'豚こま','150','g',2);h.beforeWrite=()=>{throw Error('offline')};assert.equal(await h.run('requestSave()'),false);h.beforeWrite=null;

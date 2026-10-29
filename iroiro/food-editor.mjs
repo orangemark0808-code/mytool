@@ -95,7 +95,6 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
     for(const field of ['quantity','unit','storage'])item[field]=next[field];
     inlineDrafts.delete(id);inlineErrors.delete(id);const errorNode=$(`food-inline-error-${id}`);if(errorNode)errorNode.hidden=true;$('foodInlineCancelButton').hidden=!inlineDrafts.size;error('');
     for(const field of ['quantity','unit','storage']){const input=$(`food-inline-${field}-${id}`);if(input&&input!==getActiveElement())input.value=item[field]}
-    $(`food-inline-check-${id}`)?.setAttribute('aria-label',`${item.name} ${formatFoodQuantity(item)}を選択`);
     $(`food-inline-details-${id}`)?.setAttribute('aria-label',`${item.name} ${formatFoodQuantity(item)}の詳細`);
     $(`food-inline-delete-${id}`)?.setAttribute('aria-label',`${item.name} ${formatFoodQuantity(item)}を削除`);
     if(changed)onChange();return true;
@@ -117,8 +116,9 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
     if(restoreFocus){const next=list().items[Math.min(index,list().items.length-1)];$(next?`food-inline-delete-${next.id}`:'foodUndoDeleteButton')?.focus({preventScroll:true})}
     return true;
   }
-  function deleteChecked(){
-    return removeItems(new Set(list().items.filter(item=>item.checked).map(item=>item.id)));
+  function clearChecked(){
+    const rows=list().items;if(!rows.some(item=>item.checked))return false;
+    for(const item of rows)item.checked=false;render();onChange();return true;
   }
   function undoDelete(){
     if(!undoItems.length)return false;
@@ -130,12 +130,12 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
     if(!isFoodNote(getNote()))return;
     const focused=getActiveElement(),focusId=focused?.dataset?.foodRow,focusField=focused?.dataset?.foodInline,selection=[focused?.selectionStart,focused?.selectionEnd];
     const rows=list().items,checked=rows.filter(item=>item.checked).length;
-    $('foodItemCount').textContent=`${rows.length}項目${checked?`（選択中 ${checked}項目）`:''}`;
+    $('foodItemCount').textContent=`${rows.length}項目`;
     $('foodItemsList').innerHTML=rows.map(item=>{
       const shown={...item,...inlineDrafts.get(item.id)?.patch},meta=[item.useSoon?'★早めに使いたい':'',item.expiryDate?`${FOOD_EXPIRY_LABELS[item.expiryKind]||'期限'} ${item.expiryDate}`:''].filter(Boolean).join(' · '),units=[...new Set([...FOOD_UNITS,item.unit].filter(Boolean))];
-      return `<div class="food-check-row ${item.checked?'is-checked':''}"><label class="food-check-control"><input id="food-inline-check-${escape(item.id)}" type="checkbox" data-food-check="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}を選択" ${item.checked?'checked':''}></label><div class="food-item-inline"><span class="food-item-name">${escape(item.name)}</span><div class="food-inline-amount"><input id="food-inline-quantity-${escape(item.id)}" data-food-row="${escape(item.id)}" data-food-inline="quantity" value="${escape(shown.quantity)}" placeholder="未設定" maxlength="40" aria-label="${escape(item.name)}の量"><select id="food-inline-unit-${escape(item.id)}" data-food-row="${escape(item.id)}" data-food-inline="unit" aria-label="${escape(item.name)}の単位"><option value="" ${shown.unit===''?'selected':''}>未設定</option>${units.map(unit=>`<option value="${escape(unit)}" ${shown.unit===unit?'selected':''}>${escape(unit)}</option>`).join('')}</select></div><button id="food-inline-delete-${escape(item.id)}" type="button" class="food-item-delete" data-food-delete="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}を削除" title="この食材を削除">×</button><label class="food-inline-storage">保存場所<select id="food-inline-storage-${escape(item.id)}" data-food-row="${escape(item.id)}" data-food-inline="storage" aria-label="${escape(item.name)}の保存場所"><option value="" ${shown.storage===''?'selected':''}>未設定</option>${Object.entries(FOOD_STORAGE_LABELS).map(([value,label])=>`<option value="${value}" ${shown.storage===value?'selected':''}>${label}</option>`).join('')}</select></label><button id="food-inline-details-${escape(item.id)}" type="button" class="quiet-button food-item-details" data-food-edit="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}の詳細">詳細</button>${meta?`<span class="food-item-meta">${escape(meta)}</span>`:''}${item.memo?`<span class="food-item-meta food-item-memo">${escape(item.memo)}</span>`:''}<p id="food-inline-error-${escape(item.id)}" class="form-error food-inline-error" ${inlineErrors.has(item.id)?'':'hidden'}>${escape(inlineErrors.get(item.id)||'')}</p></div></div>`;
+      return `<div class="food-check-row ${item.checked?'is-checked':''}"><div class="food-item-inline"><span class="food-item-name">${escape(item.name)}</span><div class="food-inline-amount"><input id="food-inline-quantity-${escape(item.id)}" data-food-row="${escape(item.id)}" data-food-inline="quantity" value="${escape(shown.quantity)}" placeholder="未設定" maxlength="40" aria-label="${escape(item.name)}の量"><select id="food-inline-unit-${escape(item.id)}" data-food-row="${escape(item.id)}" data-food-inline="unit" aria-label="${escape(item.name)}の単位"><option value="" ${shown.unit===''?'selected':''}>未設定</option>${units.map(unit=>`<option value="${escape(unit)}" ${shown.unit===unit?'selected':''}>${escape(unit)}</option>`).join('')}</select></div><button id="food-inline-delete-${escape(item.id)}" type="button" class="food-item-delete" data-food-delete="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}を削除" title="この食材を削除">×</button><label class="food-inline-storage">保存場所<select id="food-inline-storage-${escape(item.id)}" data-food-row="${escape(item.id)}" data-food-inline="storage" aria-label="${escape(item.name)}の保存場所"><option value="" ${shown.storage===''?'selected':''}>未設定</option>${Object.entries(FOOD_STORAGE_LABELS).map(([value,label])=>`<option value="${value}" ${shown.storage===value?'selected':''}>${label}</option>`).join('')}</select></label><button id="food-inline-details-${escape(item.id)}" type="button" class="quiet-button food-item-details" data-food-edit="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}の詳細">詳細</button>${meta?`<span class="food-item-meta">${escape(meta)}</span>`:''}${item.memo?`<span class="food-item-meta food-item-memo">${escape(item.memo)}</span>`:''}<p id="food-inline-error-${escape(item.id)}" class="form-error food-inline-error" ${inlineErrors.has(item.id)?'':'hidden'}>${escape(inlineErrors.get(item.id)||'')}</p></div></div>`;
     }).join('');
-    $('foodItemsEmpty').hidden=rows.length>0;$('foodDeleteCheckedButton').disabled=!checked;$('foodUndoDeleteButton').hidden=!undoItems.length;
+    $('foodItemsEmpty').hidden=rows.length>0;$('foodClearCheckedButton').hidden=!checked;$('foodClearCheckedButton').textContent=`以前のチェックを解除（${checked}件）`;$('foodUndoDeleteButton').hidden=!undoItems.length;
     renderPresetChoices();
     if(focusId&&focusField){const input=$(`food-inline-${focusField}-${focusId}`);input?.focus({preventScroll:true});if(focusField==='quantity'&&selection.every(Number.isInteger))input?.setSelectionRange?.(...selection)}
   }
@@ -148,7 +148,7 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
   function canClose(){if(isFoodNote(getNote())){if(!flushInline())return false;if(dirty){error('入力中の食材を追加・保存するか、キャンセルしてください。');return false}if(selectedPresets.size){error('選択中の食材を追加するか、選択を解除してください。');$('foodPresetPicker').open=true;return false}}return true}
   function bind(){
     $('foodAddItemButton').onclick=()=>openDraft();$('foodItemSubmitButton').onclick=()=>commitDraft();$('foodDuplicateButton').onclick=()=>commitDraft(2);
-    $('foodItemCancelButton').onclick=()=>{clearDraft();clearPresetSelection();$('foodItemForm').hidden=true};$('foodDeleteCheckedButton').onclick=deleteChecked;$('foodUndoDeleteButton').onclick=undoDelete;
+    $('foodItemCancelButton').onclick=()=>{clearDraft();clearPresetSelection();$('foodItemForm').hidden=true};$('foodClearCheckedButton').onclick=clearChecked;$('foodUndoDeleteButton').onclick=undoDelete;
     $('foodPresetChoices').onchange=event=>{const name=event.target.dataset.foodPreset;if(!Object.values(presetGroups()).flat().includes(name))return;if(event.target.checked){selectedPresets.add(name);presetDefaults.set(name,structuredClone(getPresets().find(item=>item.name===name)||{name,quantity:'',unit:'g',storage:'chilled'}))}else{selectedPresets.delete(name);presetDefaults.delete(name)}updatePresetControls();error('')};
     $('foodPresetAddButton').onclick=addSelectedPresets;$('foodPresetClearButton').onclick=clearPresetSelection;
     $('foodItemNameInput').onkeydown=event=>{if(event.key==='Enter'&&!event.isComposing&&event.keyCode!==229){event.preventDefault();event.stopPropagation();commitDraft()}};
@@ -156,9 +156,9 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
     $('foodUnitInput').addEventListener('change',()=>{dirty=true;updateCustomUnit()});
     $('foodItemsList').onclick=event=>{const removeId=event.target.closest('[data-food-delete]')?.dataset.foodDelete;if(removeId){deleteItem(removeId);return}const id=event.target.closest('[data-food-edit]')?.dataset.foodEdit;if(id)openDraft(id)};
     $('foodItemsList').oninput=event=>{const id=event.target.dataset.foodRow,field=event.target.dataset.foodInline;if(id&&field)stageInline(id,{[field]:event.target.value})};
-    $('foodItemsList').onchange=event=>{const inlineId=event.target.dataset.foodRow,field=event.target.dataset.foodInline;if(inlineId&&field){stageInline(inlineId,{[field]:event.target.value});commitInline(inlineId);return}const id=event.target.dataset.foodCheck,item=list().items.find(item=>item.id===id);if(item){item.checked=event.target.checked;render();onChange()}};
+    $('foodItemsList').onchange=event=>{const inlineId=event.target.dataset.foodRow,field=event.target.dataset.foodInline;if(inlineId&&field){stageInline(inlineId,{[field]:event.target.value});commitInline(inlineId);return}};
     $('foodInlineCancelButton').onclick=cancelInline;
     $('editorForm').addEventListener('submit',event=>{if(isFoodNote(getNote())){event.preventDefault();if(!$('foodItemForm').hidden)commitDraft()}});
   }
-  return {bind,render,validate,canClose,openDraft,commitDraft,deleteItem,deleteChecked,undoDelete,addSelectedPresets,stageInline,commitInline,cancelInline,sync(){},reset(){clearDraft();selectedPresets.clear();presetDefaults.clear();inlineDrafts.clear();inlineErrors.clear();$('foodInlineCancelButton').hidden=true;undoItems=[];$('foodPresetPicker').open=false;$('foodPresetPicker').hidden=false;$('foodItemForm').hidden=false}};
+  return {bind,render,validate,canClose,openDraft,commitDraft,deleteItem,clearChecked,undoDelete,addSelectedPresets,stageInline,commitInline,cancelInline,sync(){},reset(){clearDraft();selectedPresets.clear();presetDefaults.clear();inlineDrafts.clear();inlineErrors.clear();$('foodInlineCancelButton').hidden=true;undoItems=[];$('foodPresetPicker').open=false;$('foodPresetPicker').hidden=false;$('foodItemForm').hidden=false}};
 }
