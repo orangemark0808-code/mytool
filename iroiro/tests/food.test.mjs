@@ -141,3 +141,35 @@ function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onch
   h.element('noteCategorySelect').value='food';h.run('handleCategoryChange()');
   assert.equal(h.run('editingNote.id'),'');assert.equal(h.run('editingNote.content'),'入力済みの本文');assert.equal(h.element('noteTitleInput').value,'食材');
 });
+
+ test('新規作成でも食材以外のカテゴリーには題名を自動入力しない',()=>{
+  const h=harness();h.run(`${cats};openEditor(createNote())`);
+  h.element('noteCategorySelect').value='app';h.run('handleCategoryChange()');
+  assert.equal(h.element('noteTitleInput').value,'');assert.equal(h.run('editingNote.title'),'');
+  assert.equal(h.element('noteTitleInput').readOnly,false);
+});
+
+ test('新規メモに入力した題名は食材を選んでも上書きしない',()=>{
+  const h=harness();h.run(`${cats};selectCategory('app');openEditor(createNote())`);
+  h.element('noteTitleInput').value='買ってきた食材';
+  h.element('noteCategorySelect').value='food';h.run('handleCategoryChange()');
+  assert.equal(h.element('noteTitleInput').value,'買ってきた食材');assert.equal(h.run('editingNote.title'),'買ってきた食材');
+});
+
+ test('既存メモを食材へ変更しても空の題名に自動入力せず、手動で題名を補って保存できる',async()=>{
+  const original={title:'',categoryId:'app',content:'保存済みの本文'};
+  const h=harness([[path('existing'),original]]);h.context.original=original;
+  h.run(`${cats};openEditor(normalizeNote('existing',original))`);
+  h.element('noteCategorySelect').value='food';h.run('handleCategoryChange()');
+  assert.equal(h.element('noteTitleInput').value,'');assert.equal(h.run('editingNote.title'),'');assert.equal(h.element('noteTitleInput').readOnly,false);
+  assert.equal(await h.run('requestSave()'),false);assert.equal(h.element('saveStatus').textContent,'未保存（入力内容を確認）');
+  h.element('noteTitleInput').value='冷蔵庫の食材';h.run('syncEditingNoteFromForm();scheduleSave()');
+  assert.equal(await h.run('requestSave()'),true);await h.run('closeEditor()');
+  assert.equal(h.store.get(path('existing')).title,'冷蔵庫の食材');assert.equal(h.store.get(path('existing')).content,original.content);assert.equal(h.element('editorDialog').open,false);
+});
+
+ test('既存メモを食材へ変更しても保存済みの題名を保持する',()=>{
+  const h=harness();h.run(`${cats};openEditor(normalizeNote('existing',{title:'元の題名',categoryId:'app'}))`);
+  h.element('noteCategorySelect').value='food';h.run('handleCategoryChange()');
+  assert.equal(h.element('noteTitleInput').value,'元の題名');assert.equal(h.run('editingNote.title'),'元の題名');
+});

@@ -95,7 +95,7 @@ function handleCategoryChange(){
     clearTimeout(saveTimer);saveTimer=null;openFoodInventory(next);return;
   }
   syncEditingNoteFromForm(false);
-  if(isFoodNote(editingNote)&&!editingNote.title.trim()){editingNote.title='食材';$('noteTitleInput').value='食材'}
+  if(!editingNote.id&&isFoodNote(editingNote)&&!editingNote.title.trim()){editingNote.title='食材';$('noteTitleInput').value='食材'}
   updateEditor();scheduleSave();
 }
 function updateEditorMode(){
@@ -105,7 +105,7 @@ function updateEditorMode(){
   $('editorDialog').classList.toggle('food-mode',foodMode);$('foodFields').hidden=!foodMode;
   if(foodMode){ensureFoodList(note);foodEditor.render()}else $('foodError').hidden=true;
   const inventory=foodMode&&note.id===foodInventoryId(note.categoryId);
-  $('noteTitleInput').readOnly=foodMode;$('noteCategorySelect').disabled=inventory;$('deleteNoteButton').hidden=foodMode;$('noteCategoryLabelText').textContent=foodMode?'タグ':'カテゴリー';
+  $('noteTitleInput').readOnly=inventory;$('noteCategorySelect').disabled=inventory;$('deleteNoteButton').hidden=foodMode;$('noteCategoryLabelText').textContent=foodMode?'タグ':'カテゴリー';
   $('noteTitleInput').removeAttribute('list');
   $('taskFields').hidden=!taskMode;$('taskItemsSection').hidden=!taskMode;$('typeSwitcher').hidden=taskMode||mangaMode||foodMode;
   $('mangaFields').hidden=!mangaMode;$('mangaRowsSection').hidden=!mangaMode;
