@@ -7,12 +7,12 @@ import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, 
 import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.23-1';
 import { mergeNoteData } from './note-concurrency.mjs?v=2026-10-25-03';
 import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-29-08';
-import { createFoodEditor } from './food-editor.mjs?v=2026-10-29-11';
+import { createFoodEditor } from './food-editor.mjs?v=2026-10-29-12';
 import { defaultFoodPresets, readFoodPresets, validateFoodPresets } from './food-presets.mjs?v=2026-10-29-08';
 import { createFoodPresetManager } from './food-preset-manager.mjs?v=2026-10-29-08';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026-10-29-11'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-29-12'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -156,7 +156,14 @@ function renderTaskItems(){
   $('taskChecklistProgress').textContent=progress.total?`${progress.done}/${progress.total}完了`:'';
   $('taskItemsList').innerHTML=task.items.map((item,index)=>`<div class="task-item-row ${item.checked?'checked':''}"><input type="checkbox" data-task-check="${index}" aria-label="${index+1}番目のチェック項目を完了" ${item.checked?'checked':''}><input type="text" value="${escapeHtml(item.text)}" data-task-item="${index}" aria-label="チェック項目${index+1}" placeholder="作業を入力"><button type="button" class="remove-item" data-task-remove="${index}" aria-label="チェック項目${index+1}を削除">×</button></div>`).join('');
 }
+const composingInputs=new WeakSet();
+function trackComposition(container){
+  container.oncompositionstart=event=>composingInputs.add(event.target);
+  container.oncompositionend=event=>composingInputs.delete(event.target);
+}
+function isImeConfirm(event){return event.isComposing||event.keyCode===229||event.which===229||composingInputs.has(event.target)}
 function bindTaskEvents(){
+  trackComposition($('taskItemsList'));
   ['taskDueDateInput','taskStatusSelect','taskPrioritySelect'].forEach(id=>$(id).onchange=()=>{syncEditingNoteFromForm();scheduleSave()});
   $('taskDueDateInput').oninput=()=>{syncEditingNoteFromForm();scheduleSave()};
   $('clearTaskDueDateButton').onclick=()=>{$('taskDueDateInput').value='';syncEditingNoteFromForm();scheduleSave()};
@@ -183,7 +190,7 @@ function bindTaskEvents(){
   };
   $('taskItemsList').onkeydown=e=>{
     const index=e.target.dataset.taskItem;
-    if(index===undefined||e.key!=='Enter'||e.isComposing||!editingNote)return;
+    if(index===undefined||e.key!=='Enter'||isImeConfirm(e)||!editingNote)return;
     e.preventDefault();const at=Number(index)+1,task=ensureTask(editingNote);
     task.items.splice(at,0,{id:uid(),text:'',checked:false,order:at});task.items.forEach((item,order)=>item.order=order);
     renderTaskItems();refreshRelatedLinks();scheduleSave();$('taskItemsList').querySelector(`[data-task-item="${at}"]`)?.focus();
@@ -241,7 +248,7 @@ function updateEditor(){
   renderItems();updateEditorMode();renderLinks();$('saveStatus').textContent=saveInProgress||editRevision>savedRevision?'保存中…':isFoodNote(n)&&n.inventoryDraft&&!ensureFoodList(n).items.length&&!n.isPinned?'未保存（空の食材カード）':n.id?'保存済み':'未保存';
 }
 function refreshRelatedLinks(){if(!editingNote)return;rememberCurrentFormat(editingNote);editingNote.urls=extractUrls(editingNote);renderLinks()}
-function renderItems(){cancelItemDrag();$('itemsList').innerHTML=editingNote.items.map((item,index)=>`<div class="item-row draggable-item-row ${item.checked?'checked':''}" data-item-id="${escapeHtml(item.id)}"><input type="${editingNote.type==='checklist'?'checkbox':'button'}" ${editingNote.type==='checklist'&&item.checked?'checked':''} ${editingNote.type==='bullet'?'value="•" tabindex="-1"':''} data-check="${index}"/><input type="text" value="${escapeHtml(item.text)}" placeholder="項目を入力" data-item="${index}"/><button type="button" class="remove-item" data-remove="${index}" aria-label="項目を削除">×</button></div>`).join('');document.querySelectorAll('[data-item]').forEach(el=>{el.oninput=e=>{editingNote.items[e.target.dataset.item].text=e.target.value;refreshRelatedLinks();scheduleSave()};el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const at=+e.target.dataset.item+1;editingNote.items.splice(at,0,{id:uid(),text:'',checked:false,order:at});editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave();document.querySelector(`[data-item="${at}"]`)?.focus()}}});document.querySelectorAll('[data-check]').forEach(el=>el.onchange=e=>{if(editingNote.type==='checklist'){editingNote.items[e.target.dataset.check].checked=e.target.checked;renderItems();refreshRelatedLinks();scheduleSave()}});document.querySelectorAll('[data-remove]').forEach(el=>el.onclick=e=>{editingNote.items.splice(+e.currentTarget.dataset.remove,1);editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave()});document.querySelectorAll('.draggable-item-row').forEach(bindItemDrag)}
+function renderItems(){cancelItemDrag();trackComposition($('itemsList'));$('itemsList').innerHTML=editingNote.items.map((item,index)=>`<div class="item-row draggable-item-row ${item.checked?'checked':''}" data-item-id="${escapeHtml(item.id)}"><input type="${editingNote.type==='checklist'?'checkbox':'button'}" ${editingNote.type==='checklist'&&item.checked?'checked':''} ${editingNote.type==='bullet'?'value="•" tabindex="-1"':''} data-check="${index}"/><input type="text" value="${escapeHtml(item.text)}" placeholder="項目を入力" data-item="${index}"/><button type="button" class="remove-item" data-remove="${index}" aria-label="項目を削除">×</button></div>`).join('');document.querySelectorAll('[data-item]').forEach(el=>{el.oninput=e=>{editingNote.items[e.target.dataset.item].text=e.target.value;refreshRelatedLinks();scheduleSave()};el.onkeydown=e=>{if(e.key==='Enter'&&!isImeConfirm(e)){e.preventDefault();const at=+e.target.dataset.item+1;editingNote.items.splice(at,0,{id:uid(),text:'',checked:false,order:at});editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave();document.querySelector(`[data-item="${at}"]`)?.focus()}}});document.querySelectorAll('[data-check]').forEach(el=>el.onchange=e=>{if(editingNote.type==='checklist'){editingNote.items[e.target.dataset.check].checked=e.target.checked;renderItems();refreshRelatedLinks();scheduleSave()}});document.querySelectorAll('[data-remove]').forEach(el=>el.onclick=e=>{editingNote.items.splice(+e.currentTarget.dataset.remove,1);editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave()});document.querySelectorAll('.draggable-item-row').forEach(bindItemDrag)}
 function itemDragAllowedTarget(target,touch=false){if(target.closest('input[type="checkbox"],.remove-item'))return false;return touch||!target.closest('input,button')}
 function bindItemDrag(row){row.addEventListener('pointerdown',event=>{if(event.pointerType!=='mouse'||itemDragState||!itemDragAllowedTarget(event.target))return;const state={row,kind:'pointer',pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,started:false,timer:null};itemDragState=state;startItemDrag(state)});row.addEventListener('pointermove',event=>{const state=itemDragState;if(!state||state.kind!=='pointer'||state.pointerId!==event.pointerId||!state.started)return;event.preventDefault();event.stopPropagation();autoScrollItemEditor(event.clientY);updateItemDragTarget(event.clientX,event.clientY,state)});row.addEventListener('pointerup',event=>{const state=itemDragState;if(state?.kind==='pointer'&&state.pointerId===event.pointerId)finishItemDrag()});row.addEventListener('pointercancel',event=>{if(itemDragState?.kind==='pointer'&&itemDragState.pointerId===event.pointerId)cancelItemDrag()});row.addEventListener('touchstart',event=>{if(itemDragState||!itemDragAllowedTarget(event.target,true))return;const touch=event.changedTouches[0];if(!touch)return;const state={row,kind:'touch',touchId:touch.identifier,startX:touch.clientX,startY:touch.clientY,started:false,timer:null,scrollTop:document.querySelector('.editor-content')?.scrollTop||0};itemDragState=state;state.timer=setTimeout(()=>startItemDrag(state),450);document.addEventListener('touchmove',handleItemTouchMove,{passive:false});document.addEventListener('touchend',finishItemTouch,{passive:false});document.addEventListener('touchcancel',cancelItemTouch,{passive:false})},{passive:true})}
 function startItemDrag(state){if(itemDragState!==state)return;state.started=true;document.activeElement?.blur();state.row.classList.add('dragging');document.body.classList.add('item-drag-active');if(state.kind==='pointer')state.row.setPointerCapture?.(state.pointerId);navigator.vibrate?.(12)}

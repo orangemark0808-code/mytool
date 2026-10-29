@@ -59,3 +59,17 @@ test('キーボードで×を操作した後は隣の×へ、空になったら�
   h.context.document.activeElement={dataset:{foodDelete:'b'}};remove(h,'b');assert.equal(focused,'c');
   h.context.document.activeElement={dataset:{foodDelete:'c'}};remove(h,'c');assert.equal(focused,'undo');
 });
+
+test('食材行のチェック欄をなくしても定番の複数選択と×削除を使える',()=>{
+  const h=setup();assert.doesNotMatch(h.element('foodItemsList').innerHTML,/type="checkbox"|data-food-check|food-check-control/);
+  assert.match(h.element('foodPresetChoices').innerHTML,/type="checkbox" data-food-preset=/);assert.equal(h.element('foodClearCheckedButton').hidden,true);
+  remove(h,'b');assert.deepEqual(ids(h),['a','c']);h.run('foodEditor.undoDelete()');assert.deepEqual(ids(h),['a','b','c']);
+});
+
+test('旧チェック済みの項目は開くだけでは変更せず、明示的に解除して在庫に戻せる',async()=>{
+  const h=setup();const original=structuredClone(h.store.get(path));original.foodList.items[0].checked=true;h.store.set(path,original);h.context.checkedOriginal=original;
+  h.run(`notes=[normalizeNote('${rootId}',checkedOriginal)];openFoodInventory('food');foodEditor.bind()`);
+  assert.equal(h.writes.length,0);assert.equal(h.element('foodClearCheckedButton').hidden,false);assert.match(h.element('foodClearCheckedButton').textContent,/1件/);
+  h.element('foodClearCheckedButton').onclick();assert.equal(h.element('foodClearCheckedButton').hidden,true);assert.deepEqual(ids(h),['a','b','c']);
+  await h.run('closeEditor()');assert.equal(h.store.get(path).foodList.items[0].checked,false);assert.equal(h.store.get(path).foodList.items[0].quantity,'150');
+});
