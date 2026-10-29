@@ -6,11 +6,11 @@ import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFire
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.23-1';
 import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.23-1';
 import { mergeNoteData } from './note-concurrency.mjs?v=2026-10-25-03';
-import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, consumeFood, foodSearchText } from './food-core.mjs?v=2026-10-28-02';
-import { createFoodEditor } from './food-editor.mjs?v=2026-10-28-02';
+import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-28-03';
+import { createFoodEditor } from './food-editor.mjs?v=2026-10-28-03';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026-10-28-02'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-28-03'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -19,8 +19,7 @@ const $=id=>document.getElementById(id); const uid=()=>crypto.randomUUID?.()||`$
 let editorBaseData=null;
 let app,auth,db,currentUser=null,notes=[],categories=[],selectedCategory='all',editingNote=null,saveTimer=null,unsubscribeNotes=null,unsubscribeSettings=null,settingsCreatingForUid='',closingEditor=false,deletingNote=false,pendingCategoryId='',pendingType='',categoryDragState=null,itemDragState=null,editRevision=0,savedRevision=0,requestedRevision=0,saveInProgress=false,savePromise=Promise.resolve(true),editorSession='',backupBusy=false,pendingBackup=null,migrationBusy=false,regularSort='updated-desc';
 const pendingTaskWrites=new Set();
-const pendingFoodWrites=new Set();
-const foodEditor=createFoodEditor({element:$,getNote:()=>editingNote,isFoodNote,onChange:scheduleSave,save:requestSave,saveAndNext:saveAndNextFood});
+const foodEditor=createFoodEditor({element:$,getNote:()=>editingNote,isFoodNote,onChange:()=>{refreshRelatedLinks();scheduleSave()},escapeHtml,uid});
 const pendingPinWrites=new Map();
 let pendingNetaImport=null,netaImportBusy=false;
 const mangaEditor=createMangaEditor({element:$,getNote:()=>editingNote,isMangaNote,ensureManga,onChange:()=>{syncEditingNoteFromForm();renderLinks();scheduleSave()},syncNote:()=>syncEditingNoteFromForm(),escapeHtml});
@@ -51,23 +50,27 @@ function ensureFormatStores(note){if(!note)return;note.contentByType=isRecord(no
 function rememberCurrentFormat(note){ensureFormatStores(note);if(note.type==='text')note.contentByType.text=String(note.content||'');else note.itemsByType[note.type]=copyItems(note.items)}
 function normalizeNote(id,data={}){
   if(!isRecord(data))data={};
-  const note={id,title:String(data.title||''),type:['text','bullet','checklist'].includes(data.type)?data.type:'text',content:String(data.content||''),items:copyItems(data.items),categoryId:String(data.categoryId||''),task:isRecord(data.task)?normalizeTask(data.task):null,manga:isRecord(data.manga)?normalizeManga(data.manga):null,food:isRecord(data.food)?normalizeFood(data.food):null,urls:[],isPinned:Boolean(data.isPinned),createdAt:data.createdAt??null,updatedAt:data.updatedAt??null,contentByType:{text:typeof data.contentByType?.text==='string'?data.contentByType.text:(data.type==='text'||!data.type?String(data.content||''):'')},itemsByType:isRecord(data.itemsByType)?{bullet:data.itemsByType.bullet,checklist:data.itemsByType.checklist}:{},schemaVersion:Number(data.schemaVersion??SCHEMA_VERSION)||SCHEMA_VERSION};
+  const note={id,title:String(data.title||''),type:['text','bullet','checklist'].includes(data.type)?data.type:'text',content:String(data.content||''),items:copyItems(data.items),categoryId:String(data.categoryId||''),task:isRecord(data.task)?normalizeTask(data.task):null,manga:isRecord(data.manga)?normalizeManga(data.manga):null,food:isRecord(data.food)?normalizeFood(data.food):null,foodList:isRecord(data.foodList)?normalizeFoodList(data.foodList):null,urls:[],isPinned:Boolean(data.isPinned),createdAt:data.createdAt??null,updatedAt:data.updatedAt??null,contentByType:{text:typeof data.contentByType?.text==='string'?data.contentByType.text:(data.type==='text'||!data.type?String(data.content||''):'')},itemsByType:isRecord(data.itemsByType)?{bullet:data.itemsByType.bullet,checklist:data.itemsByType.checklist}:{},schemaVersion:Number(data.schemaVersion??SCHEMA_VERSION)||SCHEMA_VERSION};
   ensureFormatStores(note);
   ['bullet','checklist'].forEach(type=>note.itemsByType[type]=copyItems(note.itemsByType[type]));
   // URLは本文から導けるため、バックアップやFirestore内のキャッシュは信用しない。
   note.urls=extractUrls(note);
   return note;
 }
-function createNote(){const now=new Date(),categoryId=getCategory(selectedCategory)?selectedCategory:'';return{id:'',title:'',type:'text',content:'',items:[],categoryId,task:isTaskCategory(categoryId)?normalizeTask():null,manga:isMangaCategory(categoryId)?normalizeManga():null,food:isFoodCategory(categoryId)?normalizeFood():null,urls:[],isPinned:false,createdAt:now,updatedAt:now,contentByType:{text:''},itemsByType:{bullet:[],checklist:[]}}}
+function createNote(){if(isFoodCategory(selectedCategory))return getFoodInventory(selectedCategory);const now=new Date(),categoryId=getCategory(selectedCategory)?selectedCategory:'';return{id:'',title:'',type:'text',content:'',items:[],categoryId,task:isTaskCategory(categoryId)?normalizeTask():null,manga:isMangaCategory(categoryId)?normalizeManga():null,food:isFoodCategory(categoryId)?normalizeFood():null,urls:[],isPinned:false,createdAt:now,updatedAt:now,contentByType:{text:''},itemsByType:{bullet:[],checklist:[]}}}
 function isFoodCategory(id){return getCategory(id)?.name.trim()==='食材'}
 function isFoodNote(note){return Boolean(note&&isFoodCategory(note.categoryId))}
-function foodForNote(note){return note.food||normalizeFood()}
-function ensureFood(note){if(!note.food)note.food=normalizeFood();return note.food}
-async function saveAndNextFood(){
-  if(!editingNote||!isFoodNote(editingNote))return;
-  syncEditingNoteFromForm();if(!editingNote.title.trim()||!foodEditor.validate(editingNote))return;
-  const categoryId=editingNote.categoryId;await closeEditor();
-  if(!editingNote&&currentUser){const next=createNote();next.categoryId=categoryId;next.food=normalizeFood();openEditor(next)}
+function ensureFoodList(note){if(!note.foodList)note.foodList=normalizeFoodList();return note.foodList}
+function getFoodInventory(categoryId){
+  const sources=notes.filter(note=>note.categoryId===categoryId),projection=foodInventoryFromSources(categoryId,sources),stored=sources.find(note=>note.id===projection.id);
+  const result=normalizeNote(projection.id,{...stored,...projection});
+  result.inventoryDraft=!stored;
+  result.inventoryImportSources=sources.filter(note=>note.id!==projection.id&&!Object.hasOwn(stored?.foodList?.importedSources||{},note.id)).map(note=>({id:note.id,data:noteData(structuredClone(note))}));
+  return result;
+}
+function openFoodInventory(categoryId){
+  if(!currentUser||!isFoodCategory(categoryId))return;
+  openEditor(getFoodInventory(categoryId));
 }
 function isTaskCategory(id){return getCategory(id)?.name.trim()==='タスク'}
 function isTaskNote(note){return Boolean(note&&isTaskCategory(note.categoryId))}
@@ -89,14 +92,16 @@ function updateEditorMode(){
   const taskMode=isTaskNote(note),mangaMode=isMangaNote(note),foodMode=isFoodNote(note);
   $('editorDialog').classList.toggle('manga-mode',mangaMode);
   $('editorDialog').classList.toggle('food-mode',foodMode);$('foodFields').hidden=!foodMode;
-  if(foodMode){ensureFood(note);foodEditor.render()}else $('foodError').hidden=true;
-  if(foodMode){$('noteTitleInput').setAttribute('list','foodNameSuggestions');$('foodNameSuggestions').innerHTML=[...new Set(notes.filter(isFoodNote).map(item=>item.title.trim()).filter(Boolean))].map(name=>`<option value="${escapeHtml(name)}"></option>`).join('')}else $('noteTitleInput').removeAttribute('list');
+  if(foodMode){ensureFoodList(note);foodEditor.render()}else $('foodError').hidden=true;
+  const inventory=foodMode&&note.id===foodInventoryId(note.categoryId);
+  $('noteTitleInput').readOnly=inventory;$('noteCategorySelect').disabled=inventory;$('deleteNoteButton').hidden=foodMode;$('noteCategoryLabelText').textContent=foodMode?'タグ':'カテゴリー';
+  $('noteTitleInput').removeAttribute('list');
   $('taskFields').hidden=!taskMode;$('taskItemsSection').hidden=!taskMode;$('typeSwitcher').hidden=taskMode||mangaMode||foodMode;
   $('mangaFields').hidden=!mangaMode;$('mangaRowsSection').hidden=!mangaMode;
-  $('textEditor').hidden=!taskMode&&!mangaMode&&!foodMode&&note.type!=='text';$('itemsEditor').hidden=taskMode||mangaMode||foodMode||note.type==='text';
+  $('textEditor').hidden=foodMode||(!taskMode&&!mangaMode&&note.type!=='text');$('itemsEditor').hidden=taskMode||mangaMode||foodMode||note.type==='text';
   $('noteContentLabel').hidden=!taskMode&&!mangaMode&&!foodMode;$('noteContentLabel').textContent=mangaMode?'自分用メモ（任意）':'補足メモ（任意）';
-  $('noteTitleInput').placeholder=taskMode?'タスク名（必須）':mangaMode?'漫画ネタのタイトル（必須）':foodMode?'食材名（例：豚こま）':'題名（任意）';
-  $('noteTitleInput').setAttribute('aria-label',taskMode?'タスク名':mangaMode?'漫画タイトル':foodMode?'食材名':'題名');
+  $('noteTitleInput').placeholder=taskMode?'タスク名（必須）':mangaMode?'漫画ネタのタイトル（必須）':foodMode?'食材':'題名（任意）';
+  $('noteTitleInput').setAttribute('aria-label',taskMode?'タスク名':mangaMode?'漫画タイトル':foodMode?'カードの題名':'題名');
   $('noteTitleInput').setAttribute('aria-required',String(taskMode||mangaMode||foodMode));
   $('noteContentInput').placeholder=taskMode?'詳細、関連URL、注意事項など…':mangaMode?'制作時の注意や補足…':foodMode?'開封済み、カット済みなど…':'ここにメモを入力…';
   $('noteContentInput').setAttribute('aria-label',taskMode?'補足メモ':mangaMode?'自分用メモ':foodMode?'食材メモ':'本文');
@@ -153,14 +158,14 @@ function noteTitleValid(note){
   if(!isTaskNote(note)||note.title.trim()||!hasMeaningfulContent(note))return true;
   $('taskTitleError').hidden=false;$('saveStatus').textContent='タスク名を入力してください。';$('noteTitleInput').focus();return false;
 }
-function hasMeaningfulContent(note){return Boolean((isFoodNote(note)&&(()=>{const food=foodForNote(note);return food.remainingGrams!==null||food.storage||food.useSoon||food.expiryDate||food.expiryKind})())||note.title.trim()||note.content.trim()||note.items.some(item=>String(item.text||'').trim())||(isTaskNote(note)&&taskForNote(note).items.some(item=>item.text.trim()))||(isMangaNote(note)&&mangaHasContent(mangaForNote(note)))||extractUrls(note).length)}
+function hasMeaningfulContent(note){return Boolean((isFoodNote(note)&&ensureFoodList(note).items.length)||note.title.trim()||note.content.trim()||note.items.some(item=>String(item.text||'').trim())||(isTaskNote(note)&&taskForNote(note).items.some(item=>item.text.trim()))||(isMangaNote(note)&&mangaHasContent(mangaForNote(note)))||extractUrls(note).length)}
 function setStatus(message){$('syncStatus').textContent=message}
 function initialize(){document.body.dataset.appVersion=VERSION;bindEvents();scheduleTaskDayRefresh();if(!configured()){$('syncStatus').textContent='Firebase設定が未設定です';$('loginButton').disabled=true;renderAll();return}app=initializeApp(config);auth=getAuth(app);db=getFirestore(app);onAuthStateChanged(auth,handleAuth)}
 function bindEvents(){
   $('prepareNetaImportButton').onclick=prepareNetaImport;$('confirmNetaImportButton').onclick=importNetaRecords;
   mangaEditor.bind();
   bindTaskEvents();foodEditor.bind();
-  $('createNoteButton').onclick=()=>currentUser&&openEditor(createNote()); $('loginButton').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>setStatus(`ログイン失敗: ${e.message}`)); $('logoutButton').onclick=()=>signOut(auth);
+  $('createNoteButton').onclick=()=>{if(!currentUser)return;if(isFoodCategory(selectedCategory)){openFoodInventory(selectedCategory);foodEditor.openDraft()}else openEditor(createNote())}; $('loginButton').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>setStatus(`ログイン失敗: ${e.message}`)); $('logoutButton').onclick=()=>signOut(auth);
   $('searchInput').oninput=renderNotes;$('sortSelect').onchange=()=>{if(!isTaskCategory(selectedCategory))regularSort=$('sortSelect').value;renderNotes()};$('noteTitleInput').oninput=()=>{syncEditingNoteFromForm();scheduleSave()};$('noteContentInput').oninput=()=>{syncEditingNoteFromForm();renderLinks();scheduleSave()};$('noteCategorySelect').onchange=handleCategoryChange;
   $('closeEditorButton').onclick=e=>{e.preventDefault();closeEditor()}; $('editorDialog').addEventListener('cancel',e=>{e.preventDefault();closeEditor()});$('editorDialog').addEventListener('close',cancelItemDrag);
   $('pinButton').onclick=()=>{editingNote.isPinned=!editingNote.isPinned;updateEditor();scheduleSave()}; $('deleteNoteButton').onclick=confirmDelete;$('confirmDeleteButton').onclick=e=>{e.preventDefault();deleteCurrentNote()};
@@ -172,7 +177,7 @@ function clearRealtimeListeners(){if(unsubscribeNotes){unsubscribeNotes();unsubs
 async function handleAuth(user){clearRealtimeListeners();settingsCreatingForUid='';currentUser=user;if(!user){notes=[];categories=[];$('loginButton').hidden=false;$('logoutButton').hidden=true;setStatus(configured()?'ログインすると同期できます':'Firebase設定が未設定です');renderAll();return}const activeUid=user.uid;$('loginButton').hidden=true;$('logoutButton').hidden=false;setStatus('同期中…');const activeSettings=doc(db,'users',activeUid,'iroiroSettings','main');const activeNotes=collection(db,'users',activeUid,'iroiroNotes');unsubscribeSettings=onSnapshot(activeSettings,snap=>{if(currentUser?.uid!==activeUid)return;if(snap.exists()&&Array.isArray(snap.data().categories)){applyRemoteCategories(snap.data().categories);return}if(settingsCreatingForUid!==activeUid){settingsCreatingForUid=activeUid;setDoc(activeSettings,{categories:structuredClone(DEFAULT_CATEGORIES),schemaVersion:SCHEMA_VERSION,updatedAt:serverTimestamp()}).catch(e=>setStatus(`カテゴリー初期化失敗: ${e.message}`)).finally(()=>{if(settingsCreatingForUid===activeUid)settingsCreatingForUid=''})}},err=>setStatus(`カテゴリー同期失敗: ${err.message}`));unsubscribeNotes=onSnapshot(query(activeNotes,orderBy('updatedAt','desc')),snap=>{if(currentUser?.uid!==activeUid)return;notes=snap.docs.map(x=>normalizeNote(x.id,x.data()));setStatus('同期済み');renderAll()},err=>setStatus(`同期失敗: ${err.message}`));try{await checkLegacy()}catch(e){setStatus(`移行状態の確認失敗: ${e.message}`)}}
 function applyRemoteCategories(nextCategories){let migrated=false;const prepared=nextCategories.map(category=>{const legacy=LEGACY_DEFAULT_CATEGORY_COLORS[category.id],standard=STANDARD_CATEGORY_COLOR_MIGRATIONS[category.id],savedColor=String(category.color||'').toLowerCase();if(legacy&&(savedColor===legacy[0]||standard&&savedColor===standard[0])){migrated=true;return{...category,color:standard?.[1]||legacy[1]}}return category});categories=orderedCategories(prepared);notes.forEach(note=>note.urls=extractUrls(note));renderAll();refreshEditorCategoryOptions();if(migrated)saveCategories(categories)}
 function refreshEditorCategoryOptions(){if(!editingNote||!$('editorDialog').open)return;const select=$('noteCategorySelect');const current=editingNote.categoryId;select.innerHTML=`<option value="">未分類</option>${categories.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}`;if(current===''||categories.some(c=>c.id===current)){select.value=current;updateEditorMode();return}editingNote.categoryId='';select.value='';updateEditorMode();scheduleSave()}
-function openEditor(note){foodEditor.reset();editingNote=structuredClone(note);ensureFormatStores(editingNote);editorBaseData=editorNoteData(note);editorSession=uid();editRevision=0;savedRevision=0;requestedRevision=0;saveInProgress=false;savePromise=Promise.resolve(true);updateEditor();$('editorDialog').showModal();setTimeout(()=>$('noteTitleInput').focus(),40)}
+function openEditor(note){foodEditor.reset();editingNote=structuredClone(note);ensureFormatStores(editingNote);editorBaseData=editorNoteData(note);editorSession=uid();editRevision=0;savedRevision=0;requestedRevision=0;saveInProgress=false;savePromise=Promise.resolve(true);updateEditor();$('editorDialog').showModal();setTimeout(()=>{if(isFoodNote(editingNote))$('foodAddItemButton').focus({preventScroll:true});else $('noteTitleInput').focus()},40)}
 function syncEditingNoteFromForm(readSpecialFields=true){
   if(!editingNote)return;
   const note=editingNote;
@@ -183,7 +188,7 @@ function syncEditingNoteFromForm(readSpecialFields=true){
     if(note.title.trim())$('taskTitleError').hidden=true;
   }
   if(isMangaNote(note)){ensureManga(note);if(readSpecialFields)mangaEditor.sync();if(note.title.trim())$('mangaTitleError').hidden=true}
-  if(isFoodNote(note)){ensureFood(note);if(readSpecialFields)foodEditor.sync()}
+  if(isFoodNote(note))ensureFoodList(note)
   rememberCurrentFormat(note);note.urls=extractUrls(note);
 }
 function updateEditor(){
@@ -210,7 +215,7 @@ function finishItemDrag(){const state=itemDragState;if(!state)return;const sourc
 function cancelItemDrag(){const state=itemDragState;if(!state)return;clearTimeout(state.timer);if(state.kind==='touch'){document.removeEventListener('touchmove',handleItemTouchMove);document.removeEventListener('touchend',finishItemTouch);document.removeEventListener('touchcancel',cancelItemTouch)}state.row.classList.remove('dragging');document.querySelectorAll('.draggable-item-row').forEach(row=>row.classList.remove('drop-before','drop-after'));document.body.classList.remove('item-drag-active');itemDragState=null}
 function moveDraggedItem(sourceIndex,targetIndex,before){if(!editingNote||sourceIndex===targetIndex)return;const [source]=editingNote.items.splice(sourceIndex,1);let insertAt=targetIndex;if(sourceIndex<targetIndex)insertAt--;if(!before)insertAt++;editingNote.items.splice(insertAt,0,source);editingNote.items.forEach((item,index)=>item.order=index);refreshRelatedLinks();renderItems();scheduleSave()}
 function trimUrlEnding(value){return value.replace(/[。、，．！？）】」』〉》;:,.]+$/u,'')}
-function extractUrls(note){const text=isMangaNote(note)?[note.content,mangaSearchText(mangaForNote(note))].join('\n'):isTaskNote(note)?[note.content,...taskForNote(note).items.map(item=>item.text)].join('\n'):note.type==='text'?note.content:note.items.map(i=>i.text).join('\n');const found=text.match(/https?:\/\/[^\s<>"']+/g)||[];const links=[];for(const raw of found){const url=trimUrlEnding(raw);try{const parsed=new URL(url);if((parsed.protocol==='http:'||parsed.protocol==='https:')&&!links.some(link=>link.url===parsed.href))links.push({url:parsed.href,title:'',domain:parsed.hostname.replace(/^www\./,'')})}catch{}}return links}
+function extractUrls(note){const text=note.foodList?[note.content,foodListSearchText(note.foodList)].join('\n'):isMangaNote(note)?[note.content,mangaSearchText(mangaForNote(note))].join('\n'):isTaskNote(note)?[note.content,...taskForNote(note).items.map(item=>item.text)].join('\n'):note.type==='text'?note.content:note.items.map(i=>i.text).join('\n');const found=text.match(/https?:\/\/[^\s<>"']+/g)||[];const links=[];for(const raw of found){const url=trimUrlEnding(raw);try{const parsed=new URL(url);if((parsed.protocol==='http:'||parsed.protocol==='https:')&&!links.some(link=>link.url===parsed.href))links.push({url:parsed.href,title:'',domain:parsed.hostname.replace(/^www\./,'')})}catch{}}return links}
 function hasStoredTypeContent(note,type){ensureFormatStores(note);return type==='text'?Boolean(note.contentByType.text.trim()):note.itemsByType[type].some(item=>String(item.text||'').trim())}
 function itemsFromText(content,checked=false){return String(content||'').split(/\r?\n/).map(text=>text.trim()).filter(Boolean).map((text,order)=>({id:uid(),text,checked,order}))}
 function convertCurrentContent(note,targetType){if(targetType==='text'){if(note.type==='text')return String(note.content||'');return note.items.map(item=>note.type==='checklist'?`${item.checked?'☑':'☐'} ${item.text}`:item.text).filter(text=>text.trim()).join('\n')}if(note.type==='text')return itemsFromText(note.content);return note.items.filter(item=>String(item.text||'').trim()).map((item,order)=>({id:uid(),text:String(item.text||''),checked:false,order}))}
@@ -218,8 +223,8 @@ function showStoredTypeContent(note,type){ensureFormatStores(note);note.type=typ
 function requestTypeChange(type){if(!editingNote||deletingNote||isTaskNote(editingNote)||isMangaNote(editingNote)||isFoodNote(editingNote)||type===editingNote.type)return;syncEditingNoteFromForm();if(hasStoredTypeContent(editingNote,type)){pendingType=type;$('typeConfirmDialog').showModal();return}applyTypeChange(type,'replace')}
 function applyTypeChange(type,mode='replace'){if(!type||!editingNote)return;syncEditingNoteFromForm();if(mode==='previous')showStoredTypeContent(editingNote,type);else{const converted=convertCurrentContent(editingNote,type);editingNote.type=type;if(type==='text'){editingNote.content=converted;editingNote.contentByType.text=converted}else{editingNote.items=converted;editingNote.itemsByType[type]=copyItems(converted)}}editingNote.urls=extractUrls(editingNote);pendingType='';updateEditor();scheduleSave()}
 function scheduleSave(){if(deletingNote||!editingNote)return;editRevision++;$('saveStatus').textContent='保存中…';clearTimeout(saveTimer);saveTimer=setTimeout(()=>requestSave(),550)}
-function noteData(note){rememberCurrentFormat(note);return{title:note.title,type:note.type,content:note.content,items:note.items,contentByType:note.contentByType,itemsByType:note.itemsByType,categoryId:note.categoryId,task:note.task?normalizeTask(note.task):null,manga:note.manga?normalizeManga(note.manga):null,food:note.food?normalizeFood(note.food):null,urls:extractUrls(note),isPinned:note.isPinned,schemaVersion:SCHEMA_VERSION}}
-function editorNoteData(note){const copy=structuredClone(note);if(isTaskNote(copy))ensureTask(copy);if(isFoodNote(copy))ensureFood(copy);return noteData(copy)}
+function noteData(note){rememberCurrentFormat(note);return{title:note.title,type:note.type,content:note.content,items:note.items,contentByType:note.contentByType,itemsByType:note.itemsByType,categoryId:note.categoryId,task:note.task?normalizeTask(note.task):null,manga:note.manga?normalizeManga(note.manga):null,food:note.food?normalizeFood(note.food):null,foodList:note.foodList?normalizeFoodList(note.foodList):null,urls:extractUrls(note),isPinned:note.isPinned,schemaVersion:SCHEMA_VERSION}}
+function editorNoteData(note){const copy=structuredClone(note);if(isTaskNote(copy))ensureTask(copy);if(isFoodNote(copy))ensureFoodList(copy);return noteData(copy)}
 function captureSaveSnapshot(){syncEditingNoteFromForm();return{note:structuredClone(editingNote),base:structuredClone(editorBaseData),uid:currentUser?.uid,session:editorSession,revision:editRevision}}
 function requestSave(){requestedRevision=Math.max(requestedRevision,editRevision);if(saveInProgress)return savePromise;if(requestedRevision<=savedRevision)return Promise.resolve(true);savePromise=drainSaveQueue();return savePromise}
 async function drainSaveQueue(){saveInProgress=true;try{while(savedRevision<requestedRevision){const revision=requestedRevision;const snapshot=captureSaveSnapshot();const result=await persistSnapshot(snapshot);if(!result.ok)return false;savedRevision=revision}return true}finally{saveInProgress=false}}
@@ -231,7 +236,28 @@ async function persistSnapshot(snapshot){
   $('saveStatus').textContent='保存中…';
   try{
     let savedData=noteData(snapshot.note);
-    if(isNew){
+    if(isFoodNote(snapshot.note)&&snapshot.note.id===foodInventoryId(snapshot.note.categoryId)){
+      const target=doc(db,'users',snapshot.uid,'iroiroNotes',snapshot.note.id);
+      savedData=await runTransaction(db,async transaction=>{
+        const latest=await transaction.get(target);
+        requireActiveUser(snapshot.uid);
+        if(!latest.exists()&&!snapshot.note.inventoryDraft)throw new Error('別の端末で食材カードが削除されました。入力を保持しています。');
+        const importSources=[];
+        for(const source of snapshot.note.inventoryImportSources||[]){
+          const current=await transaction.get(doc(db,'users',snapshot.uid,'iroiroNotes',source.id));
+          if(!current.exists()||JSON.stringify(noteData(normalizeNote(source.id,current.data())))!==JSON.stringify(source.data))throw new Error('以前の食材が別の端末で変更されました。入力を保持しています。一覧を開き直して確認してください。');
+          importSources.push(normalizeNote(source.id,current.data()));
+        }
+        requireActiveUser(snapshot.uid);
+        const remote=latest.exists()?editorNoteData(normalizeNote(snapshot.note.id,latest.data())):structuredClone(snapshot.base);
+        if(latest.exists()&&importSources.length)remote.foodList=foodInventoryFromSources(snapshot.note.categoryId,[{...remote,id:snapshot.note.id},...importSources]).foodList;
+        const merged=mergeNoteData(snapshot.base,noteData(snapshot.note),remote);merged.urls=extractUrls(merged);
+        if(latest.exists())transaction.update(target,{...merged,updatedAt:serverTimestamp()});
+        else transaction.set(target,{...merged,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+        return merged;
+      });
+      if(editingNote&&editorSession===snapshot.session){editingNote.inventoryDraft=false;editingNote.inventoryImportSources=[]}
+    }else if(isNew){
       const created=await addDoc(refs().notes,{...noteData(snapshot.note),createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
       if(editingNote&&editorSession===snapshot.session&&!editingNote.id)editingNote.id=created.id;
     }else {
@@ -282,6 +308,7 @@ async function persistSnapshot(snapshot){
 }
 async function closeEditor(){
   if(closingEditor||!editingNote)return;
+  if(!foodEditor.canClose())return;
   syncEditingNoteFromForm();if(!noteTitleValid(editingNote))return;
   closingEditor=true;
   try{
@@ -317,7 +344,6 @@ function cardPinButton(note){
 }
 async function openCardNote(id){
   const activeUid=currentUser?.uid;
-  if(pendingFoodWrites.has(`${activeUid}:${id}`))return;
   const pending=pendingPinWrites.get(`${activeUid}:${id}`);
   if(pending)await pending.promise;
   if(currentUser?.uid!==activeUid)return;
@@ -360,57 +386,27 @@ function renderMangaCard(note){
 function renderNoteCard(n){
   if(isTaskNote(n))return renderTaskCard(n);
   if(isMangaNote(n))return renderMangaCard(n);
-  if(isFoodNote(n))return renderFoodCard(n);
+  if(isFoodNote(n))return renderFoodSummaryCard(n);
   const c=getCategory(n.categoryId)||{name:'未分類',color:'#6B7280'},color=categoryColor(c.color),progress=n.type==='checklist'?`${n.items.filter(i=>i.checked).length}/${n.items.length}完了`:'',linkInfo=n.urls.length?`🔗 ${n.urls.length}件`:'';
   return`<article class="note-card" data-id="${escapeHtml(n.id)}"><div class="card-top"><span class="type-icon">${n.type==='text'?'▤':n.type==='bullet'?'☷':'☑'}</span><h3 class="card-title"><button type="button" class="card-open" data-open-note="${escapeHtml(n.id)}" aria-label="${escapeHtml(displayTitle(n))}の詳細を開く">${escapeHtml(displayTitle(n))}</button></h3></div>${cardPreviewHtml(n)}<footer class="card-footer"><div class="card-footer-left"><span class="category-pill" style="background:${color};color:${categoryTextColor(color)}">${escapeHtml(c.name)}</span><span>更新 ${shortDate(n.updatedAt)}</span>${linkInfo?`<span>${linkInfo}</span>`:''}</div><div class="card-footer-right">${progress?`<span class="card-progress">${progress}</span>`:''}${cardPinButton(n)}</div></footer></article>`;
 }
-function renderFoodSummaryCard(list){
-  const categoryId=list[0].categoryId,available=list.filter(note=>foodForNote(note).remainingGrams!==0);
-  const soon=available.filter(note=>foodForNote(note).useSoon).length;
-  const preview=available.slice(0,3).map(note=>{const grams=foodForNote(note).remainingGrams;return `${displayTitle(note)} ${grams===null?'未計量':`${grams}g`}`}).join(' / ');
-  return `<article class="note-card food-summary-card" data-food-category="${escapeHtml(categoryId)}"><div class="card-top"><span class="type-icon" aria-hidden="true">🥬</span><h3 class="card-title"><button type="button" class="card-open" data-open-food-list="${escapeHtml(categoryId)}" aria-label="食材の一覧を開く">食材</button></h3></div><p class="food-summary-count">在庫 ${available.length}件${soon?` · 早めに使いたい ${soon}件`:''}</p><p class="card-preview">${escapeHtml(preview||'在庫のある食材はありません。')}${available.length>3?' …':''}</p><footer class="card-footer"><span>開いて食材をまとめて管理</span><span aria-hidden="true">→</span></footer></article>`;
-}
-function renderFoodCard(note){
-  const food=foodForNote(note),title=displayTitle(note),depleted=food.remainingGrams===0;
-  const busy=pendingFoodWrites.has(`${currentUser?.uid}:${note.id}`);
-  const expiry=food.expiryDate?`${FOOD_EXPIRY_LABELS[food.expiryKind]||'期限'} ${food.expiryDate}`:'';
-  return `<article class="food-row ${depleted?'food-depleted':''}" data-id="${escapeHtml(note.id)}">
-    <button type="button" class="food-card-open" data-open-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}の詳細を開く">
-      <span class="food-card-name">${escapeHtml(title)}</span><span class="food-card-grams">${food.remainingGrams===null?'未計量':`${food.remainingGrams}<small>g</small>`}</span>
-      <span class="food-card-details">${escapeHtml([FOOD_STORAGE_LABELS[food.storage],food.useSoon&&!depleted?'★ 早めに使いたい':'',expiry].filter(Boolean).join(' · '))||'タップして量や保存場所を編集'}</span>
-    </button><div class="food-card-actions">${depleted&&food.restoreGrams!==null?`<button type="button" class="quiet-button" data-food-action="${escapeHtml(note.id)}" data-food-undo="true" ${busy?'disabled':''}>使用を戻す</button>`:!depleted?`<button type="button" class="quiet-button" data-food-action="${escapeHtml(note.id)}" ${busy||food.remainingGrams===null?'disabled':''}>使い切った</button>`:''}${cardPinButton(note)}</div></article>`;
-}
-async function changeFoodStock(id,undo=false){
-  const note=notes.find(item=>item.id===id),activeUid=currentUser?.uid,key=`${activeUid}:${id}`;
-  if(!activeUid||!isFoodNote(note)||pendingFoodWrites.has(key))return false;
-  const expected=foodForNote(note);if(undo?expected.restoreGrams===null:!validGrams(expected.remainingGrams)||expected.remainingGrams<=0)return false;
-  pendingFoodWrites.add(key);renderAll();
-  try{
-    const updated=await runTransaction(db,async transaction=>{
-      const target=doc(db,'users',activeUid,'iroiroNotes',id),snap=await transaction.get(target);requireActiveUser(activeUid);
-      if(!snap.exists()||!isFoodCategory(snap.data().categoryId))throw new Error('食材の記録が変更されています。再読み込みして確認してください。');
-      const food=normalizeFood(snap.data().food);
-      if(food.remainingGrams!==expected.remainingGrams||food.restoreGrams!==expected.restoreGrams)throw new Error('別の端末で残量が変更されました。最新の残量を確認してください。');
-      const next=undo?{...food,remainingGrams:food.restoreGrams,restoreGrams:null}:consumeFood(food,food.remainingGrams);
-      transaction.update(target,{'food.remainingGrams':next.remainingGrams,'food.restoreGrams':next.restoreGrams,updatedAt:serverTimestamp(),schemaVersion:SCHEMA_VERSION});return next;
-    });
-    if(currentUser?.uid===activeUid){const current=notes.find(item=>item.id===id);if(current)current.food=updated}
-    return true;
-  }catch(e){if(currentUser?.uid===activeUid)setStatus(`食材の残量を保存できませんでした: ${e.message}`);return false}
-  finally{pendingFoodWrites.delete(key);if(currentUser?.uid===activeUid)renderAll()}
+function renderFoodSummaryCard(note){
+  const rows=ensureFoodList(note).items,available=rows.filter(item=>!item.checked),category=getCategory(note.categoryId)||{name:'食材',color:'#38A169'};
+  const preview=rows.slice(0,3).map(item=>`<div class="card-list-item ${item.checked?'completed':''}">${item.checked?'☑':'□'} ${escapeHtml(item.name)}　${escapeHtml(formatFoodQuantity(item))}</div>`).join('');
+  return `<article class="note-card food-summary-card" data-food-category="${escapeHtml(note.categoryId)}"><div class="card-top"><span class="type-icon" aria-hidden="true">☑</span><h3 class="card-title"><button type="button" class="card-open" data-open-food-list="${escapeHtml(note.categoryId)}" aria-label="食材カードを開く">食材</button></h3></div><div class="card-preview card-list-preview">${preview||'＋から食材を追加できます。'}${rows.length>3?'<div>…</div>':''}</div><footer class="card-footer"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span>${available.length}項目${rows.length!==available.length?`（選択中${rows.length-available.length}項目）`:''}</span><span>開いて編集 →</span></footer></article>`;
 }
 function renderNotes(){
   const term=$('searchInput').value.trim().toLowerCase(),taskView=isTaskCategory(selectedCategory),mangaView=isMangaCategory(selectedCategory),foodView=isFoodCategory(selectedCategory);
-  $('notesGrid').classList.toggle('food-list',foodView);$('completedFoodsGrid').classList.add('food-list');
+  $('notesGrid').classList.remove('food-list');
   $('taskDueSortOption').hidden=!taskView;
   if(!taskView&&$('sortSelect').value==='task-due')$('sortSelect').value='updated-desc';
-  const shown=notes.filter(note=>{
+  const displayNotes=[...notes.filter(note=>!isFoodNote(note)),...categories.filter(category=>isFoodCategory(category.id)).map(category=>getFoodInventory(category.id))];
+  const shown=displayNotes.filter(note=>{
     const category=getCategory(note.categoryId)?.name||'未分類',task=isTaskNote(note)?taskForNote(note):null;
-    return(selectedCategory==='all'||(selectedCategory===''?!getCategory(note.categoryId):note.categoryId===selectedCategory))&&[note.title,note.content,category,...note.items.map(item=>item.text),...(task?task.items.map(item=>item.text):[]),...(isMangaNote(note)?[mangaSearchText(mangaForNote(note))]:[]),...(isFoodNote(note)?[foodSearchText(foodForNote(note))]:[]),...extractUrls(note).map(link=>link.url)].join(' ').toLowerCase().includes(term);
+    return(selectedCategory==='all'||(selectedCategory===''?!getCategory(note.categoryId):note.categoryId===selectedCategory))&&[note.title,note.content,category,...note.items.map(item=>item.text),...(task?task.items.map(item=>item.text):[]),...(isMangaNote(note)?[mangaSearchText(mangaForNote(note))]:[]),...(isFoodNote(note)?[foodListSearchText(ensureFoodList(note))]:[]),...extractUrls(note).map(link=>link.url)].join(' ').toLowerCase().includes(term);
   });
   const sort=$('sortSelect').value;
   shown.sort((a,b)=>{
-    if(foodView&&foodForNote(a).useSoon!==foodForNote(b).useSoon)return foodForNote(a).useSoon?-1:1;
     const done=Number(isTaskNote(a)&&taskForNote(a).status==='done')-Number(isTaskNote(b)&&taskForNote(b).status==='done');
     if(done)return done;
     if(a.isPinned!==b.isPinned)return a.isPinned?-1:1;
@@ -419,35 +415,26 @@ function renderNotes(){
     const key=sort.startsWith('created')?'createdAt':'updatedAt';
     return sort.endsWith('asc')?dateMillis(a[key])-dateMillis(b[key]):dateMillis(b[key])-dateMillis(a[key]);
   });
-  const complete=taskView?shown.filter(note=>taskForNote(note).status==='done'):[],depleted=foodView?shown.filter(note=>foodForNote(note).remainingGrams===0):[],active=taskView?shown.filter(note=>taskForNote(note).status!=='done'):foodView?shown.filter(note=>foodForNote(note).remainingGrams!==0):shown;
+  const complete=taskView?shown.filter(note=>taskForNote(note).status==='done'):[],active=taskView?shown.filter(note=>taskForNote(note).status!=='done'):shown;
   $('listTitle').textContent=selectedCategory==='all'?'すべてのメモ':selectedCategory===''?'未分類':getCategory(selectedCategory)?.name||'カテゴリー';
-  $('completedFoods').hidden=!depleted.length;$('completedFoodsSummary').textContent=`使い切った食材（${depleted.length}件）`;$('completedFoodsGrid').innerHTML=depleted.map(renderFoodCard).join('');
-  $('foodListHint').hidden=!foodView;$('foodEmptyState').hidden=!foodView||active.length>0||shown.length===0;
-  const groupedFoods=selectedCategory==='all'?active.filter(isFoodNote):[];
-  const cards=[];let foodSummaryAdded=false;
-  for(const note of active){
-    if(groupedFoods.length&&isFoodNote(note)){
-      if(!foodSummaryAdded){cards.push(renderFoodSummaryCard(groupedFoods));foodSummaryAdded=true}
-    }else cards.push(renderNoteCard(note));
-  }
-  $('noteCount').textContent=foodView?`在庫 ${active.length}件（使い切り${depleted.length}件）`:taskView?`${shown.length}件（未完了${active.length}件）`:groupedFoods.length?`${cards.length}件（食材${groupedFoods.length}件を1枚に集約）`:`${shown.length}件`;
-  $('notesGrid').innerHTML=cards.join('');$('completedTasksGrid').innerHTML=complete.map(renderTaskCard).join('');
+  $('completedFoods').hidden=true;$('completedFoodsGrid').innerHTML='';$('foodListHint').hidden=!foodView;$('foodEmptyState').hidden=true;
+  $('noteCount').textContent=taskView?`${shown.length}件（未完了${active.length}件）`:`${shown.length}件`;
+  $('notesGrid').innerHTML=active.map(renderNoteCard).join('');$('completedTasksGrid').innerHTML=complete.map(renderTaskCard).join('');
   $('completedTasks').hidden=!complete.length;$('completedTasksSummary').textContent=`完了したタスク（${complete.length}件）`;
   $('taskEmptyState').hidden=!taskView||active.length>0||shown.length===0;
   $('emptyState').hidden=shown.length>0;
   $('emptyStateTitle').textContent=term?'検索条件に合うメモがありません':taskView?'まだタスクがありません':mangaView?'まだ漫画ネタがありません':foodView?'家にある食材を登録しましょう':'まだメモがありません';
-  $('emptyStateMessage').textContent=term?'検索語やカテゴリーを変更してください。':taskView?'右下の＋から、タスクを追加できます。':mangaView?'右下の＋から、漫画ネタを追加できます。':foodView?'右下の＋から、食材名と残っているg数を入力できます。':'右下の＋から、思いつきをすぐ残せます。';
-  const createLabel=taskView?'新しいタスク':mangaView?'新しい漫画ネタ':foodView?'新しい食材':'新しいメモ';$('createNoteButton').setAttribute('aria-label',`${createLabel}を作成`);$('createNoteButton').title=createLabel;
+  $('emptyStateMessage').textContent=term?'検索語やカテゴリーを変更してください。':taskView?'右下の＋から、タスクを追加できます。':mangaView?'右下の＋から、漫画ネタを追加できます。':foodView?'食材カードを開いて項目を追加できます。':'右下の＋から、思いつきをすぐ残せます。';
+  const createLabel=taskView?'新しいタスク':mangaView?'新しい漫画ネタ':foodView?'食材を追加':'新しいメモ';$('createNoteButton').setAttribute('aria-label',foodView?'食材を追加':`${createLabel}を作成`);$('createNoteButton').title=createLabel;
   document.querySelectorAll('.note-card').forEach(card=>card.onclick=e=>{
     // 個別の操作ボタンから詳細画面を開かない。
     if(e.target.closest('.task-complete-control,[data-open-note],[data-pin-note],[data-food-action],[data-open-food-list]'))return;
-    if(card.dataset.foodCategory)return selectCategory(card.dataset.foodCategory);
+    if(card.dataset.foodCategory)return openFoodInventory(card.dataset.foodCategory);
     return openCardNote(card.dataset.id);
   });
-  document.querySelectorAll('[data-open-food-list]').forEach(button=>button.onclick=()=>selectCategory(button.dataset.openFoodList));
+  document.querySelectorAll('[data-open-food-list]').forEach(button=>button.onclick=()=>openFoodInventory(button.dataset.openFoodList));
   document.querySelectorAll('[data-open-note]').forEach(button=>button.onclick=()=>openCardNote(button.dataset.openNote));
   document.querySelectorAll('[data-pin-note]').forEach(button=>button.onclick=e=>{e.stopPropagation();return toggleNotePin(button.dataset.pinNote)});
-  document.querySelectorAll('[data-food-action]').forEach(button=>button.onclick=e=>{e.stopPropagation();return changeFoodStock(button.dataset.foodAction,button.dataset.foodUndo==='true')});
   document.querySelectorAll('[data-task-complete]').forEach(input=>input.onchange=()=>toggleTaskComplete(input.dataset.taskComplete,input.checked));
 }
 async function toggleTaskComplete(id,completed){
@@ -555,8 +542,8 @@ function renameCategory(category,name){name=name.trim();if(!name||categories.som
 function addCategory(){const name=$('newCategoryName').value.trim();if(!name||categories.some(c=>c.name.toLowerCase()===name.toLowerCase())){$('categoryError').textContent='空欄または重複するカテゴリー名は追加できません。';return}const next=[...categories,{id:uid(),name,color:$('newCategoryColor').value,order:categories.length}];$('newCategoryName').value='';saveCategories(next).then(ok=>ok&&renderCategoryManagement())}
 function confirmCategoryDelete(category){if(!category||category.id===''||category.name==='未分類'){ $('categoryError').textContent='未分類は削除できません。';return }pendingCategoryId=category.id;$('categoryConfirmTitle').textContent=`カテゴリー「${category.name}」を削除しますか？`;$('categoryConfirmDialog').showModal()}
 async function deletePendingCategory(){const category=getCategory(pendingCategoryId);if(!category)return;const used=notes.filter(note=>note.categoryId===category.id);try{if(used.length){const batch=writeBatch(db);used.forEach(note=>batch.update(doc(refs().notes,note.id),{categoryId:'',updatedAt:serverTimestamp()}));await batch.commit()}const next=categories.filter(c=>c.id!==category.id);const saved=await saveCategories(next);if(!saved)throw new Error('カテゴリー設定を保存できませんでした');$('categoryConfirmDialog').close();pendingCategoryId='';renderCategoryManagement()}catch(e){$('categoryError').textContent=`削除に失敗しました: ${e.message}`}}
-function confirmDelete(){if(!closingEditor&&!deletingNote&&editingNote)$('confirmDialog').showModal()}
-async function deleteCurrentNote(){if(closingEditor||deletingNote||!editingNote)return;deletingNote=true;$('deleteNoteButton').disabled=true;clearTimeout(saveTimer);saveTimer=null;try{if(saveInProgress||requestedRevision>savedRevision){const saved=await requestSave();if(!saved)throw new Error('保存中の変更を完了できませんでした')}const noteId=editingNote?.id;if(noteId)await deleteDoc(doc(refs().notes,noteId));$('confirmDialog').close();$('editorDialog').close();editingNote=null;editorSession='';editRevision=0;savedRevision=0;requestedRevision=0;savePromise=Promise.resolve(true)}catch(e){setStatus(`削除失敗: ${e.message}`);$('saveStatus').textContent='削除できませんでした。内容を確認してもう一度お試しください。'}finally{deletingNote=false;$('deleteNoteButton').disabled=false}}
+function confirmDelete(){if(isFoodNote(editingNote))return;if(!closingEditor&&!deletingNote&&editingNote)$('confirmDialog').showModal()}
+async function deleteCurrentNote(){if(isFoodNote(editingNote))return;if(closingEditor||deletingNote||!editingNote)return;deletingNote=true;$('deleteNoteButton').disabled=true;clearTimeout(saveTimer);saveTimer=null;try{if(saveInProgress||requestedRevision>savedRevision){const saved=await requestSave();if(!saved)throw new Error('保存中の変更を完了できませんでした')}const noteId=editingNote?.id;if(noteId)await deleteDoc(doc(refs().notes,noteId));$('confirmDialog').close();$('editorDialog').close();editingNote=null;editorSession='';editRevision=0;savedRevision=0;requestedRevision=0;savePromise=Promise.resolve(true)}catch(e){setStatus(`削除失敗: ${e.message}`);$('saveStatus').textContent='削除できませんでした。内容を確認してもう一度お試しください。'}finally{deletingNote=false;$('deleteNoteButton').disabled=false}}
 async function checkLegacy(){let legacy=[];try{legacy=JSON.parse(localStorage.getItem(LEGACY_KEY)||'[]')}catch{}const marker=await getDoc(refs().migration);$('migrationPanel').hidden=!(legacy.length&&!marker.exists())}
 async function legacyNoteId(raw,index){
   const original=raw.id==null?'':String(raw.id);
@@ -611,6 +598,14 @@ function validateBackup(raw){
     if(entry.note.food!==undefined&&entry.note.food!==null){
       const food=entry.note.food;
       if(!isRecord(food)||(food.remainingGrams!==null&&!validGrams(food.remainingGrams))||(food.restoreGrams!=null&&!validGrams(food.restoreGrams))||(food.expiryDate&&!validTaskDate(food.expiryDate)))throw new Error('食材の残量または期限が不正です。');
+    }
+    if(entry.note.foodList!==undefined&&entry.note.foodList!==null){
+      const list=entry.note.foodList,seen=new Set();
+      if(!isRecord(list)||!Array.isArray(list.items)||!isRecord(list.importedSources||{}))throw new Error('食材リストの形式が不正です。');
+      for(const item of list.items){
+        if(!isRecord(item)||typeof item.id!=='string'||!item.id||seen.has(item.id)||typeof item.name!=='string'||typeof item.quantity!=='string'||(item.quantity!==''&&item.quantity!=='0'&&parseFoodQuantity(item.quantity)===null)||typeof item.unit!=='string'||item.unit.length>20||(item.expiryDate&&!validTaskDate(item.expiryDate)))throw new Error('食材の量・単位・IDが不正です。');
+        seen.add(item.id);
+      }
     }
     ids.add(entry.id);
     const note=normalizeNote(entry.id,entry.note);
