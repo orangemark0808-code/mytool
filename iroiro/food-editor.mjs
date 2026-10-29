@@ -1,6 +1,20 @@
 import { FOOD_UNITS, FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFoodItem, normalizeFoodList, parseFoodQuantity, formatFoodQuantity } from './food-core.mjs?v=2026-10-28-03';
 import { validTaskDate } from './task-core.mjs';
 
+const USUAL_FOODS=[
+  {name:'豚こま肉',quantity:'300',unit:'g',storage:'chilled'},
+  {name:'鶏もも肉',quantity:'250',unit:'g',storage:'chilled'},
+  {name:'鶏むね肉',quantity:'250',unit:'g',storage:'chilled'},
+  {name:'豚ミンチ',quantity:'280',unit:'g',storage:'chilled'},
+  {name:'鮭中辛',quantity:'4',unit:'個',storage:'chilled'},
+  {name:'ぶなしめじ',quantity:'1',unit:'パック',storage:'chilled'},
+  {name:'まいたけ',quantity:'1',unit:'パック',storage:'chilled'},
+  {name:'卵',quantity:'10',unit:'個',storage:'chilled'},
+  {name:'豆腐',quantity:'150',unit:'g',storage:'chilled'},
+  {name:'玉ねぎみじん切り',quantity:'',unit:'g',storage:'frozen'},
+  {name:'ブロッコリー',quantity:'',unit:'g',storage:'frozen'},
+  {name:'ささがきごぼう',quantity:'',unit:'g',storage:'frozen'}
+];
 const FOOD_PRESETS={
   '肉・魚・卵':['豚こま','豚バラ肉','豚ロース肉','豚ひき肉','鶏もも肉','鶏むね肉','鶏ささみ','鶏ひき肉','牛こま','牛ひき肉','合いびき肉','鮭','さば','ぶり','たら','えび','卵'],
   '野菜・きのこ':['キャベツ','白菜','レタス','玉ねぎ','にんじん','じゃがいも','大根','長ねぎ','小ねぎ','きゅうり','トマト','なす','ピーマン','ブロッコリー','ほうれん草','小松菜','もやし','かぼちゃ','しめじ','えのき','しいたけ'],
@@ -68,8 +82,8 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
       return `<div class="food-check-row ${item.checked?'is-checked':''}"><label class="food-check-control"><input type="checkbox" data-food-check="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}を選択" ${item.checked?'checked':''}></label><button type="button" class="food-item-open" data-food-edit="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}を編集"><span class="food-item-name">${escape(item.name)}</span><span class="food-item-quantity">${escape(formatFoodQuantity(item))}</span>${meta?`<span class="food-item-meta">${escape(meta)}</span>`:''}${item.memo?`<span class="food-item-meta food-item-memo">${escape(item.memo)}</span>`:''}</button></div>`;
     }).join('');
     $('foodItemsEmpty').hidden=rows.length>0;$('foodDeleteCheckedButton').disabled=!checked;$('foodUndoDeleteButton').hidden=!undoItems.length;
-    const presets=new Set(Object.values(FOOD_PRESETS).flat()),registered=[...new Set(rows.map(item=>item.name).filter(name=>name&&!presets.has(name)))];
-    const groups={...FOOD_PRESETS,...(registered.length?{'登録済みの食材':registered}:{})},selected=$('foodPresetSelect').value;
+    const usualNames=new Set(USUAL_FOODS.map(item=>item.name)),presets=new Set([...usualNames,...Object.values(FOOD_PRESETS).flat()]),registered=[...new Set(rows.map(item=>item.name).filter(name=>name&&!presets.has(name)))];
+    const groups={'いつもの食材':[...usualNames],...Object.fromEntries(Object.entries(FOOD_PRESETS).map(([label,names])=>[label,names.filter(name=>!usualNames.has(name))])),...(registered.length?{'登録済みの食材':registered}:{})},selected=$('foodPresetSelect').value;
     $('foodPresetSelect').innerHTML='<option value="">定番の食材から選ぶ（任意）</option>'+Object.entries(groups).map(([label,names])=>`<optgroup label="${escape(label)}">${names.map(name=>`<option value="${escape(name)}">${escape(name)}</option>`).join('')}</optgroup>`).join('');
     $('foodPresetSelect').value=selected;
   }
@@ -83,7 +97,13 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
   function bind(){
     $('foodAddItemButton').onclick=()=>openDraft();$('foodItemSubmitButton').onclick=()=>commitDraft();$('foodDuplicateButton').onclick=()=>commitDraft(2);
     $('foodItemCancelButton').onclick=()=>{clearDraft();$('foodItemForm').hidden=true};$('foodDeleteCheckedButton').onclick=deleteChecked;$('foodUndoDeleteButton').onclick=undoDelete;
-    $('foodPresetSelect').onchange=()=>{const name=$('foodPresetSelect').value;if(!name)return;$('foodItemNameInput').value=name;dirty=true;error('');$('foodPresetSelect').value='';$('foodItemNameInput').focus()};
+    $('foodPresetSelect').onchange=()=>{
+      const name=$('foodPresetSelect').value;if(!name)return;
+      $('foodItemNameInput').value=name;
+      const usual=USUAL_FOODS.find(item=>item.name===name);
+      if(usual){$('foodQuantityInput').value=usual.quantity;setUnit(usual.unit);$('foodStorageInput').value=usual.storage}
+      dirty=true;error('');$('foodPresetSelect').value='';$('foodItemNameInput').focus();
+    };
     $('foodItemNameInput').onkeydown=event=>{if(event.key==='Enter'&&!event.isComposing&&event.keyCode!==229){event.preventDefault();event.stopPropagation();commitDraft()}};
     for(const id of ['foodItemNameInput','foodQuantityInput','foodUnitInput','foodCustomUnitInput','foodStorageInput','foodUseSoonInput','foodExpiryKindInput','foodExpiryDateInput','foodItemMemoInput'])$(id).addEventListener(id==='foodUseSoonInput'?'change':'input',()=>{dirty=true;error('');updateCustomUnit()});
     $('foodUnitInput').addEventListener('change',()=>{dirty=true;updateCustomUnit()});
