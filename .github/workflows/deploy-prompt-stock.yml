@@ -97,6 +97,7 @@ jobs:
           cp "iroiro/task-add.mjs" "dist/iroiro/task-add.mjs"
           cp "iroiro/task-core.mjs" "dist/iroiro/task-core.mjs"
           cp "iroiro/food-core.mjs" "dist/iroiro/food-core.mjs"
+          cp "iroiro/food-read.mjs" "dist/iroiro/food-read.mjs"
           cp "iroiro/food-editor.mjs" "dist/iroiro/food-editor.mjs"
           cp "iroiro/food-presets.mjs" "dist/iroiro/food-presets.mjs"
           cp "iroiro/food-preset-manager.mjs" "dist/iroiro/food-preset-manager.mjs"

@@ -1,4 +1,5 @@
 import { appendTask } from './task-add.mjs?v=2026-10-25-03';
+import { readFoodInventory } from './food-read.mjs?v=2026-10-29-09';
 // Same-origin browser-only authentication bridge. No Firebase credentials are
 // sent to the dashboard origin or its server; only selected task fields leave.
 const targetOrigin = "https://daily-notice.ohana888.chatgpt.site";
@@ -58,19 +59,19 @@ const authError = error => String(error?.code || "").startsWith("auth/") || ["pe
 function background() {
   const cancelled = new Set();
   let reading = false, authorizing = false;
-  const send = (id, value) => {
-    if (!cancelled.has(id)) window.parent.postMessage({ type: "iroiro-tasks-result", requestId: id, ...value }, targetOrigin);
+  const send = (id, value, resource="tasks") => {
+    if (!cancelled.has(id)) window.parent.postMessage({ type: resource==="foods"?"iroiro-foods-result":"iroiro-tasks-result", requestId: id, ...value }, targetOrigin);
   };
-  const read = async (id,addition=null) => {
-    if (reading || authorizing) { send(id, { error: "busy" }); return; }
+  const read = async (id,addition=null,resource="tasks") => {
+    if (reading || authorizing) { send(id, { error: "busy" },resource); return; }
     reading = true;
     let added=false;
     try {
       if(addition){await appendTask(await client(),addition);added=true;}
-      const tasks=await readTasks();
-      send(id,{...tasks,added,operationId:addition?.operationId});
+      const data=resource==="foods"?await readFoodInventory(await client()):await readTasks();
+      send(id,{...data,added,operationId:addition?.operationId},resource);
     }
-    catch (error) { send(id, { added,operationId:addition?.operationId,error: authError(error) ? "auth-required" : addition ? error.message : "read-failed" }); }
+    catch (error) { send(id, { added,operationId:addition?.operationId,error: authError(error) ? "auth-required" : resource==="foods"?error.message:addition ? error.message : "read-failed" },resource); }
     finally { reading = false; }
   };
   window.addEventListener("message", event => {
@@ -81,9 +82,12 @@ function background() {
       return;
     }
     if (cancelled.has(id)) return;
+    if (event.data.type === "iroiro-background-ping") { window.parent.postMessage({type:"iroiro-background-ready",requestId:id},targetOrigin);return; }
+    if (event.data.type === "iroiro-foods-request") { void read(id,null,"foods"); return; }
     if (event.data.type === "iroiro-tasks-request") { void read(id); return; }
     if (event.data.type === "iroiro-task-add") { void read(id,event.data.addition); return; }
     if (event.data.type !== "iroiro-auth-channel" || !event.ports[0]) return;
+    const resource=event.data.resource==="foods"?"foods":"tasks";
     const port = event.ports[0]; let used = false;
     port.onmessage = async message => {
       if (used || cancelled.has(id)) { port.close(); return; }
@@ -103,9 +107,9 @@ function background() {
         if (cancelled.has(id)) return;
         port.postMessage({ type: "authorized", requestId: id });
         authorizing = false;
-        await read(id);
+        await read(id,null,resource);
       } catch {
-        port.postMessage({ type: "failed", requestId: id }); send(id, { error: "auth-required" });
+        port.postMessage({ type: "failed", requestId: id }); send(id, { error: "auth-required" },resource);
       } finally { authorizing = false; port.close(); }
     };
     port.start();
