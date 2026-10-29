@@ -6,11 +6,11 @@ import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFire
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.23-1';
 import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.23-1';
 import { mergeNoteData } from './note-concurrency.mjs?v=2026-10-25-03';
-import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-29-02';
-import { createFoodEditor } from './food-editor.mjs?v=2026-10-29-02';
+import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-29-03';
+import { createFoodEditor } from './food-editor.mjs?v=2026-10-29-03';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026-10-29-02'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-29-03'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -67,10 +67,14 @@ function getFoodInventory(categoryId){
   result.inventoryDraft=!stored;
   result.inventoryImportSources=sources.filter(note=>note.id!==projection.id&&!Object.hasOwn(stored?.foodList?.importedSources||{},note.id)).map(note=>({id:note.id,data:noteData(structuredClone(note))}));
   result.inventoryDeleteSources=sources.map(note=>({id:note.id,data:noteData(structuredClone(note))}));
+  const pin=pendingPinWrites.get(`${currentUser?.uid}:${result.id}`);if(pin)result.isPinned=pin.next;
   return result;
 }
-function openFoodInventory(categoryId){
+async function openFoodInventory(categoryId){
   if(!currentUser||!isFoodCategory(categoryId))return;
+  const activeUid=currentUser.uid,pending=pendingPinWrites.get(`${activeUid}:${foodInventoryId(categoryId)}`);
+  if(pending)await pending.promise;
+  if(currentUser?.uid!==activeUid)return;
   openEditor(getFoodInventory(categoryId));
 }
 function isTaskCategory(id){return getCategory(id)?.name.trim()==='タスク'}
@@ -365,6 +369,8 @@ async function openCardNote(id){
   const note=notes.find(item=>item.id===id);if(note)openEditor(note);
 }
 function toggleNotePin(id){
+  const foodCategory=categories.find(category=>isFoodCategory(category.id)&&foodInventoryId(category.id)===id);
+  if(foodCategory)return toggleFoodInventoryPin(foodCategory.id);
   const note=notes.find(item=>item.id===id);
   if(!currentUser||!note)return Promise.resolve(false);
   const activeUid=currentUser.uid,key=`${activeUid}:${id}`;
@@ -384,6 +390,36 @@ function toggleNotePin(id){
       }
       return false;
     }finally{pendingPinWrites.delete(key);if(currentUser?.uid===activeUid)renderAll()}
+  })();
+  return operation.promise;
+}
+function toggleFoodInventoryPin(categoryId){
+  if(!currentUser)return Promise.resolve(false);
+  const activeUid=currentUser.uid,id=foodInventoryId(categoryId),key=`${activeUid}:${id}`;
+  if(pendingPinWrites.has(key))return Promise.resolve(false);
+  const next=!getFoodInventory(categoryId).isPinned,sources=notes.filter(note=>note.categoryId===categoryId).map(note=>note.id),operation={promise:null,next};
+  pendingPinWrites.set(key,operation);renderAll();
+  operation.promise=(async()=>{
+    try{
+      const saved=await runTransaction(db,async transaction=>{
+        const target=doc(db,'users',activeUid,'iroiroNotes',id),latest=await transaction.get(target);
+        requireActiveUser(activeUid);
+        if(latest.exists()){
+          if(latest.data().categoryId!==categoryId)throw new Error('食材カードのカテゴリーが変更されました。');
+          transaction.update(target,{isPinned:next});return {...latest.data(),isPinned:next};
+        }
+        // 旧形式だけの一覧も、最新の食材を保持した固定カードにピン留めする。
+        const current=await Promise.all(sources.filter(sourceId=>sourceId!==id).map(async sourceId=>({id:sourceId,snapshot:await transaction.get(doc(db,'users',activeUid,'iroiroNotes',sourceId))})));
+        requireActiveUser(activeUid);
+        const existing=current.filter(source=>source.snapshot.exists()&&source.snapshot.data().categoryId===categoryId).map(source=>normalizeNote(source.id,source.snapshot.data()));
+        if(!existing.length)throw new Error('食材カードが削除されました。一覧を確認してください。');
+        const projection=foodInventoryFromSources(categoryId,existing),data={...noteData(normalizeNote(id,projection)),isPinned:next,createdAt:Timestamp.fromDate(toDate(projection.createdAt)||new Date()),updatedAt:Timestamp.fromDate(toDate(projection.updatedAt)||new Date())};
+        transaction.set(target,data);return data;
+      });
+      if(currentUser?.uid===activeUid){const current=notes.find(note=>note.id===id);if(current)current.isPinned=next;else notes.push(normalizeNote(id,saved))}
+      return true;
+    }catch(error){if(currentUser?.uid===activeUid)setStatus(`ピン留めの状態を保存できませんでした: ${error.message}`);return false}
+    finally{pendingPinWrites.delete(key);if(currentUser?.uid===activeUid)renderAll()}
   })();
   return operation.promise;
 }
@@ -407,8 +443,8 @@ function renderNoteCard(n){
 }
 function renderFoodSummaryCard(note){
   const rows=ensureFoodList(note).items,available=rows.filter(item=>!item.checked),category=getCategory(note.categoryId)||{name:'食材',color:'#38A169'};
-  const preview=rows.slice(0,3).map(item=>`<div class="card-list-item ${item.checked?'completed':''}">${item.checked?'☑':'□'} ${escapeHtml(item.name)}　${escapeHtml(formatFoodQuantity(item))}</div>`).join('');
-  return `<article class="note-card food-summary-card" data-food-category="${escapeHtml(note.categoryId)}"><div class="card-top"><span class="type-icon" aria-hidden="true">☑</span><h3 class="card-title"><button type="button" class="card-open" data-open-food-list="${escapeHtml(note.categoryId)}" aria-label="食材カードを開く">食材</button></h3></div><div class="card-preview card-list-preview">${preview||'＋から食材を追加できます。'}${rows.length>3?'<div>…</div>':''}</div><footer class="card-footer"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span>${available.length}項目${rows.length!==available.length?`（選択中${rows.length-available.length}項目）`:''}</span><span>開いて編集 →</span></footer></article>`;
+  const preview=rows.slice(0,3).map((item,index)=>`<div class="card-list-item ${item.checked?'completed':''}">${item.checked?'☑':'□'} ${escapeHtml(item.name)}　${escapeHtml(formatFoodQuantity(item))}${rows.length>3&&index===2?'…':''}</div>`).join('');
+  return `<article class="note-card food-summary-card" data-food-category="${escapeHtml(note.categoryId)}"><div class="card-top"><span class="type-icon" aria-hidden="true">☑</span><h3 class="card-title"><button type="button" class="card-open" data-open-food-list="${escapeHtml(note.categoryId)}" aria-label="食材カードを開く">食材</button></h3></div><div class="card-preview card-list-preview">${preview||'＋から食材を追加できます。'}</div><footer class="card-footer"><div class="card-footer-left"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span>${available.length}項目${rows.length!==available.length?`（選択中${rows.length-available.length}項目）`:''}</span></div><div class="card-footer-right">${cardPinButton(note)}</div></footer></article>`;
 }
 function renderNotes(){
   const term=$('searchInput').value.trim().toLowerCase(),taskView=isTaskCategory(selectedCategory),mangaView=isMangaCategory(selectedCategory),foodView=isFoodCategory(selectedCategory);

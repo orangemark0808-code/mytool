@@ -1,6 +1,12 @@
 import { FOOD_UNITS, FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFoodItem, normalizeFoodList, parseFoodQuantity, formatFoodQuantity } from './food-core.mjs?v=2026-10-28-03';
 import { validTaskDate } from './task-core.mjs';
 
+const FOOD_PRESETS={
+  '肉・魚・卵':['豚こま','豚バラ肉','豚ロース肉','豚ひき肉','鶏もも肉','鶏むね肉','鶏ささみ','鶏ひき肉','牛こま','牛ひき肉','合いびき肉','鮭','さば','ぶり','たら','えび','卵'],
+  '野菜・きのこ':['キャベツ','白菜','レタス','玉ねぎ','にんじん','じゃがいも','大根','長ねぎ','小ねぎ','きゅうり','トマト','なす','ピーマン','ブロッコリー','ほうれん草','小松菜','もやし','かぼちゃ','しめじ','えのき','しいたけ'],
+  '豆製品・乳製品など':['豆腐','油揚げ','厚揚げ','納豆','牛乳','チーズ','ヨーグルト','ハム','ベーコン','ウインナー']
+};
+
 export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHtml:escape,uid}){
   let editingId=null,dirty=false,undoItems=[];
   const list=()=>{const note=getNote();return note.foodList||(note.foodList=normalizeFoodList())};
@@ -9,7 +15,7 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
   function setUnit(unit){$('foodUnitInput').value=FOOD_UNITS.includes(unit)?unit:unit?'custom':'g';$('foodCustomUnitInput').value=FOOD_UNITS.includes(unit)?'':unit;updateCustomUnit()}
   function clearDraft(){
     editingId=null;dirty=false;$('foodItemNameInput').value='';$('foodQuantityInput').value='';setUnit('g');
-    $('foodStorageInput').value='';$('foodUseSoonInput').checked=false;$('foodExpiryKindInput').value='';$('foodExpiryDateInput').value='';$('foodItemMemoInput').value='';
+    $('foodPresetSelect').value='';$('foodStorageInput').value='chilled';$('foodUseSoonInput').checked=false;$('foodExpiryKindInput').value='';$('foodExpiryDateInput').value='';$('foodItemMemoInput').value='';
     $('foodDetails').open=false;$('foodItemSubmitButton').textContent='追加';$('foodDuplicateButton').hidden=false;error('');
   }
   function openDraft(id=null){
@@ -61,7 +67,10 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
       return `<div class="food-check-row ${item.checked?'is-checked':''}"><label class="food-check-control"><input type="checkbox" data-food-check="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}を選択" ${item.checked?'checked':''}></label><button type="button" class="food-item-open" data-food-edit="${escape(item.id)}" aria-label="${escape(item.name)} ${escape(formatFoodQuantity(item))}を編集"><span class="food-item-name">${escape(item.name)}</span><span class="food-item-quantity">${escape(formatFoodQuantity(item))}</span>${meta?`<span class="food-item-meta">${escape(meta)}</span>`:''}${item.memo?`<span class="food-item-meta food-item-memo">${escape(item.memo)}</span>`:''}</button></div>`;
     }).join('');
     $('foodItemsEmpty').hidden=rows.length>0;$('foodDeleteCheckedButton').disabled=!checked;$('foodUndoDeleteButton').hidden=!undoItems.length;
-    $('foodNameSuggestions').innerHTML=[...new Set(rows.map(item=>item.name))].map(name=>`<option value="${escape(name)}"></option>`).join('');
+    const presets=new Set(Object.values(FOOD_PRESETS).flat()),registered=[...new Set(rows.map(item=>item.name).filter(name=>name&&!presets.has(name)))];
+    const groups={...FOOD_PRESETS,...(registered.length?{'登録済みの食材':registered}:{})},selected=$('foodPresetSelect').value;
+    $('foodPresetSelect').innerHTML='<option value="">定番の食材から選ぶ（任意）</option>'+Object.entries(groups).map(([label,names])=>`<optgroup label="${escape(label)}">${names.map(name=>`<option value="${escape(name)}">${escape(name)}</option>`).join('')}</optgroup>`).join('');
+    $('foodPresetSelect').value=selected;
   }
   function validate(note){
     if(!isFoodNote(note))return true;
@@ -73,6 +82,7 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
   function bind(){
     $('foodAddItemButton').onclick=()=>openDraft();$('foodItemSubmitButton').onclick=()=>commitDraft();$('foodDuplicateButton').onclick=()=>commitDraft(2);
     $('foodItemCancelButton').onclick=()=>{clearDraft();$('foodItemForm').hidden=true};$('foodDeleteCheckedButton').onclick=deleteChecked;$('foodUndoDeleteButton').onclick=undoDelete;
+    $('foodPresetSelect').onchange=()=>{const name=$('foodPresetSelect').value;if(!name)return;$('foodItemNameInput').value=name;dirty=true;error('');$('foodPresetSelect').value='';$('foodQuantityInput').focus()};
     for(const id of ['foodItemNameInput','foodQuantityInput','foodUnitInput','foodCustomUnitInput','foodStorageInput','foodUseSoonInput','foodExpiryKindInput','foodExpiryDateInput','foodItemMemoInput'])$(id).addEventListener(id==='foodUseSoonInput'?'change':'input',()=>{dirty=true;error('');updateCustomUnit()});
     $('foodUnitInput').addEventListener('change',()=>{dirty=true;updateCustomUnit()});
     $('foodItemsList').onclick=event=>{const id=event.target.closest('[data-food-edit]')?.dataset.foodEdit;if(id)openDraft(id)};
