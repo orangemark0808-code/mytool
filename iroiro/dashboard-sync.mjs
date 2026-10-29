@@ -186,6 +186,29 @@ async function legacy() {
   } catch { window.opener?.postMessage({ type: "iroiro-tasks-result", requestId, error: true }, targetOrigin); }
 }
 
+// First-party read fallback for browsers that restrict background frame auth.
+// The Site receives selected stock fields, never a Firebase/Google credential.
+async function foodsWindow(){
+  let reading=false;
+  const read=async()=>{
+    if(reading)return;reading=true;login.disabled=true;status.textContent='最新の食材を取得しています…';
+    try{
+      const data=await readFoodInventory(await client());
+      window.opener.postMessage({type:'iroiro-foods-result',requestId,...data},targetOrigin);
+      status.textContent='食材を取得しました。今日のお知らせへ反映しています…';
+    }catch(error){
+      if(authError(error)){login.hidden=false;login.disabled=false;status.textContent='イロイロキロクのアカウントでログインしてください。';}
+      else{status.textContent='食材を取得できませんでした。閉じてもう一度お試しください。';window.opener.postMessage({type:'iroiro-foods-result',requestId,error:'read-failed'},targetOrigin);}
+    }finally{reading=false;}
+  };
+  window.addEventListener('message',event=>{if(event.origin===targetOrigin&&event.source===window.opener&&event.data?.type==='iroiro-foods-saved'&&event.data.requestId===requestId)window.close();});
+  try{
+    const {auth,authModule}=await client();
+    login.onclick=async()=>{login.disabled=true;try{await authModule.signInWithPopup(auth,new authModule.GoogleAuthProvider());await read();}catch{login.disabled=false;status.textContent='ログインできませんでした。もう一度接続してください。';}};
+    if(auth.currentUser)await read();else{login.hidden=false;status.textContent='イロイロキロクのアカウントでログインしてください。';}
+  }catch{status.textContent='接続できませんでした。閉じてもう一度お試しください。';window.opener?.postMessage({type:'iroiro-foods-result',requestId,error:'read-failed'},targetOrigin);}
+}
+
 // Restored iframe history can omit the startup hash. Embedded documents still
 // accept requests only from the exact parent origin/window and a valid ID.
 if (window.parent !== window) {
@@ -197,5 +220,6 @@ if (window.parent !== window) {
   history.replaceState(null, "", location.pathname);
   if (mode === "background") background();
   else if (mode === "authorize") void authorize();
+  else if (mode === "foods") void foodsWindow();
   else void legacy();
 }
