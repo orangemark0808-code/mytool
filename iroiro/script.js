@@ -6,11 +6,11 @@ import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFire
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.23-1';
 import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.23-1';
 import { mergeNoteData } from './note-concurrency.mjs?v=2026-10-25-03';
-import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-28-03';
-import { createFoodEditor } from './food-editor.mjs?v=2026-10-28-03';
+import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-29-01';
+import { createFoodEditor } from './food-editor.mjs?v=2026-10-29-01';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026-10-28-03'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-29-01'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -86,7 +86,18 @@ function selectCategory(id){
   else if(!isTaskCategory(id)&&wasTask)$('sortSelect').value=regularSort;
   renderAll();
 }
-function handleCategoryChange(){syncEditingNoteFromForm(false);updateEditor();scheduleSave()}
+function handleCategoryChange(){
+  if(!editingNote)return;
+  const next=$('noteCategorySelect').value;
+  // 共通の＋から食材へ切り替えた場合も、固定の食材カードを開く。
+  // 入力済みの本文や項目がある新規メモは、この経路で置き換えない。
+  if(isFoodCategory(next)&&!editingNote.id&&!saveInProgress&&!hasMeaningfulContent(editingNote)&&!$('noteTitleInput').value.trim()&&!$('noteContentInput').value.trim()){
+    clearTimeout(saveTimer);saveTimer=null;openFoodInventory(next);return;
+  }
+  syncEditingNoteFromForm(false);
+  if(!editingNote.id&&isFoodNote(editingNote)&&!editingNote.title.trim()){editingNote.title='食材';$('noteTitleInput').value='食材'}
+  updateEditor();scheduleSave();
+}
 function updateEditorMode(){
   const note=editingNote;if(!note)return;
   const taskMode=isTaskNote(note),mangaMode=isMangaNote(note),foodMode=isFoodNote(note);
@@ -153,7 +164,7 @@ function bindTaskEvents(){
   };
 }
 function noteTitleValid(note){
-  if(!foodEditor.validate(note))return false;
+  if(!foodEditor.validate(note)){$('saveStatus').textContent='未保存（入力内容を確認）';return false}
   if(isMangaNote(note)&&!note.title.trim()&&hasMeaningfulContent(note)){$('mangaTitleError').hidden=false;$('saveStatus').textContent='漫画タイトルを入力してください。';$('noteTitleInput').focus();return false}
   if(!isTaskNote(note)||note.title.trim()||!hasMeaningfulContent(note))return true;
   $('taskTitleError').hidden=false;$('saveStatus').textContent='タスク名を入力してください。';$('noteTitleInput').focus();return false;
@@ -199,7 +210,7 @@ function updateEditor(){
   document.querySelectorAll('#typeSwitcher button').forEach(b=>b.classList.toggle('active',b.dataset.type===n.type));
   $('pinButton').classList.toggle('active',n.isPinned);$('pinButton').textContent=`${n.isPinned?'★':'♧'} ピン留め`;
   $('createdAt').textContent=formatDate(n.createdAt);$('updatedAt').textContent=formatDate(n.updatedAt);
-  renderItems();updateEditorMode();renderLinks();$('saveStatus').textContent=saveInProgress||editRevision>savedRevision?'保存中…':n.id?'保存済み':'未保存';
+  renderItems();updateEditorMode();renderLinks();$('saveStatus').textContent=saveInProgress||editRevision>savedRevision?'保存中…':isFoodNote(n)&&n.inventoryDraft&&!ensureFoodList(n).items.length&&!n.isPinned?'未保存（空の食材カード）':n.id?'保存済み':'未保存';
 }
 function refreshRelatedLinks(){if(!editingNote)return;rememberCurrentFormat(editingNote);editingNote.urls=extractUrls(editingNote);renderLinks()}
 function renderItems(){cancelItemDrag();$('itemsList').innerHTML=editingNote.items.map((item,index)=>`<div class="item-row draggable-item-row ${item.checked?'checked':''}" data-item-id="${escapeHtml(item.id)}"><input type="${editingNote.type==='checklist'?'checkbox':'button'}" ${editingNote.type==='checklist'&&item.checked?'checked':''} ${editingNote.type==='bullet'?'value="•" tabindex="-1"':''} data-check="${index}"/><input type="text" value="${escapeHtml(item.text)}" placeholder="項目を入力" data-item="${index}"/><button type="button" class="remove-item" data-remove="${index}" aria-label="項目を削除">×</button></div>`).join('');document.querySelectorAll('[data-item]').forEach(el=>{el.oninput=e=>{editingNote.items[e.target.dataset.item].text=e.target.value;refreshRelatedLinks();scheduleSave()};el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const at=+e.target.dataset.item+1;editingNote.items.splice(at,0,{id:uid(),text:'',checked:false,order:at});editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave();document.querySelector(`[data-item="${at}"]`)?.focus()}}});document.querySelectorAll('[data-check]').forEach(el=>el.onchange=e=>{if(editingNote.type==='checklist'){editingNote.items[e.target.dataset.check].checked=e.target.checked;renderItems();refreshRelatedLinks();scheduleSave()}});document.querySelectorAll('[data-remove]').forEach(el=>el.onclick=e=>{editingNote.items.splice(+e.currentTarget.dataset.remove,1);editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave()});document.querySelectorAll('.draggable-item-row').forEach(bindItemDrag)}
