@@ -238,3 +238,65 @@ function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onch
   assert.equal(h.element('deleteNoteButton').hidden,false);assert.equal(h.element('deleteConfirmTitle').textContent,'このメモを削除しますか？');
   await h.run('deleteCurrentNote()');assert.equal(h.store.has(path('ordinary')),false);assert.equal(h.element('editorDialog').open,false);
 });
+
+ test('登録前から定番の候補があり、候補を選んでも量・単位・保存場所を上書きしない',()=>{
+  const h=start();h.run('foodEditor.bind();foodEditor.openDraft()');
+  for(const name of ['豚こま','鶏もも肉','鶏むね肉','キャベツ','にんじん','豆腐'])assert.ok(h.element('foodPresetSelect').innerHTML.includes(`value="${name}"`));
+  h.element('foodQuantityInput').value='150';h.element('foodUnitInput').value='g';h.element('foodStorageInput').value='frozen';h.element('foodPresetSelect').value='鶏もも肉';h.element('foodPresetSelect').onchange();
+  assert.equal(h.element('foodItemNameInput').value,'鶏もも肉');assert.equal(h.element('foodQuantityInput').value,'150');assert.equal(h.element('foodStorageInput').value,'frozen');assert.equal(h.run('foodEditor.canClose()'),false);
+  assert.equal(h.run('foodEditor.commitDraft()'),true);assert.equal(h.run('editingNote.foodList.items[0].name'),'鶏もも肉');assert.equal(h.run('editingNote.foodList.items[0].storage'),'frozen');
+});
+
+ test('定番以外の自由入力名も次の候補に追加し、HTMLを実行せずに表示する',()=>{
+  const h=start();add(h,'<自家製つくね>','150');
+  assert.match(h.element('foodPresetSelect').innerHTML,/登録済みの食材/);assert.match(h.element('foodPresetSelect').innerHTML,/&lt;自家製つくね&gt;/);assert.equal(h.element('foodPresetSelect').innerHTML.includes('<自家製つくね>'),false);
+});
+
+ test('新しい食材は冷蔵が初期値で、既存の冷凍・常温・未設定は編集しても保持する',()=>{
+  const h=start();h.run('foodEditor.openDraft()');assert.equal(h.element('foodStorageInput').value,'chilled');
+  add(h,'冷蔵の卵','2','個');assert.equal(h.run('editingNote.foodList.items[0].storage'),'chilled');
+  for(const storage of ['frozen','ambient','']){
+    add(h,'既存の食材','1','個',1,{foodStorageInput:storage});const id=h.run('editingNote.foodList.items.at(-1).id');h.context.itemId=id;
+    h.run('foodEditor.openDraft(itemId)');assert.equal(h.element('foodStorageInput').value,storage);h.run('foodEditor.commitDraft()');
+    h.run('foodEditor.openDraft()');assert.equal(h.element('foodStorageInput').value,'chilled');
+  }
+});
+
+ test('一覧は3項目と3行目の省略記号・星を表示し、開いて編集の案内は出さない',()=>{
+  const h=start();for(let i=0;i<5;i++)add(h,'豚こま'+i,'150');const html=h.run('renderFoodSummaryCard(editingNote)');
+  assert.equal((html.match(/class="card-list-item /g)||[]).length,3);assert.ok(html.includes('150g…</div>'));assert.ok(!html.includes('豚こま3'));assert.ok(!html.includes('開いて編集'));
+  assert.match(html,/data-pin-note="food-inventory-food"[^>]*>☆<\/button>/);
+});
+
+ test('既存の食材カードの星を切り替えても食材・本文・更新日を変更しない',async()=>{
+  const original={title:'食材',categoryId:'food',content:'補足',updatedAt:'2026-01-01',isPinned:false,foodList:normalizeFoodList({items:[{id:'a',name:'卵',quantity:'2',unit:'個'}]})},h=start([[rootId,original]]);
+  assert.equal(await h.run(`toggleNotePin('${rootId}')`),true);assert.deepEqual(h.store.get(path(rootId)),{...original,isPinned:true});assert.equal(h.element('editorDialog').open,true);
+  assert.equal(await h.run(`toggleNotePin('${rootId}')`),true);assert.deepEqual(h.store.get(path(rootId)),original);
+});
+
+ test('旧形式だけの食材も星を押すと1枚のカードへ保存し、最新の量と元データを保持する',async()=>{
+  const old={title:'豚こま',categoryId:'food',updatedAt:'2026-01-01',food:{remainingGrams:170}},h=start([['old',old]]);
+  h.store.set(path('old'),{...old,food:{remainingGrams:150}});
+  assert.equal(await h.run(`toggleNotePin('${rootId}')`),true);const saved=h.store.get(path(rootId));assert.equal(saved.isPinned,true);assert.equal(saved.foodList.items[0].quantity,'150');assert.equal(h.store.get(path('old')).food.remainingGrams,150);
+  h.run("selectCategory('food')");assert.equal((h.element('notesGrid').innerHTML.match(/<article /g)||[]).length,1);assert.equal(await h.run(`toggleNotePin('${rootId}')`),true);assert.equal(h.store.get(path(rootId)).isPinned,false);
+});
+
+ test('食材のピン留め保存中は連打を防ぎ、カードを開くときに保存結果を待つ',async()=>{
+  const original={title:'食材',categoryId:'food',isPinned:false,foodList:normalizeFoodList()},h=start([[rootId,original]]);h.element('editorDialog').close();h.run('editingNote=null');
+  let release;h.beforeWrite=()=>new Promise(resolve=>release=resolve);const pin=h.run(`toggleNotePin('${rootId}')`);await tick();const opening=h.run("openFoodInventory('food')");
+  assert.equal(await h.run(`toggleNotePin('${rootId}')`),false);assert.match(h.element('notesGrid').innerHTML,/aria-pressed="true"[^>]*disabled/);assert.equal(h.element('editorDialog').open,false);
+  release();await pin;await opening;assert.equal(h.run('editingNote.isPinned'),true);
+});
+
+ test('食材のピン留め失敗は表示を戻し、アカウント変更後の表示に干渉しない',async()=>{
+  const original={title:'食材',categoryId:'food',isPinned:false,foodList:normalizeFoodList()},h=start([[rootId,original]]);h.beforeWrite=()=>{throw Error('offline')};
+  assert.equal(await h.run(`toggleNotePin('${rootId}')`),false);assert.match(h.element('notesGrid').innerHTML,/aria-pressed="false"/);assert.equal(h.store.get(path(rootId)).isPinned,false);
+  let fail;h.beforeWrite=()=>new Promise((resolve,reject)=>fail=reject);const pending=h.run(`toggleNotePin('${rootId}')`);await tick();const opening=h.run("openFoodInventory('food')");
+  h.run("currentUser={uid:'other-user'};notes=[];editingNote=null");h.element('editorDialog').close();h.element('syncStatus').textContent='同期済み';fail(Error('offline'));await pending;await opening;
+  assert.equal(h.element('syncStatus').textContent,'同期済み');assert.equal(h.element('editorDialog').open,false);
+});
+
+ test('別端末で削除された食材を星の操作で復活させない',async()=>{
+  const original={title:'食材',categoryId:'food',foodList:normalizeFoodList()},h=start([[rootId,original]]);h.store.delete(path(rootId));
+  assert.equal(await h.run(`toggleNotePin('${rootId}')`),false);assert.equal(h.store.has(path(rootId)),false);
+});
