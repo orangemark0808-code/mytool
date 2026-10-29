@@ -99,3 +99,45 @@ function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onch
   assert.equal(list.items.length,3);assert.equal(list.items[2].quantity,'');assert.notEqual(list.items[0].id,list.items[1].id);
   assert.equal(normalizeFoodItem({storage:'constructor'}).storage,'');
 });
+
+ test('共通の＋から空のメモを作って食材を選んでも、実際の題名が入り空のまま閉じられる',async()=>{
+  const h=harness();h.run(`${cats};selectCategory('app');openEditor(createNote())`);
+  h.element('noteCategorySelect').value='food';h.run('handleCategoryChange()');
+  assert.equal(h.element('noteTitleInput').value,'食材');assert.equal(h.run('editingNote.title'),'食材');
+  assert.equal(h.run('editingNote.id'),rootId);assert.equal(h.element('noteTitleInput').readOnly,true);
+  assert.equal(h.element('saveStatus').textContent,'未保存（空の食材カード）');
+  await h.run('closeEditor()');assert.equal(h.element('editorDialog').open,false);assert.equal(h.writes.length,0);
+});
+
+ test('共通の＋→食材→170gを追加した経路でも、保存済みになり戻るで一覧へ戻れる',async()=>{
+  const h=harness();h.run(`${cats};selectCategory('app');openEditor(createNote())`);
+  h.element('noteCategorySelect').value='food';h.run('handleCategoryChange()');add(h,'豚こま','170','g');
+  assert.equal(await h.run('requestSave()'),true);assert.equal(h.element('saveStatus').textContent,'保存済み');
+  await h.run('closeEditor()');assert.equal(h.element('editorDialog').open,false);
+  assert.equal(h.store.get(path(rootId)).foodList.items[0].quantity,'170');assert.equal(h.writes.length,1);
+});
+
+ test('共通の＋から食材を選んでも既存の食材カードと項目を引き継ぎ、新しいカードを増やさない',async()=>{
+  const original={title:'食材',categoryId:'food',foodList:normalizeFoodList({items:[{id:'existing',name:'キャベツ',quantity:'1/2',unit:'玉'}]})};
+  const h=harness([[path(rootId),original]]);h.context.original=original;
+  h.run(`${cats};notes=[normalizeNote('${rootId}',original)];selectCategory('app');openEditor(createNote())`);
+  h.element('noteCategorySelect').value='food';h.run('handleCategoryChange()');
+  assert.equal(h.run('editingNote.foodList.items[0].id'),'existing');add(h,'豚こま','170','g');await h.run('closeEditor()');
+  assert.equal(h.element('editorDialog').open,false);assert.equal(h.store.get(path(rootId)).foodList.items.length,2);assert.equal(h.writes.every(write=>write.ref===path(rootId)),true);
+});
+
+ test('題名の検証で保存が止まった場合は保存中表示を残さず、修正して再保存できる',async()=>{
+  const h=start();add(h,'豚こま','170','g');h.element('noteTitleInput').value='';
+  assert.equal(await h.run('requestSave()'),false);assert.equal(h.run('saveInProgress'),false);
+  assert.equal(h.element('saveStatus').textContent,'未保存（入力内容を確認）');assert.equal(h.writes.length,0);
+  h.element('noteTitleInput').value='食材';h.run('syncEditingNoteFromForm();scheduleSave()');
+  assert.equal(await h.run('requestSave()'),true);assert.equal(h.element('foodError').hidden,true);
+  assert.equal(h.element('saveStatus').textContent,'保存済み');await h.run('closeEditor()');assert.equal(h.element('editorDialog').open,false);
+});
+
+ test('入力済みの新規メモは食材への切り替えで既存カードに置き換えず、本文を保持する',()=>{
+  const h=harness();h.run(`${cats};selectCategory('app');openEditor(createNote())`);
+  h.element('noteContentInput').value='入力済みの本文';h.run('syncEditingNoteFromForm();scheduleSave()');
+  h.element('noteCategorySelect').value='food';h.run('handleCategoryChange()');
+  assert.equal(h.run('editingNote.id'),'');assert.equal(h.run('editingNote.content'),'入力済みの本文');assert.equal(h.element('noteTitleInput').value,'食材');
+});

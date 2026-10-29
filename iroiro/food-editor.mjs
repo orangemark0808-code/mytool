@@ -63,7 +63,12 @@ export function createFoodEditor({element:$,getNote,isFoodNote,onChange,escapeHt
     $('foodItemsEmpty').hidden=rows.length>0;$('foodDeleteCheckedButton').disabled=!checked;$('foodUndoDeleteButton').hidden=!undoItems.length;
     $('foodNameSuggestions').innerHTML=[...new Set(rows.map(item=>item.name))].map(name=>`<option value="${escape(name)}"></option>`).join('');
   }
-  function validate(note){if(!isFoodNote(note))return true;if(!note.title.trim()){error('カードの題名を入力してください。');return false}return true}
+  function validate(note){
+    if(!isFoodNote(note))return true;
+    if(!note.title.trim()){error('カードの題名を入力してください。');return false}
+    if($('foodError').textContent==='カードの題名を入力してください。')error('');
+    return true;
+  }
   function canClose(){if(isFoodNote(getNote())&&dirty){error('入力中の食材を追加・保存するか、キャンセルしてください。');return false}return true}
   function bind(){
     $('foodAddItemButton').onclick=()=>openDraft();$('foodItemSubmitButton').onclick=()=>commitDraft();$('foodDuplicateButton').onclick=()=>commitDraft(2);
