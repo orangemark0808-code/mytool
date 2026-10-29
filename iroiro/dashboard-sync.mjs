@@ -1,7 +1,8 @@
 import { appendTask } from './task-add.mjs?v=2026-10-25-03';
 import { readFoodInventory } from './food-read.mjs?v=2026-10-29-13';
-// Same-origin browser-only authentication bridge. No Firebase credentials are
-// sent to the dashboard origin or its server; only selected task fields leave.
+// Legacy reads/additions exchange selected fields only. The explicit server-link
+// mode below transfers a Firebase refresh credential only after the owner has
+// opted in on the Site and clicked a fresh Google confirmation in this window.
 const targetOrigin = "https://daily-notice.ohana888.chatgpt.site";
 const params = new URLSearchParams(location.hash.slice(1));
 const mode = params.get("mode") || "legacy";
@@ -164,10 +165,61 @@ async function authorize() {
   } catch { fail(); }
 }
 
+async function serverLinkWindow() {
+  let started = false, ready = false, working = false, sent = false, cancelled = false, expectedEmail = '';
+  login.hidden = false; login.disabled = true; login.textContent = 'Googleで確認して登録';
+  status.textContent = '今日のお知らせの登録内容を確認しています…';
+  const disclosure = document.getElementById('serverDisclosure');
+  if (disclosure) disclosure.hidden = false;
+  const send = value => window.opener.postMessage({ ...value, requestId }, targetOrigin);
+  window.addEventListener('message', event => {
+    if (event.origin !== targetOrigin || event.source !== window.opener || event.data?.requestId !== requestId) return;
+    if (event.data.type === 'iroiro-server-link-saved') { status.textContent = 'サーバー接続を登録しました。'; window.close(); return; }
+    if (event.data.type === 'iroiro-server-link-cancel' || event.data.type === 'iroiro-server-link-failed') {
+      cancelled = true; login.disabled = true; status.textContent = '接続画面を閉じて、今日のお知らせから操作してください。'; return;
+    }
+    if (event.data.type !== 'iroiro-server-link-begin' || started || cancelled) return;
+    if (typeof event.data.expectedEmail !== 'string' || !event.data.expectedEmail.trim() || event.data.expectedEmail.length > 320) { send({type:'iroiro-server-link-error'}); return; }
+    expectedEmail = event.data.expectedEmail.trim().toLowerCase(); started = true;
+    login.disabled = !ready;
+    status.textContent = expectedEmail + ' で確認し、接続情報を今日のお知らせのサーバーへ登録します。';
+  });
+  send({type:'iroiro-server-link-ready'});
+  try {
+    const { auth, authModule } = await client(); ready = true; login.disabled = !started || cancelled;
+    login.onclick = async () => {
+      if (!started || cancelled || working || sent) return;
+      working = true; login.disabled = true;
+      try {
+        const provider = new authModule.GoogleAuthProvider();
+        provider.setCustomParameters({login_hint:expectedEmail,prompt:'select_account'});
+        const currentEmail = auth.currentUser?.email?.toLowerCase();
+        const result = auth.currentUser && currentEmail === expectedEmail
+          ? await authModule.reauthenticateWithPopup(auth.currentUser,provider)
+          : await authModule.signInWithPopup(auth,provider);
+        if (cancelled) return;
+        const user = result.user;
+        if (user.email?.toLowerCase() !== expectedEmail) throw Error('account-mismatch');
+        const idToken = await user.getIdToken(true);
+        if (cancelled) return;
+        const refreshToken = user.refreshToken;
+        if (auth.currentUser?.uid !== user.uid || typeof idToken !== 'string' || !idToken || idToken.length > 20000 || typeof refreshToken !== 'string' || !refreshToken || refreshToken.length > 20000) throw Error('invalid-credential');
+        sent = true;
+        // This is the single, explicit opt-in path. Tokens are never placed in
+        // URLs, the DOM, logs, legacy frame messages, or browser storage here.
+        send({type:'iroiro-server-link-credential',idToken,refreshToken});
+        status.textContent = 'サーバーへ登録しています…';
+      } catch {
+        if (!cancelled) { status.textContent = 'Googleでの確認ができませんでした。今日のお知らせから再試行してください。'; send({type:'iroiro-server-link-error'}); }
+      } finally { working = false; }
+    };
+  } catch { if (!cancelled) send({type:'iroiro-server-link-error'}); }
+}
+
 // Read/add in a first-party source window when a Home Screen app or browser
 // isolates iframe authentication. Only task fields cross the origin boundary.
 async function tasksWindow() {
-  let requested = false, cancelled = false, busy = false, addition = null;
+  let requested = false, cancelled = false, busy = false, addition = null, expectedEmail = '';
   const run = async () => {
     if (cancelled || busy) return;
     busy = true; login.disabled = true;
@@ -175,9 +227,9 @@ async function tasksWindow() {
     try {
       const current = await client();
       if (cancelled) return;
-      if (!current.auth.currentUser) {
+      if (!current.auth.currentUser || expectedEmail && current.auth.currentUser.email?.toLowerCase() !== expectedEmail) {
         login.hidden = false; login.disabled = false;
-        status.textContent = "イロイロキロクのアカウントでログインしてください。";
+        status.textContent = expectedEmail ? expectedEmail + ' で接続してください。アカウントが一致するまで追加しません。' : "イロイロキロクのアカウントでログインしてください。";
         return;
       }
       status.textContent = addition ? "タスクを追加しています…" : "最新のタスクを取得しています…";
@@ -196,6 +248,8 @@ async function tasksWindow() {
     if (event.data.type === "iroiro-cancel") { cancelled = true; login.disabled = true; return; }
     if (event.data.type !== "iroiro-tasks-window-request" || requested || cancelled) return;
     requested = true; addition = event.data.addition ?? null;
+    if (event.data.expectedEmail !== undefined && (typeof event.data.expectedEmail !== 'string' || event.data.expectedEmail.length > 320)) { window.opener.postMessage({type:'iroiro-tasks-result',requestId,error:'invalid-input'},targetOrigin); return; }
+    expectedEmail = (event.data.expectedEmail || '').trim().toLowerCase();
     void run();
   });
   login.onclick = async () => {
@@ -204,7 +258,11 @@ async function tasksWindow() {
     try {
       const { auth, authModule } = await client();
       if (cancelled) return;
-      if (!auth.currentUser) await authModule.signInWithPopup(auth, new authModule.GoogleAuthProvider());
+      if (!auth.currentUser || expectedEmail && auth.currentUser.email?.toLowerCase() !== expectedEmail) {
+        const provider = new authModule.GoogleAuthProvider();
+        if (expectedEmail) provider.setCustomParameters({login_hint:expectedEmail,prompt:'select_account'});
+        await authModule.signInWithPopup(auth, provider);
+      }
       busy = false;
       await run();
     } catch {
@@ -273,5 +331,6 @@ if (window.parent !== window) {
   else if (mode === "authorize") void authorize();
   else if (mode === "foods") void foodsWindow();
   else if (mode === "tasks") void tasksWindow();
+  else if (mode === "server-link") void serverLinkWindow();
   else void legacy();
 }
