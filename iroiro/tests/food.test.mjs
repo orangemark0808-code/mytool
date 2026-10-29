@@ -173,3 +173,68 @@ function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onch
   h.element('noteCategorySelect').value='food';h.run('handleCategoryChange()');
   assert.equal(h.element('noteTitleInput').value,'元の題名');assert.equal(h.run('editingNote.title'),'元の題名');
 });
+
+ test('食材にも削除ボタンを表示し、確認を開くだけでは内容を削除しない',()=>{
+  const original={title:'豚こま',categoryId:'food',food:{remainingGrams:170}},h=start([['old',original]]);
+  assert.equal(h.element('deleteNoteButton').hidden,false);h.run('confirmDelete()');
+  assert.equal(h.element('confirmDialog').open,true);assert.match(h.element('deleteConfirmMessage').textContent,/すべて削除/);
+  h.element('confirmDialog').close();assert.equal(h.store.has(path('old')),true);assert.equal(h.run('editingNote.foodList.items.length'),1);
+});
+
+ test('旧形式だけの食材カードも削除でき、一覧と再読込から消え、＋で空のカードを作り直せる',async()=>{
+  const h=start([['old',{title:'豚こま',categoryId:'food',food:{remainingGrams:170}}],['other',{title:'通常のメモ',categoryId:'app',content:'残す'}]]);
+  await h.run('deleteCurrentNote()');assert.equal(h.store.has(path('old')),false);assert.equal(h.store.has(path(rootId)),false);assert.equal(h.store.has(path('other')),true);
+  assert.equal(h.element('editorDialog').open,false);h.run("selectCategory('food')");assert.equal(h.element('notesGrid').innerHTML,'');
+  h.run("notes=notes.filter(note=>note.categoryId!=='food');openEditor(createNote())");assert.equal(h.run('editingNote.title'),'食材');assert.equal(h.run('editingNote.foodList.items.length'),0);
+  add(h,'にんじん','1','本');await h.run('closeEditor()');reload(h);assert.equal(h.run('editingNote.foodList.items.length'),1);assert.equal(h.run('editingNote.foodList.items[0].name'),'にんじん');
+});
+
+ test('固定食材カードと取込済み・未取込の旧食材をまとめて削除し、他カテゴリーは残す',async()=>{
+  const original={title:'食材',categoryId:'food',foodList:normalizeFoodList({items:[{id:'a',name:'卵',quantity:'2',unit:'個'}],importedSources:{old:true}})};
+  const h=start([[rootId,original],['old',{title:'豚こま',categoryId:'food',food:{remainingGrams:170}}],['new-old',{title:'キャベツ',categoryId:'food',food:{remainingGrams:300}}],['other',{title:'残す',categoryId:'app'}]]);
+  await h.run('deleteCurrentNote()');assert.equal(h.store.has(path(rootId)),false);assert.equal(h.store.has(path('old')),false);assert.equal(h.store.has(path('new-old')),false);assert.equal(h.store.has(path('other')),true);
+  h.run("selectCategory('all')");assert.equal(h.element('notesGrid').innerHTML.includes('data-food-category'),false);
+});
+
+ test('削除の通信失敗では一部だけ削除せず、確認画面と食材を保持して再試行できる',async()=>{
+  const h=start([['a',{title:'豚こま',categoryId:'food',food:{remainingGrams:170}}],['b',{title:'卵',categoryId:'food',food:{remainingGrams:100}}]]);
+  h.run('confirmDelete()');h.beforeDelete=ref=>{if(ref===path('b'))throw Error('offline')};await h.run('deleteCurrentNote()');
+  assert.equal(h.store.has(path('a')),true);assert.equal(h.store.has(path('b')),true);assert.equal(h.element('editorDialog').open,true);assert.equal(h.element('confirmDialog').open,true);assert.equal(h.element('confirmDeleteButton').disabled,false);
+  h.beforeDelete=null;await h.run('deleteCurrentNote()');assert.equal(h.store.has(path('a')),false);assert.equal(h.store.has(path('b')),false);
+});
+
+ test('別端末で食材カードが編集されたら削除を止め、追記を消さない',async()=>{
+  const original={title:'食材',categoryId:'food',foodList:normalizeFoodList({items:[{id:'a',name:'卵',quantity:'2',unit:'個'}]})},h=start([[rootId,original]]);
+  h.store.set(path(rootId),{...original,foodList:normalizeFoodList({items:[...original.foodList.items,{id:'remote',name:'キャベツ',quantity:'1/2',unit:'玉'}]})});
+  await h.run('deleteCurrentNote()');assert.equal(h.store.get(path(rootId)).foodList.items.length,2);assert.equal(h.element('editorDialog').open,true);assert.match(h.element('syncStatus').textContent,/別の端末/);
+});
+
+ test('旧食材が編集・移動されたら削除を止め、他カテゴリーに移ったメモを消さない',async()=>{
+  const old={title:'豚こま',categoryId:'food',food:{remainingGrams:170}},h=start([['old',old]]);h.store.set(path('old'),{...old,categoryId:'app'});
+  await h.run('deleteCurrentNote()');assert.equal(h.store.get(path('old')).categoryId,'app');assert.equal(h.element('editorDialog').open,true);
+});
+
+ test('別端末で同じ食材カードが新規作成された場合も未確認の内容を削除しない',async()=>{
+  const h=start();h.store.set(path(rootId),{title:'食材',categoryId:'food',foodList:normalizeFoodList({items:[{id:'remote',name:'卵',quantity:'2',unit:'個'}]})});
+  await h.run('deleteCurrentNote()');assert.equal(h.store.get(path(rootId)).foodList.items.length,1);assert.equal(h.element('editorDialog').open,true);
+});
+
+ test('保存待ち中の削除は保存完了を待ち、戻るや連打で処理を重ねない',async()=>{
+  const h=start();add(h);let release;h.beforeWrite=()=>new Promise(resolve=>release=resolve);
+  const saving=h.run('requestSave()');await tick();const removing=h.run('deleteCurrentNote()');await h.run('closeEditor()');await h.run('deleteCurrentNote()');
+  assert.equal(h.element('editorDialog').open,true);assert.equal(h.element('confirmDeleteButton').disabled,true);
+  release();await saving;await removing;assert.equal(h.store.has(path(rootId)),false);assert.equal(h.element('editorDialog').open,false);
+});
+
+ test('削除待ち中にアカウントが変わった場合は次のアカウントのメモを削除しない',async()=>{
+  const h=start();add(h);let release;h.beforeWrite=()=>new Promise(resolve=>release=resolve);
+  const saving=h.run('requestSave()');await tick();const removing=h.run('deleteCurrentNote()');h.run("currentUser={uid:'other-user'}");release();await saving;await removing;
+  assert.equal(h.store.has(path(rootId)),true);assert.equal(h.element('editorDialog').open,true);
+});
+
+ test('通常メモの削除ボタン・確認文・削除動作を維持する',async()=>{
+  const original={title:'通常メモ',categoryId:'app',content:'本文'},h=harness([[path('ordinary'),original]]);h.context.original=original;
+  h.run(`${cats};notes=[normalizeNote('ordinary',original)];openEditor(notes[0]);confirmDelete()`);
+  assert.equal(h.element('deleteNoteButton').hidden,false);assert.equal(h.element('deleteConfirmTitle').textContent,'このメモを削除しますか？');
+  await h.run('deleteCurrentNote()');assert.equal(h.store.has(path('ordinary')),false);assert.equal(h.element('editorDialog').open,false);
+});

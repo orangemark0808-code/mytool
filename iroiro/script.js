@@ -6,11 +6,11 @@ import { Timestamp, addDoc, collection, deleteDoc, doc, getDoc, getDocs, getFire
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS, validTaskDate, localDateKey, normalizeTask, taskIsOverdue, compareTaskDue, taskProgress } from './task-core.mjs?v=2026.10.23-1';
 import { normalizeManga, mangaSearchText, mangaHasContent, mangaFromNeta } from './manga-core.mjs?v=2026.10.23-1';
 import { mergeNoteData } from './note-concurrency.mjs?v=2026-10-25-03';
-import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-29-01';
-import { createFoodEditor } from './food-editor.mjs?v=2026-10-29-01';
+import { FOOD_STORAGE_LABELS, FOOD_EXPIRY_LABELS, normalizeFood, validGrams, normalizeFoodList, foodInventoryFromSources, foodInventoryId, foodListSearchText, formatFoodQuantity, parseFoodQuantity } from './food-core.mjs?v=2026-10-29-02';
+import { createFoodEditor } from './food-editor.mjs?v=2026-10-29-02';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026-10-29-01'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-29-02'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -66,6 +66,7 @@ function getFoodInventory(categoryId){
   const result=normalizeNote(projection.id,{...stored,...projection});
   result.inventoryDraft=!stored;
   result.inventoryImportSources=sources.filter(note=>note.id!==projection.id&&!Object.hasOwn(stored?.foodList?.importedSources||{},note.id)).map(note=>({id:note.id,data:noteData(structuredClone(note))}));
+  result.inventoryDeleteSources=sources.map(note=>({id:note.id,data:noteData(structuredClone(note))}));
   return result;
 }
 function openFoodInventory(categoryId){
@@ -105,7 +106,7 @@ function updateEditorMode(){
   $('editorDialog').classList.toggle('food-mode',foodMode);$('foodFields').hidden=!foodMode;
   if(foodMode){ensureFoodList(note);foodEditor.render()}else $('foodError').hidden=true;
   const inventory=foodMode&&note.id===foodInventoryId(note.categoryId);
-  $('noteTitleInput').readOnly=inventory;$('noteCategorySelect').disabled=inventory;$('deleteNoteButton').hidden=foodMode;$('noteCategoryLabelText').textContent=foodMode?'タグ':'カテゴリー';
+  $('noteTitleInput').readOnly=inventory;$('noteCategorySelect').disabled=inventory;$('deleteNoteButton').hidden=false;$('noteCategoryLabelText').textContent=foodMode?'タグ':'カテゴリー';
   $('noteTitleInput').removeAttribute('list');
   $('taskFields').hidden=!taskMode;$('taskItemsSection').hidden=!taskMode;$('typeSwitcher').hidden=taskMode||mangaMode||foodMode;
   $('mangaFields').hidden=!mangaMode;$('mangaRowsSection').hidden=!mangaMode;
@@ -267,7 +268,10 @@ async function persistSnapshot(snapshot){
         else transaction.set(target,{...merged,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
         return merged;
       });
-      if(editingNote&&editorSession===snapshot.session){editingNote.inventoryDraft=false;editingNote.inventoryImportSources=[]}
+      if(editingNote&&editorSession===snapshot.session){
+        editingNote.inventoryDraft=false;editingNote.inventoryImportSources=[];
+        editingNote.inventoryDeleteSources=[...(editingNote.inventoryDeleteSources||[]).filter(source=>source.id!==snapshot.note.id),{id:snapshot.note.id,data:structuredClone(savedData)}];
+      }
     }else if(isNew){
       const created=await addDoc(refs().notes,{...noteData(snapshot.note),createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
       if(editingNote&&editorSession===snapshot.session&&!editingNote.id)editingNote.id=created.id;
@@ -318,7 +322,7 @@ async function persistSnapshot(snapshot){
   }catch(e){$('saveStatus').textContent=e.code==='edit-conflict'?e.message:'保存できませんでした';setStatus(`保存失敗: ${e.message}`);return{ok:false,error:e}}
 }
 async function closeEditor(){
-  if(closingEditor||!editingNote)return;
+  if(closingEditor||deletingNote||!editingNote)return;
   if(!foodEditor.canClose())return;
   syncEditingNoteFromForm();if(!noteTitleValid(editingNote))return;
   closingEditor=true;
@@ -411,7 +415,7 @@ function renderNotes(){
   $('notesGrid').classList.remove('food-list');
   $('taskDueSortOption').hidden=!taskView;
   if(!taskView&&$('sortSelect').value==='task-due')$('sortSelect').value='updated-desc';
-  const displayNotes=[...notes.filter(note=>!isFoodNote(note)),...categories.filter(category=>isFoodCategory(category.id)).map(category=>getFoodInventory(category.id))];
+  const displayNotes=[...notes.filter(note=>!isFoodNote(note)),...categories.filter(category=>isFoodCategory(category.id)&&notes.some(note=>note.categoryId===category.id)).map(category=>getFoodInventory(category.id))];
   const shown=displayNotes.filter(note=>{
     const category=getCategory(note.categoryId)?.name||'未分類',task=isTaskNote(note)?taskForNote(note):null;
     return(selectedCategory==='all'||(selectedCategory===''?!getCategory(note.categoryId):note.categoryId===selectedCategory))&&[note.title,note.content,category,...note.items.map(item=>item.text),...(task?task.items.map(item=>item.text):[]),...(isMangaNote(note)?[mangaSearchText(mangaForNote(note))]:[]),...(isFoodNote(note)?[foodListSearchText(ensureFoodList(note))]:[]),...extractUrls(note).map(link=>link.url)].join(' ').toLowerCase().includes(term);
@@ -435,7 +439,7 @@ function renderNotes(){
   $('taskEmptyState').hidden=!taskView||active.length>0||shown.length===0;
   $('emptyState').hidden=shown.length>0;
   $('emptyStateTitle').textContent=term?'検索条件に合うメモがありません':taskView?'まだタスクがありません':mangaView?'まだ漫画ネタがありません':foodView?'家にある食材を登録しましょう':'まだメモがありません';
-  $('emptyStateMessage').textContent=term?'検索語やカテゴリーを変更してください。':taskView?'右下の＋から、タスクを追加できます。':mangaView?'右下の＋から、漫画ネタを追加できます。':foodView?'食材カードを開いて項目を追加できます。':'右下の＋から、思いつきをすぐ残せます。';
+  $('emptyStateMessage').textContent=term?'検索語やカテゴリーを変更してください。':taskView?'右下の＋から、タスクを追加できます。':mangaView?'右下の＋から、漫画ネタを追加できます。':foodView?'右下の＋から、食材カードを作成できます。':'右下の＋から、思いつきをすぐ残せます。';
   const createLabel=taskView?'新しいタスク':mangaView?'新しい漫画ネタ':foodView?'食材を追加':'新しいメモ';$('createNoteButton').setAttribute('aria-label',foodView?'食材を追加':`${createLabel}を作成`);$('createNoteButton').title=createLabel;
   document.querySelectorAll('.note-card').forEach(card=>card.onclick=e=>{
     // 個別の操作ボタンから詳細画面を開かない。
@@ -553,8 +557,52 @@ function renameCategory(category,name){name=name.trim();if(!name||categories.som
 function addCategory(){const name=$('newCategoryName').value.trim();if(!name||categories.some(c=>c.name.toLowerCase()===name.toLowerCase())){$('categoryError').textContent='空欄または重複するカテゴリー名は追加できません。';return}const next=[...categories,{id:uid(),name,color:$('newCategoryColor').value,order:categories.length}];$('newCategoryName').value='';saveCategories(next).then(ok=>ok&&renderCategoryManagement())}
 function confirmCategoryDelete(category){if(!category||category.id===''||category.name==='未分類'){ $('categoryError').textContent='未分類は削除できません。';return }pendingCategoryId=category.id;$('categoryConfirmTitle').textContent=`カテゴリー「${category.name}」を削除しますか？`;$('categoryConfirmDialog').showModal()}
 async function deletePendingCategory(){const category=getCategory(pendingCategoryId);if(!category)return;const used=notes.filter(note=>note.categoryId===category.id);try{if(used.length){const batch=writeBatch(db);used.forEach(note=>batch.update(doc(refs().notes,note.id),{categoryId:'',updatedAt:serverTimestamp()}));await batch.commit()}const next=categories.filter(c=>c.id!==category.id);const saved=await saveCategories(next);if(!saved)throw new Error('カテゴリー設定を保存できませんでした');$('categoryConfirmDialog').close();pendingCategoryId='';renderCategoryManagement()}catch(e){$('categoryError').textContent=`削除に失敗しました: ${e.message}`}}
-function confirmDelete(){if(isFoodNote(editingNote))return;if(!closingEditor&&!deletingNote&&editingNote)$('confirmDialog').showModal()}
-async function deleteCurrentNote(){if(isFoodNote(editingNote))return;if(closingEditor||deletingNote||!editingNote)return;deletingNote=true;$('deleteNoteButton').disabled=true;clearTimeout(saveTimer);saveTimer=null;try{if(saveInProgress||requestedRevision>savedRevision){const saved=await requestSave();if(!saved)throw new Error('保存中の変更を完了できませんでした')}const noteId=editingNote?.id;if(noteId)await deleteDoc(doc(refs().notes,noteId));$('confirmDialog').close();$('editorDialog').close();editingNote=null;editorSession='';editRevision=0;savedRevision=0;requestedRevision=0;savePromise=Promise.resolve(true)}catch(e){setStatus(`削除失敗: ${e.message}`);$('saveStatus').textContent='削除できませんでした。内容を確認してもう一度お試しください。'}finally{deletingNote=false;$('deleteNoteButton').disabled=false}}
+function confirmDelete(){
+  if(closingEditor||deletingNote||!editingNote)return;
+  const food=isFoodNote(editingNote);
+  $('deleteConfirmTitle').textContent=food?'この食材カードを削除しますか？':'このメモを削除しますか？';
+  $('deleteConfirmMessage').textContent=food?'カード内の食材をすべて削除します。削除した内容は元に戻せません。カテゴリー「食材」は残ります。':'削除したメモは元に戻せません。';
+  $('confirmDialog').showModal();
+}
+// 比較するのは正規化済みのメモ内容。Firestore内のMapのキー順には依存しない。
+function sameNoteContent(a,b){
+  if(a===b)return true;
+  if(Array.isArray(a)||Array.isArray(b))return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((value,index)=>sameNoteContent(value,b[index]));
+  return isRecord(a)&&isRecord(b)&&Object.keys(a).length===Object.keys(b).length&&Object.keys(a).every(key=>Object.hasOwn(b,key)&&sameNoteContent(a[key],b[key]));
+}
+async function deleteFoodInventory(activeUid){
+  const note=editingNote,targetId=note.id,targets=new Map((note.inventoryDeleteSources||[]).map(source=>[source.id,source.data]));
+  // 仮の一覧は元メモからの表示のみで、固定IDのカードはまだ存在しない。
+  targets.set(targetId,targets.get(targetId)||null);
+  await runTransaction(db,async transaction=>{
+    const current=await Promise.all([...targets].map(async([id,expected])=>({id,expected,latest:await transaction.get(doc(db,'users',activeUid,'iroiroNotes',id))})));
+    requireActiveUser(activeUid);
+    for(const {id,expected,latest}of current){
+      if(expected===null?!latest.exists():latest.exists()&&sameNoteContent(noteData(normalizeNote(id,latest.data())),expected))continue;
+      throw new Error('食材が別の端末で変更されました。一覧を開き直して確認してから削除してください。');
+    }
+    for(const [id,expected]of targets)if(expected!==null)transaction.delete(doc(db,'users',activeUid,'iroiroNotes',id));
+  });
+  return new Set(targets.keys());
+}
+async function deleteCurrentNote(){
+  if(closingEditor||deletingNote||!editingNote||!currentUser)return;
+  const activeUid=currentUser.uid,session=editorSession;
+  deletingNote=true;$('deleteNoteButton').disabled=true;$('confirmDeleteButton').disabled=true;clearTimeout(saveTimer);saveTimer=null;
+  try{
+    if(saveInProgress||requestedRevision>savedRevision){if(!await requestSave())throw new Error('保存中の変更を完了できませんでした')}
+    requireActiveUser(activeUid);
+    if(editorSession!==session)throw new Error('編集中のカードが変わりました。もう一度確認してください。');
+    const noteId=editingNote.id;
+    let deletedIds=new Set(noteId?[noteId]:[]);
+    if(isFoodNote(editingNote)&&noteId===foodInventoryId(editingNote.categoryId))deletedIds=await deleteFoodInventory(activeUid);
+    else if(noteId)await deleteDoc(doc(db,'users',activeUid,'iroiroNotes',noteId));
+    requireActiveUser(activeUid);
+    notes=notes.filter(note=>!deletedIds.has(note.id));renderAll();
+    $('confirmDialog').close();$('editorDialog').close();editingNote=null;editorSession='';editRevision=0;savedRevision=0;requestedRevision=0;savePromise=Promise.resolve(true);
+  }catch(e){setStatus(`削除失敗: ${e.message}`);$('saveStatus').textContent='削除できませんでした。内容を確認してもう一度お試しください。'}
+  finally{deletingNote=false;$('deleteNoteButton').disabled=false;$('confirmDeleteButton').disabled=false}
+}
 async function checkLegacy(){let legacy=[];try{legacy=JSON.parse(localStorage.getItem(LEGACY_KEY)||'[]')}catch{}const marker=await getDoc(refs().migration);$('migrationPanel').hidden=!(legacy.length&&!marker.exists())}
 async function legacyNoteId(raw,index){
   const original=raw.id==null?'':String(raw.id);

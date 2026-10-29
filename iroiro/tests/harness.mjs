@@ -51,6 +51,7 @@ export function harness(initial = []) {
     doc: (...parts) => (typeof parts[0] === 'string' ? parts : parts.slice(1)).join('/'),
     Timestamp: { fromDate: date => date },
     getDoc: async ref => snapshot(ref), setDoc: write,
+    deleteDoc: async ref => { await api.beforeDelete?.(ref); store.delete(ref); },
     updateDoc: async (ref, patch) => {
       const next=structuredClone(store.get(ref)||{});
       for(const [key,value] of Object.entries(patch)) {
@@ -65,9 +66,13 @@ export function harness(initial = []) {
       const pending = [];
       const result = await callback({ get: async ref => snapshot(ref),
         set: (ref, data, options) => pending.push([ref, data, options]),
-        update: (ref, patch) => pending.push([ref, patch, {transactionUpdate:true}]) });
+        update: (ref, patch) => pending.push([ref, patch, {transactionUpdate:true}]),
+        delete: ref => pending.push([ref,null,{transactionDelete:true}]) });
+      const removals=pending.filter(args=>args[2]?.transactionDelete);
+      for(const [ref]of removals)await api.beforeDelete?.(ref);
       for (const args of pending) {
-        if(args[2]?.transactionUpdate) await api.context.updateDoc(args[0],args[1]);
+        if(args[2]?.transactionDelete)store.delete(args[0]);
+        else if(args[2]?.transactionUpdate) await api.context.updateDoc(args[0],args[1]);
         else await write(...args);
       }
       return result;

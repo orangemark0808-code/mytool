@@ -52,7 +52,7 @@ export async function setDoc(ref,data,options){write(ref,data,options);notify()}
 export async function updateDoc(ref,data){write(ref,data,{merge:true});notify()}
 export async function addDoc(ref,data){const id=crypto.randomUUID();write(doc(ref,id),data);notify();return{id}}
 export async function deleteDoc(ref){delete store[ref.path];notify()}
-export async function runTransaction(db,callback){const pending=[];const result=await callback({get:getDoc,set:(...args)=>pending.push(args),update:(ref,data)=>pending.push([ref,data,{merge:true}])});for(const args of pending)write(...args);notify();return result}
+export async function runTransaction(db,callback){const pending=[],removed=[];const result=await callback({get:getDoc,set:(...args)=>pending.push(args),update:(ref,data)=>pending.push([ref,data,{merge:true}]),delete:ref=>removed.push(ref)});for(const args of pending)write(...args);for(const ref of removed)delete store[ref.path];notify();return result}
 export function writeBatch(){const pending=[];return{set:(...args)=>pending.push(args),update:(ref,data)=>pending.push([ref,data,{merge:true}]),commit:async()=>{for(const args of pending)write(...args);notify()}}}
 `;
 
