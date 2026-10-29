@@ -141,6 +141,9 @@ body [hidden]{display:none!important}
 #foodItemCount{font-size:13px;color:var(--muted)}
 .food-item-form{padding:16px;border:1px solid #d7cfc6;border-radius:12px;background:#faf9f6;margin:12px 0 20px}
 .food-item-form>.food-field{margin:12px 0}
+.food-options{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.food-options>summary{font-size:13px;color:var(--muted);cursor:pointer;line-height:1.6}
+.food-options>.food-field{margin:12px 0}
 .food-amount-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.6fr);gap:12px;margin:14px 0}
 .food-form-actions,.food-delete-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
 .food-item-form textarea{width:100%;box-sizing:border-box;min-height:70px;resize:vertical;border:1px solid #a49a90;border-radius:9px;padding:10px;font:inherit;font-size:16px;background:#fff}

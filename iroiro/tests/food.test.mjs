@@ -300,3 +300,47 @@ function select(h,id){h.run('foodEditor.bind()');h.element('foodItemsList').onch
   const original={title:'食材',categoryId:'food',foodList:normalizeFoodList()},h=start([[rootId,original]]);h.store.delete(path(rootId));
   assert.equal(await h.run(`toggleNotePin('${rootId}')`),false);assert.equal(h.store.has(path(rootId)),false);
 });
+
+ test('名前だけで連続追加でき、入力欄を開き直さずに保存・再読込できる',async()=>{
+  const h=start();assert.equal(h.element('foodItemForm').hidden,false);assert.equal(h.element('foodOptions').open,false);
+  for(const name of ['豚こま','キャベツ','にんじん']){
+    h.element('foodItemNameInput').value=name;assert.equal(h.run('foodEditor.commitDraft()'),true);
+    assert.equal(h.element('foodItemForm').hidden,false);assert.equal(h.element('foodItemNameInput').value,'');assert.equal(h.element('foodOptions').open,false);assert.equal(h.run('foodEditor.canClose()'),true);
+  }
+  await h.run('closeEditor()');reload(h);const items=h.run('editingNote.foodList.items');assert.equal(items.length,3);assert.equal(new Set(items.map(item=>item.id)).size,3);
+  for(const item of items){assert.equal(item.quantity,'');assert.equal(item.storage,'chilled')}
+  assert.match(h.element('foodItemsList').innerHTML,/量未設定/);
+});
+
+ test('定番候補を選んでEnterで名前だけ追加でき、日本語の変換確定Enterでは追加しない',()=>{
+  const h=start();h.run('foodEditor.bind()');h.element('foodPresetSelect').value='鶏もも肉';h.element('foodPresetSelect').onchange();
+  let prevented=0;const event={key:'Enter',preventDefault(){prevented++},stopPropagation(){}};
+  h.element('foodItemNameInput').onkeydown({...event,isComposing:true});h.element('foodItemNameInput').onkeydown({...event,keyCode:229});assert.equal(h.run('editingNote.foodList.items.length'),0);
+  h.element('foodItemNameInput').onkeydown(event);assert.equal(prevented,1);assert.equal(h.run('editingNote.foodList.items[0].name'),'鶏もも肉');assert.equal(h.run('editingNote.foodList.items[0].quantity'),'');
+});
+
+ test('名前だけで追加した項目を開いて量・単位・保存場所・期限・メモを同じIDで追記できる',async()=>{
+  const h=start();h.element('foodItemNameInput').value='キャベツ';h.run('foodEditor.commitDraft()');await h.run('requestSave()');
+  const id=h.run('editingNote.foodList.items[0].id');h.context.itemId=id;h.run('foodEditor.openDraft(itemId)');assert.equal(h.element('foodOptions').open,true);
+  h.element('foodQuantityInput').value='1/2';h.element('foodUnitInput').value='玉';h.element('foodStorageInput').value='frozen';h.element('foodExpiryKindInput').value='bestBefore';h.element('foodExpiryDateInput').value='2026-11-01';h.element('foodItemMemoInput').value='カット済み';
+  assert.equal(h.run('foodEditor.commitDraft()'),true);assert.equal(h.element('foodItemForm').hidden,true);await h.run('closeEditor()');reload(h);
+  const items=h.run('editingNote.foodList.items');assert.equal(items.length,1);assert.equal(items[0].id,id);assert.equal(items[0].quantity,'1/2');assert.equal(items[0].unit,'玉');assert.equal(items[0].storage,'frozen');assert.equal(items[0].expiryDate,'2026-11-01');assert.equal(items[0].memo,'カット済み');
+});
+
+ test('既存の食材の量を空欄にして量未設定へ戻せるが、不正な数値は保存しない',()=>{
+  const h=start();add(h);const id=h.run('editingNote.foodList.items[0].id');h.context.itemId=id;h.run('foodEditor.openDraft(itemId)');h.element('foodQuantityInput').value='';assert.equal(h.run('foodEditor.commitDraft()'),true);assert.equal(h.run('editingNote.foodList.items[0].quantity'),'');
+  h.run('foodEditor.openDraft(itemId)');h.element('foodQuantityInput').value='1/0';h.element('foodOptions').open=false;
+  assert.equal(h.run('foodEditor.commitDraft()'),false);assert.equal(h.element('foodOptions').open,true);assert.equal(h.run('editingNote.foodList.items[0].quantity'),'');
+});
+
+ test('名前だけの項目をバックアップして復元でき、量の空欄を0に変えない',()=>{
+  const h=start();h.element('foodItemNameInput').value='なすび';h.run('foodEditor.commitDraft()');h.context.savedNote=h.run('backupNote(editingNote.id,editingNote)');
+  h.run("restored=validateBackup({app:'iroiro',backupFormatVersion:1,data:{notes:[savedNote],settings:{categories:[{id:'food',name:'食材'}]}}})");
+  assert.equal(h.run('restored.notes[0].data.foodList.items[0].quantity'),'');assert.equal(h.run('restored.notes[0].data.foodList.items[0].name'),'なすび');
+});
+
+ test('名前が空なら追加せず、追加前の入力中は項目切り替えで捨てない',()=>{
+  const h=start();assert.equal(h.run('foodEditor.commitDraft()'),false);assert.equal(h.run('editingNote.foodList.items.length'),0);
+  h.run('foodEditor.bind()');h.element('foodPresetSelect').value='卵';h.element('foodPresetSelect').onchange();assert.equal(h.run('foodEditor.openDraft()'),false);assert.equal(h.element('foodItemNameInput').value,'卵');assert.equal(h.run('foodEditor.canClose()'),false);
+  h.element('foodItemCancelButton').onclick();assert.equal(h.run('foodEditor.canClose()'),true);
+});
