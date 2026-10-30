@@ -209,11 +209,19 @@ body [hidden]{display:none!important}
 
 /* 上部固定は、星のピン留めとは独立した表示。 */
 .card-fixed-badge{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;width:26px;height:26px;border-radius:6px;background:#eaf5ff;color:#25638c}
-.fixed-note-badge{display:flex;align-items:center;gap:5px;margin:4px 0 12px;color:#25638c;font-size:12px;font-weight:600}
+.fixed-note-badge{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;gap:5px;margin:0;padding:5px 7px;min-height:32px;border-radius:7px;background:#eaf5ff;color:#25638c;font-size:12px;font-weight:600;white-space:nowrap}
 .item-row .checklist-text,.task-item-row .checklist-text{display:block;flex:1;width:100%;min-width:0;min-height:46px;margin:0;border:1px solid rgba(58,42,26,.5);border-radius:9px;padding:10px;line-height:1.6;font-size:16px;color:var(--ink);background:#fff;resize:none;overflow:hidden;overflow-wrap:anywhere;white-space:pre-wrap;field-sizing:content}
 .item-row.checked .checklist-text,.task-item-row.checked .checklist-text{color:var(--muted);text-decoration:line-through}
 .item-row,.task-item-row{align-items:flex-start}
 .item-row>input,.task-item-row>input[type=checkbox]{margin-top:12px}
 .item-row .remove-item,.task-item-row .remove-item{flex:0 0 36px;min-height:44px}
 
-.task-card-badges .card-fixed-badge{margin-left:auto}
+/* タグと補足は左、完了数・固定・ピン留めは右の共通配置。 */
+.card-footer,.task-card-footer{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;overflow:hidden}
+.card-footer-left{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden}
+.card-footer-left>.category-pill,.task-card .category-pill{flex:0 1 auto;min-width:0;max-width:90px;white-space:nowrap;text-overflow:ellipsis}
+.card-footer-left>span:not(.category-pill){flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-footer-right{display:flex;align-items:center;gap:6px;margin-left:0;white-space:nowrap}
+.card-footer-right>.card-progress,.card-footer-right>.task-card-progress{flex:0 0 auto}
+.card-fixed-badge svg,.fixed-note-badge svg{display:block;flex:0 0 18px}
+@media(max-width:700px){.fixed-note-label{display:none}}
