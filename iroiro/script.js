@@ -12,7 +12,13 @@ import { defaultFoodPresets, readFoodPresets, validateFoodPresets } from './food
 import { createFoodPresetManager } from './food-preset-manager.mjs?v=2026-10-29-08';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026-10-29-12'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-30-01'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+// 指定されたカードを、星のピン留めとは独立して常に上部へ表示する。
+const FIXED_CARD_TITLES=['やること','アプリ関連','買物リスト','食材','調味料'];
+const FIXED_CARD_ICON='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16M12 20V8m-5 5 5-5 5 5"/></svg>';
+function fixedCardRank(note){const index=FIXED_CARD_TITLES.indexOf(String(note?.title||'').trim());return index<0?Infinity:index}
+function isFixedCard(note){return Number.isFinite(fixedCardRank(note))}
+function fixedCardBadge(note){return isFixedCard(note)?`<span class="card-fixed-badge" title="上部固定" aria-label="上部固定">${FIXED_CARD_ICON}</span>`:''}
 const CATEGORY_COLOR_PALETTE=['#FF7F00','#3A86D4','#D94F8A','#38A169','#7E5FC4','#E25555','#1E9A8A','#FFD400'];
 const LEGACY_DEFAULT_CATEGORY_COLORS={app:['#fff0e8','#FF7F00'],manga:['#fff8d8','#FFD400'],blog:['#eaf5ff','#3A86D4'],cooking:['#ecf8ed','#38A169'],shopping:['#f5edff','#7E5FC4'],research:['#e9f7f5','#1E9A8A']};
 const STANDARD_CATEGORY_COLOR_MIGRATIONS={manga:['#e0aa16','#FFD400']};
@@ -154,7 +160,20 @@ function renderTaskItems(){
   if(!editingNote||!isTaskNote(editingNote))return;
   const task=ensureTask(editingNote),progress=taskProgress(task);
   $('taskChecklistProgress').textContent=progress.total?`${progress.done}/${progress.total}完了`:'';
-  $('taskItemsList').innerHTML=task.items.map((item,index)=>`<div class="task-item-row ${item.checked?'checked':''}"><input type="checkbox" data-task-check="${index}" aria-label="${index+1}番目のチェック項目を完了" ${item.checked?'checked':''}><input type="text" value="${escapeHtml(item.text)}" data-task-item="${index}" aria-label="チェック項目${index+1}" placeholder="作業を入力"><button type="button" class="remove-item" data-task-remove="${index}" aria-label="チェック項目${index+1}を削除">×</button></div>`).join('');
+  $('taskItemsList').innerHTML=task.items.map((item,index)=>`<div class="task-item-row ${item.checked?'checked':''}"><input type="checkbox" data-task-check="${index}" aria-label="${index+1}番目のチェック項目を完了" ${item.checked?'checked':''}><textarea class="checklist-text" rows="1" data-task-item="${index}" aria-label="チェック項目${index+1}" placeholder="作業を入力">${escapeHtml(item.text)}</textarea><button type="button" class="remove-item" data-task-remove="${index}" aria-label="チェック項目${index+1}を削除">×</button></div>`).join('');
+  $('taskItemsList').querySelectorAll('.checklist-text').forEach(resizeChecklistInput);
+}
+function resizeChecklistInput(input){
+  if(!input?.style)return;
+  input.style.height='auto';
+  if(input.scrollHeight)input.style.height=`${input.scrollHeight+2}px`;
+}
+function resizeChecklistInputs(){document.querySelectorAll('.checklist-text').forEach(resizeChecklistInput)}
+function observeChecklistWidths(){
+  if(typeof ResizeObserver==='undefined')return;
+  const widths=new WeakMap();
+  const observer=new ResizeObserver(entries=>{for(const entry of entries){if(widths.get(entry.target)===entry.contentRect.width)continue;widths.set(entry.target,entry.contentRect.width);entry.target.querySelectorAll('.checklist-text').forEach(resizeChecklistInput)}});
+  observer.observe($('itemsList'));observer.observe($('taskItemsList'));
 }
 const composingInputs=new WeakSet();
 function trackComposition(container){
@@ -175,7 +194,7 @@ function bindTaskEvents(){
   $('taskItemsList').oninput=e=>{
     const index=e.target.dataset.taskItem;
     if(index===undefined||!editingNote)return;
-    ensureTask(editingNote).items[Number(index)].text=e.target.value;const progress=taskProgress(editingNote.task);$('taskChecklistProgress').textContent=progress.total?`${progress.done}/${progress.total}完了`:'';refreshRelatedLinks();scheduleSave();
+    resizeChecklistInput(e.target);ensureTask(editingNote).items[Number(index)].text=e.target.value;const progress=taskProgress(editingNote.task);$('taskChecklistProgress').textContent=progress.total?`${progress.done}/${progress.total}完了`:'';refreshRelatedLinks();scheduleSave();
   };
   $('taskItemsList').onchange=e=>{
     const index=e.target.dataset.taskCheck;
@@ -190,7 +209,7 @@ function bindTaskEvents(){
   };
   $('taskItemsList').onkeydown=e=>{
     const index=e.target.dataset.taskItem;
-    if(index===undefined||e.key!=='Enter'||isImeConfirm(e)||!editingNote)return;
+    if(index===undefined||e.key!=='Enter'||e.shiftKey||isImeConfirm(e)||!editingNote)return;
     e.preventDefault();const at=Number(index)+1,task=ensureTask(editingNote);
     task.items.splice(at,0,{id:uid(),text:'',checked:false,order:at});task.items.forEach((item,order)=>item.order=order);
     renderTaskItems();refreshRelatedLinks();scheduleSave();$('taskItemsList').querySelector(`[data-task-item="${at}"]`)?.focus();
@@ -206,11 +225,12 @@ function hasMeaningfulContent(note){return Boolean((isFoodNote(note)&&ensureFood
 function setStatus(message){$('syncStatus').textContent=message}
 function initialize(){document.body.dataset.appVersion=VERSION;bindEvents();scheduleTaskDayRefresh();if(!configured()){$('syncStatus').textContent='Firebase設定が未設定です';$('loginButton').disabled=true;renderAll();return}app=initializeApp(config);auth=getAuth(app);db=getFirestore(app);onAuthStateChanged(auth,handleAuth)}
 function bindEvents(){
+  observeChecklistWidths();
   $('prepareNetaImportButton').onclick=prepareNetaImport;$('confirmNetaImportButton').onclick=importNetaRecords;
   mangaEditor.bind();
   bindTaskEvents();foodEditor.bind();foodPresetManager.bind();
   $('createNoteButton').onclick=()=>{if(!currentUser)return;if(isFoodCategory(selectedCategory))return openFoodInventory(selectedCategory);openEditor(createNote())}; $('loginButton').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>setStatus(`ログイン失敗: ${e.message}`)); $('logoutButton').onclick=()=>signOut(auth);
-  $('searchInput').oninput=renderNotes;$('sortSelect').onchange=()=>{if(!isTaskCategory(selectedCategory))regularSort=$('sortSelect').value;renderNotes()};$('noteTitleInput').oninput=()=>{syncEditingNoteFromForm();scheduleSave()};$('noteContentInput').oninput=()=>{syncEditingNoteFromForm();renderLinks();scheduleSave()};$('noteCategorySelect').onchange=handleCategoryChange;
+  $('searchInput').oninput=renderNotes;$('sortSelect').onchange=()=>{if(!isTaskCategory(selectedCategory))regularSort=$('sortSelect').value;renderNotes()};$('noteTitleInput').oninput=()=>{syncEditingNoteFromForm();updateFixedCardBadge();scheduleSave()};$('noteContentInput').oninput=()=>{syncEditingNoteFromForm();renderLinks();scheduleSave()};$('noteCategorySelect').onchange=handleCategoryChange;
   $('closeEditorButton').onclick=e=>{e.preventDefault();closeEditor()}; $('editorDialog').addEventListener('cancel',e=>{e.preventDefault();closeEditor()});$('editorDialog').addEventListener('close',cancelItemDrag);
   $('pinButton').onclick=()=>{editingNote.isPinned=!editingNote.isPinned;updateEditor();scheduleSave()}; $('deleteNoteButton').onclick=confirmDelete;$('confirmDeleteButton').onclick=e=>{e.preventDefault();if(pendingCardDelete)deleteCardNote();else deleteCurrentNote()};
   $('confirmDialog').addEventListener('close',()=>{if(!$('confirmDialog').open)pendingCardDelete=null});
@@ -223,7 +243,7 @@ function clearRealtimeListeners(){if(unsubscribeNotes){unsubscribeNotes();unsubs
 async function handleAuth(user){clearRealtimeListeners();if(currentUser?.uid!==user?.uid){if(pendingCardDelete){pendingCardDelete=null;$('confirmDialog').close()}foodPresetManager.reset();foodPresets=defaultFoodPresets();foodPresetsReady=false;$('foodManagePresetsButton').disabled=true}settingsCreatingForUid='';currentUser=user;if(!user){notes=[];categories=[];$('loginButton').hidden=false;$('logoutButton').hidden=true;setStatus(configured()?'ログインすると同期できます':'Firebase設定が未設定です');renderAll();return}const activeUid=user.uid;$('loginButton').hidden=true;$('logoutButton').hidden=false;setStatus('同期中…');const activeSettings=doc(db,'users',activeUid,'iroiroSettings','main');const activeNotes=collection(db,'users',activeUid,'iroiroNotes');unsubscribeSettings=onSnapshot(activeSettings,snap=>{if(currentUser?.uid!==activeUid)return;applyRemoteFoodPresets(snap.exists()?snap.data():{});if(snap.exists()&&Array.isArray(snap.data().categories)){applyRemoteCategories(snap.data().categories);return}if(settingsCreatingForUid!==activeUid){settingsCreatingForUid=activeUid;setDoc(activeSettings,{categories:structuredClone(DEFAULT_CATEGORIES),schemaVersion:SCHEMA_VERSION,updatedAt:serverTimestamp()},{merge:true}).catch(e=>setStatus(`カテゴリー初期化失敗: ${e.message}`)).finally(()=>{if(settingsCreatingForUid===activeUid)settingsCreatingForUid=''})}},err=>setStatus(`カテゴリー同期失敗: ${err.message}`));unsubscribeNotes=onSnapshot(query(activeNotes,orderBy('updatedAt','desc')),snap=>{if(currentUser?.uid!==activeUid)return;notes=snap.docs.map(x=>normalizeNote(x.id,x.data()));setStatus('同期済み');renderAll()},err=>setStatus(`同期失敗: ${err.message}`));try{await checkLegacy()}catch(e){setStatus(`移行状態の確認失敗: ${e.message}`)}}
 function applyRemoteCategories(nextCategories){let migrated=false;const prepared=nextCategories.map(category=>{const legacy=LEGACY_DEFAULT_CATEGORY_COLORS[category.id],standard=STANDARD_CATEGORY_COLOR_MIGRATIONS[category.id],savedColor=String(category.color||'').toLowerCase();if(legacy&&(savedColor===legacy[0]||standard&&savedColor===standard[0])){migrated=true;return{...category,color:standard?.[1]||legacy[1]}}return category});categories=orderedCategories(prepared);notes.forEach(note=>note.urls=extractUrls(note));renderAll();refreshEditorCategoryOptions();if(migrated)saveCategories(categories)}
 function refreshEditorCategoryOptions(){if(!editingNote||!$('editorDialog').open)return;const select=$('noteCategorySelect');const current=editingNote.categoryId;select.innerHTML=`<option value="">未分類</option>${categories.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}`;if(current===''||categories.some(c=>c.id===current)){select.value=current;updateEditorMode();return}editingNote.categoryId='';select.value='';updateEditorMode();scheduleSave()}
-function openEditor(note){foodPresetManager.reset();foodEditor.reset();editingNote=structuredClone(note);ensureFormatStores(editingNote);editorBaseData=editorNoteData(note);editorSession=uid();editRevision=0;savedRevision=0;requestedRevision=0;saveInProgress=false;savePromise=Promise.resolve(true);updateEditor();$('editorDialog').showModal();setTimeout(()=>{if(!editingNote)return;if(isFoodNote(editingNote))($('foodItemForm').hidden?$('foodAddItemButton'):$('foodItemNameInput')).focus({preventScroll:true});else $('noteTitleInput').focus()},40)}
+function openEditor(note){foodPresetManager.reset();foodEditor.reset();editingNote=structuredClone(note);ensureFormatStores(editingNote);editorBaseData=editorNoteData(note);editorSession=uid();editRevision=0;savedRevision=0;requestedRevision=0;saveInProgress=false;savePromise=Promise.resolve(true);updateEditor();$('editorDialog').showModal();resizeChecklistInputs();setTimeout(()=>{if(!editingNote)return;if(isFoodNote(editingNote))($('foodItemForm').hidden?$('foodAddItemButton'):$('foodItemNameInput')).focus({preventScroll:true});else $('noteTitleInput').focus()},40)}
 function syncEditingNoteFromForm(readSpecialFields=true){
   if(!editingNote)return;
   const note=editingNote;
@@ -237,7 +257,9 @@ function syncEditingNoteFromForm(readSpecialFields=true){
   if(isFoodNote(note))ensureFoodList(note)
   rememberCurrentFormat(note);note.urls=extractUrls(note);
 }
+function updateFixedCardBadge(){$('fixedNoteBadge').hidden=!isFixedCard(editingNote);$('fixedNoteBadge').innerHTML=`${FIXED_CARD_ICON} 上部固定`}
 function updateEditor(){
+  updateFixedCardBadge();
   const n=editingNote;
   $('noteTitleInput').value=n.title;$('noteContentInput').value=n.content;
   $('noteCategorySelect').innerHTML=`<option value="">未分類</option>${categories.map(c=>`<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('')}`;
@@ -245,11 +267,11 @@ function updateEditor(){
   document.querySelectorAll('#typeSwitcher button').forEach(b=>b.classList.toggle('active',b.dataset.type===n.type));
   $('pinButton').classList.toggle('active',n.isPinned);$('pinButton').textContent=`${n.isPinned?'★':'♧'} ピン留め`;
   $('createdAt').textContent=formatDate(n.createdAt);$('updatedAt').textContent=formatDate(n.updatedAt);
-  renderItems();updateEditorMode();renderLinks();$('saveStatus').textContent=saveInProgress||editRevision>savedRevision?'保存中…':isFoodNote(n)&&n.inventoryDraft&&!ensureFoodList(n).items.length&&!n.isPinned?'未保存（空の食材カード）':n.id?'保存済み':'未保存';
+  renderItems();updateEditorMode();resizeChecklistInputs();renderLinks();$('saveStatus').textContent=saveInProgress||editRevision>savedRevision?'保存中…':isFoodNote(n)&&n.inventoryDraft&&!ensureFoodList(n).items.length&&!n.isPinned?'未保存（空の食材カード）':n.id?'保存済み':'未保存';
 }
 function refreshRelatedLinks(){if(!editingNote)return;rememberCurrentFormat(editingNote);editingNote.urls=extractUrls(editingNote);renderLinks()}
-function renderItems(){cancelItemDrag();trackComposition($('itemsList'));$('itemsList').innerHTML=editingNote.items.map((item,index)=>`<div class="item-row draggable-item-row ${item.checked?'checked':''}" data-item-id="${escapeHtml(item.id)}"><input type="${editingNote.type==='checklist'?'checkbox':'button'}" ${editingNote.type==='checklist'&&item.checked?'checked':''} ${editingNote.type==='bullet'?'value="•" tabindex="-1"':''} data-check="${index}"/><input type="text" value="${escapeHtml(item.text)}" placeholder="項目を入力" data-item="${index}"/><button type="button" class="remove-item" data-remove="${index}" aria-label="項目を削除">×</button></div>`).join('');document.querySelectorAll('[data-item]').forEach(el=>{el.oninput=e=>{editingNote.items[e.target.dataset.item].text=e.target.value;refreshRelatedLinks();scheduleSave()};el.onkeydown=e=>{if(e.key==='Enter'&&!isImeConfirm(e)){e.preventDefault();const at=+e.target.dataset.item+1;editingNote.items.splice(at,0,{id:uid(),text:'',checked:false,order:at});editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave();document.querySelector(`[data-item="${at}"]`)?.focus()}}});document.querySelectorAll('[data-check]').forEach(el=>el.onchange=e=>{if(editingNote.type==='checklist'){editingNote.items[e.target.dataset.check].checked=e.target.checked;renderItems();refreshRelatedLinks();scheduleSave()}});document.querySelectorAll('[data-remove]').forEach(el=>el.onclick=e=>{editingNote.items.splice(+e.currentTarget.dataset.remove,1);editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave()});document.querySelectorAll('.draggable-item-row').forEach(bindItemDrag)}
-function itemDragAllowedTarget(target,touch=false){if(target.closest('input[type="checkbox"],.remove-item'))return false;return touch||!target.closest('input,button')}
+function renderItems(){cancelItemDrag();trackComposition($('itemsList'));$('itemsList').innerHTML=editingNote.items.map((item,index)=>`<div class="item-row draggable-item-row ${item.checked?'checked':''}" data-item-id="${escapeHtml(item.id)}"><input type="${editingNote.type==='checklist'?'checkbox':'button'}" ${editingNote.type==='checklist'&&item.checked?'checked':''} ${editingNote.type==='bullet'?'value="•" tabindex="-1"':''} data-check="${index}"/><textarea class="checklist-text" rows="1" placeholder="項目を入力" aria-label="項目${index+1}" data-item="${index}">${escapeHtml(item.text)}</textarea><button type="button" class="remove-item" data-remove="${index}" aria-label="項目を削除">×</button></div>`).join('');document.querySelectorAll('[data-item]').forEach(el=>{resizeChecklistInput(el);el.oninput=e=>{resizeChecklistInput(e.target);editingNote.items[e.target.dataset.item].text=e.target.value;refreshRelatedLinks();scheduleSave()};el.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!isImeConfirm(e)){e.preventDefault();const at=+e.target.dataset.item+1;editingNote.items.splice(at,0,{id:uid(),text:'',checked:false,order:at});editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave();document.querySelector(`[data-item="${at}"]`)?.focus()}}});document.querySelectorAll('[data-check]').forEach(el=>el.onchange=e=>{if(editingNote.type==='checklist'){editingNote.items[e.target.dataset.check].checked=e.target.checked;renderItems();refreshRelatedLinks();scheduleSave()}});document.querySelectorAll('[data-remove]').forEach(el=>el.onclick=e=>{editingNote.items.splice(+e.currentTarget.dataset.remove,1);editingNote.items.forEach((x,i)=>x.order=i);renderItems();refreshRelatedLinks();scheduleSave()});document.querySelectorAll('.draggable-item-row').forEach(bindItemDrag)}
+function itemDragAllowedTarget(target,touch=false){if(target.closest('input[type="checkbox"],.remove-item'))return false;return touch||!target.closest('input,textarea,button')}
 function bindItemDrag(row){row.addEventListener('pointerdown',event=>{if(event.pointerType!=='mouse'||itemDragState||!itemDragAllowedTarget(event.target))return;const state={row,kind:'pointer',pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,started:false,timer:null};itemDragState=state;startItemDrag(state)});row.addEventListener('pointermove',event=>{const state=itemDragState;if(!state||state.kind!=='pointer'||state.pointerId!==event.pointerId||!state.started)return;event.preventDefault();event.stopPropagation();autoScrollItemEditor(event.clientY);updateItemDragTarget(event.clientX,event.clientY,state)});row.addEventListener('pointerup',event=>{const state=itemDragState;if(state?.kind==='pointer'&&state.pointerId===event.pointerId)finishItemDrag()});row.addEventListener('pointercancel',event=>{if(itemDragState?.kind==='pointer'&&itemDragState.pointerId===event.pointerId)cancelItemDrag()});row.addEventListener('touchstart',event=>{if(itemDragState||!itemDragAllowedTarget(event.target,true))return;const touch=event.changedTouches[0];if(!touch)return;const state={row,kind:'touch',touchId:touch.identifier,startX:touch.clientX,startY:touch.clientY,started:false,timer:null,scrollTop:document.querySelector('.editor-content')?.scrollTop||0};itemDragState=state;state.timer=setTimeout(()=>startItemDrag(state),450);document.addEventListener('touchmove',handleItemTouchMove,{passive:false});document.addEventListener('touchend',finishItemTouch,{passive:false});document.addEventListener('touchcancel',cancelItemTouch,{passive:false})},{passive:true})}
 function startItemDrag(state){if(itemDragState!==state)return;state.started=true;document.activeElement?.blur();state.row.classList.add('dragging');document.body.classList.add('item-drag-active');if(state.kind==='pointer')state.row.setPointerCapture?.(state.pointerId);navigator.vibrate?.(12)}
 function autoScrollItemEditor(y){const scroller=document.querySelector('.editor-content');if(!scroller)return;const rect=scroller.getBoundingClientRect(),edge=48;if(y<rect.top+edge)scroller.scrollTop-=14;else if(y>rect.bottom-edge)scroller.scrollTop+=14}
@@ -341,7 +363,7 @@ async function persistSnapshot(snapshot){
           const input=taskItemId?$('taskItemsList').querySelector(`[data-task-item="${editingNote.task.items.findIndex(item=>item.id===taskItemId)}"]`)
             :itemId?$('itemsList').querySelector(`[data-item="${editingNote.items.findIndex(item=>item.id===itemId)}"]`):fieldId?$(fieldId):null;
           input?.focus();
-          if(selection.every(Number.isInteger)&&input&&['text','search','url','tel','password',undefined].includes(input.type))input.setSelectionRange?.(...selection);
+          if(selection.every(Number.isInteger)&&input&&['text','textarea','search','url','tel','password',undefined].includes(input.type))input.setSelectionRange?.(...selection);
         }
       } catch(error) {
         // The remote save succeeded, but newer local typing conflicts: keep it.
@@ -501,24 +523,24 @@ function renderTaskCard(note){
   const task=taskForNote(note),category=getCategory(note.categoryId)||{name:'未分類',color:'#6B7280'},title=displayTitle(note),progress=taskProgress(task);
   const description=note.content.trim()||task.items.filter(item=>item.text.trim()).slice(0,3).map(item=>`${item.checked?'☑':'□'} ${item.text}`).join(' / ');
   const busy=pendingTaskWrites.has(`${currentUser?.uid}:${note.id}`);
-  return`<article class="note-card task-card ${task.status==='done'?'task-done':''}" data-id="${escapeHtml(note.id)}">${cardDeleteButton(note)}<div class="task-card-main"><label class="task-complete-control"><input type="checkbox" class="task-card-checkbox" data-task-complete="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}を${task.status==='done'?'未着手に戻す':'完了にする'}" ${task.status==='done'?'checked':''} ${busy?'disabled':''}></label><button type="button" class="task-card-open" data-open-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}の詳細を開く"><span class="task-card-title">${escapeHtml(title)}</span>${description?`<span class="task-card-description">${escapeHtml(description)}</span>`:''}</button></div><div class="task-card-badges"><span class="task-status-badge status-${task.status}">${TASK_STATUS_LABELS[task.status]}</span><span class="task-priority priority-${task.priority}">優先度：${TASK_PRIORITY_LABELS[task.priority]}</span></div><footer class="task-card-footer"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span class="task-due ${taskIsOverdue(task)?'overdue':''}" title="${escapeHtml(taskDueLabel(task))}">${escapeHtml(taskDueLabel(task))}</span><div class="card-footer-right">${progress.total?`<span class="task-card-progress">${progress.done}/${progress.total}完了</span>`:''}${cardPinButton(note)}</div></footer></article>`;
+  return`<article class="note-card task-card ${task.status==='done'?'task-done':''}" data-id="${escapeHtml(note.id)}">${cardDeleteButton(note)}<div class="task-card-main"><label class="task-complete-control"><input type="checkbox" class="task-card-checkbox" data-task-complete="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}を${task.status==='done'?'未着手に戻す':'完了にする'}" ${task.status==='done'?'checked':''} ${busy?'disabled':''}></label><button type="button" class="task-card-open" data-open-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(title)}の詳細を開く"><span class="task-card-title">${escapeHtml(title)}</span>${description?`<span class="task-card-description">${escapeHtml(description)}</span>`:''}</button></div><div class="task-card-badges"><span class="task-status-badge status-${task.status}">${TASK_STATUS_LABELS[task.status]}</span><span class="task-priority priority-${task.priority}">優先度：${TASK_PRIORITY_LABELS[task.priority]}</span>${fixedCardBadge(note)}</div><footer class="task-card-footer"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span class="task-due ${taskIsOverdue(task)?'overdue':''}" title="${escapeHtml(taskDueLabel(task))}">${escapeHtml(taskDueLabel(task))}</span><div class="card-footer-right">${progress.total?`<span class="task-card-progress">${progress.done}/${progress.total}完了</span>`:''}${cardPinButton(note)}</div></footer></article>`;
 }
 function renderMangaCard(note){
   const manga=mangaForNote(note),category=getCategory(note.categoryId)||{name:'漫画',color:'#FFD400'};
   const preview=note.content.trim()||manga.pages.flatMap(page=>page.rows).map(row=>[row.actor,row.detail,row.reference].filter(Boolean).join('：')).find(text=>text.trim())||'ページ・コマごとにネタを記録できます。';
-  return`<article class="note-card manga-card" data-id="${escapeHtml(note.id)}">${cardDeleteButton(note)}<div class="card-top"><span class="type-icon">▦</span><h3 class="card-title"><button type="button" class="card-open" data-open-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(displayTitle(note))}の詳細を開く">${escapeHtml(displayTitle(note))}</button></h3></div><div class="manga-card-summary"><span>${escapeHtml(manga.status)} · ${escapeHtml(manga.genre)}</span><p class="card-preview">${escapeHtml(preview)}</p></div><footer class="card-footer"><div class="card-footer-left"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span>更新 ${shortDate(note.updatedAt)}</span></div><div class="card-footer-right"><span>${manga.pages.length}ページ</span>${cardPinButton(note)}</div></footer></article>`;
+  return`<article class="note-card manga-card" data-id="${escapeHtml(note.id)}">${cardDeleteButton(note)}<div class="card-top">${fixedCardBadge(note)||'<span class="type-icon">▦</span>'}<h3 class="card-title"><button type="button" class="card-open" data-open-note="${escapeHtml(note.id)}" aria-label="${escapeHtml(displayTitle(note))}の詳細を開く">${escapeHtml(displayTitle(note))}</button></h3></div><div class="manga-card-summary"><span>${escapeHtml(manga.status)} · ${escapeHtml(manga.genre)}</span><p class="card-preview">${escapeHtml(preview)}</p></div><footer class="card-footer"><div class="card-footer-left"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span>更新 ${shortDate(note.updatedAt)}</span></div><div class="card-footer-right"><span>${manga.pages.length}ページ</span>${cardPinButton(note)}</div></footer></article>`;
 }
 function renderNoteCard(n){
   if(isTaskNote(n))return renderTaskCard(n);
   if(isMangaNote(n))return renderMangaCard(n);
   if(isFoodNote(n))return renderFoodSummaryCard(n);
   const c=getCategory(n.categoryId)||{name:'未分類',color:'#6B7280'},color=categoryColor(c.color),progress=n.type==='checklist'?`${n.items.filter(i=>i.checked).length}/${n.items.length}完了`:'',linkInfo=n.urls.length?`🔗 ${n.urls.length}件`:'';
-  return`<article class="note-card" data-id="${escapeHtml(n.id)}">${cardDeleteButton(n)}<div class="card-top"><span class="type-icon">${n.type==='text'?'▤':n.type==='bullet'?'☷':'☑'}</span><h3 class="card-title"><button type="button" class="card-open" data-open-note="${escapeHtml(n.id)}" aria-label="${escapeHtml(displayTitle(n))}の詳細を開く">${escapeHtml(displayTitle(n))}</button></h3></div>${cardPreviewHtml(n)}<footer class="card-footer"><div class="card-footer-left"><span class="category-pill" style="background:${color};color:${categoryTextColor(color)}">${escapeHtml(c.name)}</span><span>更新 ${shortDate(n.updatedAt)}</span>${linkInfo?`<span>${linkInfo}</span>`:''}</div><div class="card-footer-right">${progress?`<span class="card-progress">${progress}</span>`:''}${cardPinButton(n)}</div></footer></article>`;
+  return`<article class="note-card" data-id="${escapeHtml(n.id)}">${cardDeleteButton(n)}<div class="card-top">${fixedCardBadge(n)||`<span class="type-icon">${n.type==='text'?'▤':n.type==='bullet'?'☷':'☑'}</span>`}<h3 class="card-title"><button type="button" class="card-open" data-open-note="${escapeHtml(n.id)}" aria-label="${escapeHtml(displayTitle(n))}の詳細を開く">${escapeHtml(displayTitle(n))}</button></h3></div>${cardPreviewHtml(n)}<footer class="card-footer"><div class="card-footer-left"><span class="category-pill" style="background:${color};color:${categoryTextColor(color)}">${escapeHtml(c.name)}</span><span>更新 ${shortDate(n.updatedAt)}</span>${linkInfo?`<span>${linkInfo}</span>`:''}</div><div class="card-footer-right">${progress?`<span class="card-progress">${progress}</span>`:''}${cardPinButton(n)}</div></footer></article>`;
 }
 function renderFoodSummaryCard(note){
   const rows=ensureFoodList(note).items,available=rows.filter(item=>!item.checked),category=getCategory(note.categoryId)||{name:'食材',color:'#38A169'};
   const preview=rows.slice(0,3).map((item,index)=>`<div class="card-list-item ${item.checked?'completed':''}">${item.checked?'☑':'□'} ${escapeHtml(item.name)}　${escapeHtml(formatFoodQuantity(item))}${rows.length>3&&index===2?'…':''}</div>`).join('');
-  return `<article class="note-card food-summary-card" data-food-category="${escapeHtml(note.categoryId)}">${cardDeleteButton(note)}<div class="card-top"><span class="type-icon" aria-hidden="true">☑</span><h3 class="card-title"><button type="button" class="card-open" data-open-food-list="${escapeHtml(note.categoryId)}" aria-label="食材カードを開く">食材</button></h3></div><div class="card-preview card-list-preview">${preview||'＋から食材を追加できます。'}</div><footer class="card-footer"><div class="card-footer-left"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span>${available.length}項目${rows.length!==available.length?`（選択中${rows.length-available.length}項目）`:''}</span></div><div class="card-footer-right">${cardPinButton(note)}</div></footer></article>`;
+  return `<article class="note-card food-summary-card" data-food-category="${escapeHtml(note.categoryId)}">${cardDeleteButton(note)}<div class="card-top">${fixedCardBadge(note)||'<span class="type-icon" aria-hidden="true">☑</span>'}<h3 class="card-title"><button type="button" class="card-open" data-open-food-list="${escapeHtml(note.categoryId)}" aria-label="食材カードを開く">食材</button></h3></div><div class="card-preview card-list-preview">${preview||'＋から食材を追加できます。'}</div><footer class="card-footer"><div class="card-footer-left"><span class="category-pill" ${categoryStyle(category.color)}>${escapeHtml(category.name)}</span><span>${available.length}項目${rows.length!==available.length?`（選択中${rows.length-available.length}項目）`:''}</span></div><div class="card-footer-right">${cardPinButton(note)}</div></footer></article>`;
 }
 function renderNotes(){
   const term=$('searchInput').value.trim().toLowerCase(),taskView=isTaskCategory(selectedCategory),mangaView=isMangaCategory(selectedCategory),foodView=isFoodCategory(selectedCategory);
@@ -532,6 +554,8 @@ function renderNotes(){
   });
   const sort=$('sortSelect').value;
   shown.sort((a,b)=>{
+    const fixedA=fixedCardRank(a),fixedB=fixedCardRank(b);
+    if(fixedA!==fixedB)return fixedA<fixedB?-1:1;
     const done=Number(isTaskNote(a)&&taskForNote(a).status==='done')-Number(isTaskNote(b)&&taskForNote(b).status==='done');
     if(done)return done;
     if(a.isPinned!==b.isPinned)return a.isPinned?-1:1;
@@ -540,7 +564,7 @@ function renderNotes(){
     const key=sort.startsWith('created')?'createdAt':'updatedAt';
     return sort.endsWith('asc')?dateMillis(a[key])-dateMillis(b[key]):dateMillis(b[key])-dateMillis(a[key]);
   });
-  const complete=taskView?shown.filter(note=>taskForNote(note).status==='done'):[],active=taskView?shown.filter(note=>taskForNote(note).status!=='done'):shown;
+  const complete=taskView?shown.filter(note=>!isFixedCard(note)&&taskForNote(note).status==='done'):[],active=taskView?shown.filter(note=>isFixedCard(note)||taskForNote(note).status!=='done'):shown;
   $('listTitle').textContent=selectedCategory==='all'?'すべてのメモ':selectedCategory===''?'未分類':getCategory(selectedCategory)?.name||'カテゴリー';
   $('completedFoods').hidden=true;$('completedFoodsGrid').innerHTML='';$('foodListHint').hidden=!foodView;$('foodEmptyState').hidden=true;
   $('noteCount').textContent=taskView?`${shown.length}件（未完了${active.length}件）`:`${shown.length}件`;

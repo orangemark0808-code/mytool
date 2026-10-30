@@ -206,3 +206,14 @@ body [hidden]{display:none!important}
 .food-check-row.is-checked{background:#f6f5f3}
 .food-delete-actions button:disabled{opacity:.5;cursor:default}
 @media(max-width:700px){.food-check-row{padding:8px;gap:4px}.food-item-form{padding:12px}.food-item-quantity{max-width:110px}.food-form-actions .quiet-button{font-size:12px}.food-amount-grid{gap:8px}}
+
+/* 上部固定は、星のピン留めとは独立した表示。 */
+.card-fixed-badge{display:inline-flex;align-items:center;justify-content:center;flex:0 0 26px;width:26px;height:26px;border-radius:6px;background:#eaf5ff;color:#25638c}
+.fixed-note-badge{display:flex;align-items:center;gap:5px;margin:4px 0 12px;color:#25638c;font-size:12px;font-weight:600}
+.item-row .checklist-text,.task-item-row .checklist-text{display:block;flex:1;width:100%;min-width:0;min-height:46px;margin:0;border:1px solid rgba(58,42,26,.5);border-radius:9px;padding:10px;line-height:1.6;font-size:16px;color:var(--ink);background:#fff;resize:none;overflow:hidden;overflow-wrap:anywhere;white-space:pre-wrap;field-sizing:content}
+.item-row.checked .checklist-text,.task-item-row.checked .checklist-text{color:var(--muted);text-decoration:line-through}
+.item-row,.task-item-row{align-items:flex-start}
+.item-row>input,.task-item-row>input[type=checkbox]{margin-top:12px}
+.item-row .remove-item,.task-item-row .remove-item{flex:0 0 36px;min-height:44px}
+
+.task-card-badges .card-fixed-badge{margin-left:auto}

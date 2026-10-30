@@ -12,6 +12,7 @@ function setup(task=false){
 for(const task of [false,true])test(`${task?'タスク':'通常'}チェックリストは変換Enterで追加せず、確定後のEnterで1行追加する`,()=>{
   const {h,input,container,count,key}=setup(task);let prevented=0;
   const event={key:'Enter',target:input,preventDefault:()=>prevented++};
+  key({...event,shiftKey:true});assert.equal(count(),1);assert.equal(prevented,0);
   key({...event,isComposing:true});key({...event,isComposing:false,keyCode:229});key({...event,which:229});assert.equal(count(),1);assert.equal(prevented,0);
   container.oncompositionstart({target:input});key(event);assert.equal(count(),1);
   container.oncompositionend({target:input});key(event);assert.equal(count(),2);assert.equal(prevented,1);

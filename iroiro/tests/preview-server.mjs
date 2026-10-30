@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root=new URL('../',import.meta.url);
 const sdk=String.raw`
-const key='iroiro-neta-import-preview-v1';
+const key='iroiro-fixed-checklist-preview-v1';
 const date=new Date(),today=[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
 const initial={
   'users/preview-user/iroiroSettings/main':{categories:[{id:'app',name:'アプリ',color:'#FF7F00',order:0},{id:'tasks',name:'タスク',color:'#FFD400',order:1},{id:'blog',name:'ブログ',color:'#3A86D4',order:2},{id:'manga',name:'漫画',color:'#FFD400',order:3},{id:'food',name:'食材',color:'#38A169',order:4}]},
@@ -17,6 +17,10 @@ const initial={
   'users/preview-user/netakiroku/new-record':{title:'【架空】新形式の漫画案',status:'ネタ作成中',category:'日常',tags:['新形式'],memo:'補足',pages:[{rows:[{panel:'1',actor:'主人公',type:'(叫)',detail:'もう一つの案',reference:''}]}],createdAt:'2026-01-01T00:00:00.000Z',updatedAt:'2026-02-02T00:00:00.000Z'},
   'users/preview-user/iroiroNotes/normal-note':{title:'通常のメモ',type:'text',categoryId:'blog',content:'架空のプレビューデータです。',items:[],createdAt:date.toISOString(),updatedAt:date.toISOString()},
 };
+for(const [index,title] of ['やること','アプリ関連','買物リスト','調味料'].entries()){
+  const task=title!=='調味料',items=[{id:'long-1',text:'アプリの入力画面で、最初に画像を2枚読み込めるようにする。読み込み後にプレビューを確認し、必要に応じて順番を変更できるようにする。',checked:false},{id:'long-2',text:'イロイロキロクの「やること」「アプリ関連」「買物リスト」「食材」「調味料」を、ピン留めとは別に上部へ固定して表示する。長いチェック項目も最後まで確認できるようにする。',checked:false}];
+  initial['users/preview-user/iroiroNotes/fixed-'+index]={title,type:'checklist',categoryId:task?'tasks':'app',content:'',items:task?[]:items,task:task?{status:'todo',priority:'normal',dueDate:'',items}:null,createdAt:date.toISOString(),updatedAt:date.toISOString()};
+}
 let store=JSON.parse(localStorage.getItem(key)||'null')||initial;
 let user={uid:'preview-user'};
 const listeners=new Set();
