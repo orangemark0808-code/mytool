@@ -12,7 +12,7 @@ import { defaultFoodPresets, readFoodPresets, validateFoodPresets } from './food
 import { createFoodPresetManager } from './food-preset-manager.mjs?v=2026-10-29-08';
 import { createMangaEditor } from './manga-editor.mjs?v=2026.10.23-1';
 
-const VERSION='2026-10-30-02'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
+const VERSION='2026-10-30-03'; const LEGACY_KEY='orangememo-notes-v1'; const SCHEMA_VERSION=3; const BACKUP_FORMAT_VERSION=1;
 // 指定されたカードを、星のピン留めとは独立して常に上部へ表示する。
 const FIXED_CARD_TITLES=['やること','アプリ関連','買物リスト','食材','調味料'];
 const FIXED_CARD_ICON='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="3"/><path d="M12 8v14M8 12h8M3 12v3a9 7 0 0 0 18 0v-3M3 12l3 3M21 12l-3 3"/></svg>';
