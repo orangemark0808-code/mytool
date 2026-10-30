@@ -91,6 +91,7 @@ jobs:
           cp "MITAMONO/README.md" "dist/MITAMONO/README.md"
           cp "iroiro/index.html" "dist/iroiro/index.html"
           cp "iroiro/apple-touch-icon-v1.png" "dist/iroiro/apple-touch-icon-v1.png"
+          cp "iroiro/apple-touch-icon-v2.png" "dist/iroiro/apple-touch-icon-v2.png"
           cp "iroiro/dashboard-sync.html" "dist/iroiro/dashboard-sync.html"
           cp "iroiro/dashboard-sync.mjs" "dist/iroiro/dashboard-sync.mjs"
           cp "iroiro/style.css" "dist/iroiro/style.css"
