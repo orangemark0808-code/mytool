@@ -60,10 +60,19 @@ test('キーボードで×を操作した後は隣の×へ、空になったら�
   h.context.document.activeElement={dataset:{foodDelete:'c'}};remove(h,'c');assert.equal(focused,'undo');
 });
 
-test('食材行のチェック欄をなくしても定番の複数選択と×削除を使える',()=>{
-  const h=setup();assert.doesNotMatch(h.element('foodItemsList').innerHTML,/type="checkbox"|data-food-check|food-check-control/);
-  assert.match(h.element('foodPresetChoices').innerHTML,/type="checkbox" data-food-preset=/);assert.equal(h.element('foodClearCheckedButton').hidden,true);
+test('食材行のチェック欄と×削除・定番の複数選択を併用できる',()=>{
+  const h=setup();assert.match(h.element('foodItemsList').innerHTML,/type="checkbox" class="food-item-check" data-food-check="a"/);
+  assert.match(h.element('foodPresetChoices').innerHTML,/type="checkbox" data-food-preset=/);assert.equal(h.element('foodClearCheckedButton').hidden,true);assert.equal(h.element('foodDeleteCheckedButton').hidden,true);
   remove(h,'b');assert.deepEqual(ids(h),['a','c']);h.run('foodEditor.undoDelete()');assert.deepEqual(ids(h),['a','b','c']);
+});
+
+test('食材にチェックすると取り消し線で残り、チェック済みをまとめて削除・復元できる',()=>{
+  const h=setup();h.run(`foodEditor.toggleChecked('b',true)`);assert.deepEqual(ids(h),['a','b','c']);
+  assert.match(h.element('foodItemsList').innerHTML,/food-check-row is-checked"><input type="checkbox" class="food-item-check" data-food-check="b"[^>]*checked>/);
+  assert.equal(h.element('foodDeleteCheckedButton').hidden,false);assert.match(h.element('foodDeleteCheckedButton').textContent,/1件/);
+  h.run('foodEditor.deleteChecked()');assert.deepEqual(ids(h),['a','c']);
+  h.run('foodEditor.undoDelete()');assert.deepEqual(ids(h),['a','b','c']);assert.match(h.element('foodItemsList').innerHTML,/data-food-check="b"[^>]*checked>/);
+  h.run(`foodEditor.toggleChecked('b',false)`);assert.equal(h.element('foodDeleteCheckedButton').hidden,true);
 });
 
 test('旧チェック済みの項目は開くだけでは変更せず、明示的に解除して在庫に戻せる',async()=>{
