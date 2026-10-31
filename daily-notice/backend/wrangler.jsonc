@@ -1,0 +1,7 @@
+{
+ "name":"daily-notice-api",
+ "main":"worker.mjs",
+ "compatibility_date":"2026-10-31",
+ "workers_dev":true,
+ "vars":{"FIREBASE_PROJECT_ID":"my-toolbox-7c6cb","OWNER_EMAIL":"orangemark0808@gmail.com","OPENAI_MODEL":"gpt-6.1-sol"}
+}

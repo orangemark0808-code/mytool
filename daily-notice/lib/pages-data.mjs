@@ -24,4 +24,6 @@ export async function readTasks(){
 }
 export async function addTask(value){const c=await ownerClient();await appendTask({...c,taskModule},value);return readTasks();}
 export async function readFoods(){const c=await ownerClient(),raw=await readFoodInventory(c),stock=foodImport(raw);if(!stock)throw Error('食材の形式を確認できませんでした。');return stock;}
-export async function mealStatus(tool){const state=await readPrivate('MealState'),saved=await readPrivate('Meal'+tool);return {configured:false,enabled:state?.enabled!==false,blocked:null,limitPerDay:10,saved:saved?.plan??null};}
+export async function mealStatus(tool){const state=await readPrivate('MealState'),saved=await readPrivate('Meal'+tool);return {configured:false,enabled:Boolean(state?.enabled??1),blocked:state?.blocked??null,limitPerDay:10,saved:saved?.plan??null};}
+
+export async function setMealEnabled(enabled){const c=await ownerClient();await c.f.runTransaction(c.db,async tx=>{const ref=privateRef(c,'MealState'),doc=await tx.get(ref),state=doc.data()||{};tx.set(ref,{...state,enabled:enabled?1:0,blocked:enabled?null:state.blocked??null,epoch:(state.epoch||0)+1,lease_id:null,lease_until:0});});}
