@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {nextMemo,mergeSnapshots} from '../lib/pages-store.mjs';
+import {validateMigration} from '../lib/migrate.mjs';
+const source=at=>({date:'2026-10-31',lastAttemptAt:at,lastSuccessAt:at,error:null});
+const snapshot=at=>({schemaVersion:1,date:'2026-10-31',calendar:{...source(at),events:[]},tasks:{...source(at),notes:[]}});
+test('stale memo cannot overwrite a newer phone edit',()=>{const saved=nextMemo({revision:4},{text:'スマホの変更',revision:4});assert.equal(saved.revision,5);assert.throws(()=>nextMemo(saved,{text:'古いPCの内容',revision:4}),/別の端末/);assert.equal(saved.text,'スマホの変更');});
+test('memo validates revision and length before writing',()=>{for(const v of [null,{}, {text:'a',revision:-1},{text:'a',revision:0.2},{text:'a'.repeat(20001),revision:0}])assert.throws(()=>nextMemo(null,v));});
+test('import merges calendar and tasks independently without rolling back newer data',()=>{const current=snapshot('2026-10-31T10:00:00Z'),incoming=snapshot('2026-10-31T09:00:00Z');incoming.tasks.lastAttemptAt='2026-10-31T11:00:00Z';const merged=mergeSnapshots(current,incoming);assert.equal(merged.calendar,current.calendar);assert.equal(merged.tasks,incoming.tasks);});
+test('migration excludes credentials and rejects malformed data',()=>{const raw={format:'daily-notice-export-v1',snapshot:snapshot('2026-10-31T09:00:00Z'),memo:{text:'メモ',revision:2,updatedAt:'2026-10-31T09:00:00Z'},refreshToken:'must-not-transfer',meals:{}};const safe=validateMigration(raw);assert.equal(safe.refreshToken,undefined);assert.equal(safe.memo.text,'メモ');assert.throws(()=>validateMigration({...raw,memo:{...raw.memo,text:5}}));assert.throws(()=>validateMigration({...raw,meals:{pan:{invalid:true}}}));});

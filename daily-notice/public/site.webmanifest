@@ -1,0 +1,21 @@
+{
+  "name": "今日のお知らせ",
+  "short_name": "今日のお知らせ",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "https://orangemark0808-code.github.io/mytool/daily-notice-icons/home-icon-192-v4.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://orangemark0808-code.github.io/mytool/daily-notice-icons/home-icon-512-v4.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

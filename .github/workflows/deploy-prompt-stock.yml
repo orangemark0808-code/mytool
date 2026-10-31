@@ -26,6 +26,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node for Daily Notice
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: daily-notice/package-lock.json
+
+      - name: Build and test Daily Notice
+        working-directory: daily-notice
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run typecheck
+          npm run build
+
       - name: Test Journal Editor
         run: node --test journal-editor/tests/core.test.mjs journal-editor/tests/integration.test.mjs journal-editor/tests/publish.test.mjs
 
@@ -63,6 +78,8 @@ jobs:
           FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
+          mkdir -p dist/daily-notice
+          cp -R daily-notice/dist/. dist/daily-notice/
           mkdir -p dist/PROMPT_STOCK
           mkdir -p dist/Scene_Prompt
           mkdir -p dist/horoscope
