@@ -225,3 +225,17 @@ body [hidden]{display:none!important}
 .card-footer-right>.card-progress,.card-footer-right>.task-card-progress{flex:0 0 auto}
 .card-fixed-badge svg,.fixed-note-badge svg{display:block;flex:0 0 18px}
 @media(max-width:700px){.fixed-note-label{display:none}}
+
+/* 食材のチェック枠（タスクのチェック項目と同じ見た目） */
+.food-check-row>.food-item-check{width:24px;height:24px;margin:0;flex:0 0 auto;align-self:flex-start;margin-top:10px;accent-color:var(--orange);cursor:pointer}
+.food-check-row.is-checked .food-inline-amount,.food-check-row.is-checked .food-inline-storage,.food-check-row.is-checked .food-item-meta{opacity:.55}
+
+/* カテゴリー色：「＋その他の色」の丸（虹色の輪＋「＋」。候補外の色を選ぶとその色で塗る） */
+.category-color-choices{display:contents}
+.category-color-custom{position:relative;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 auto;border:1px solid rgba(58,42,26,.58);border-radius:50%;background:conic-gradient(#e25555,#ffd400,#38a169,#1e9a8a,#3a86d4,#7e5fc4,#d94f8a,#e25555);cursor:pointer}
+.category-color-custom::after{content:"+";display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#fff;color:#2d2926;font-size:15px;font-weight:700;line-height:1;pointer-events:none}
+.category-color-custom.selected{background:var(--choice-color);box-shadow:0 0 0 2px #fff,0 0 0 4px #2d2926}
+.category-color-custom.selected::after{content:"";width:0;height:0}
+.category-color-custom input[type=color]{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer}
+.category-color-mark{width:16px;height:16px;margin:0 4px;border:1px solid rgba(58,42,26,.45);border-radius:50%;flex:0 0 auto}
+.new-category .category-color-custom{border-radius:9px}
