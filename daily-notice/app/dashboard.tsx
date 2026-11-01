@@ -180,11 +180,11 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
 
   return <div className="board">
     <header className="site-header">
-      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-11-01-01">2026-11-01-01</span></div>
+      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-11-01-02">2026-11-01-02</span></div>
       <MoonWidget sky={sky} />
       <div className="header-tools"><nav aria-label="表示する項目">{[["schedule", "予定"], ["tasks", "タスク"], ["meals", "メニュー"], ["memo", "メモ"]].map(([id, label]) => <a key={id} href={`#${id}`} aria-current={activeNav === id ? "location" : undefined} onClick={() => setActiveNav(id)}>{label}</a>)}</nav>
-        <div className="fetch-meta">
-          <span className="fetch-meta-heading">最終更新（日本時間）</span>
+        <div className="fetch-meta" aria-label="最終更新日時（日本時間）" title="最終更新日時（日本時間）">
+          <span className="fetch-meta-heading">最終更新</span>
           <dl>{([["予定", snapshot.calendar.lastSuccessAt], ["タスク", snapshot.tasks.lastSuccessAt]] as const).map(([label, value]) =>
             <div className="fetch-meta-row" key={label}><dt>{label}</dt><dd>{value ? <time dateTime={value}>{updateStamp(value)}</time> : "未取得"}</dd></div>
           )}</dl>
