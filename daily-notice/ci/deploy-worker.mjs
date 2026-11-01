@@ -12,6 +12,8 @@ const metadata = {
   main_module: 'worker.mjs',
   compatibility_date: config.compatibility_date,
   keep_bindings: ['secret_text'],
+  observability: {enabled: true, redact_query_string: true,
+    logs: {enabled: true, invocation_logs: false, persist: true}},
   bindings: Object.entries(config.vars).map(([name, text]) => ({name, type: 'plain_text', text})),
 };
 const form = new FormData();
