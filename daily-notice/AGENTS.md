@@ -1,5 +1,6 @@
 # このアプリを修正するAIへ
 
+- まず `README.md` のアプリ概要とデータの扱いを確認する。
 - 日本語で報告する。ソースはこのディレクトリ、配信先はGitHub Pages。
 - React / Viteの通常コマンドで開発・ビルドする。Sitesプラグインは不要。
 - `npm test`, `npm run typecheck`, `npm run build` を変更に応じて実行する。
