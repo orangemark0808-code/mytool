@@ -1,4 +1,5 @@
 import {readFile} from 'node:fs/promises';
+import {setTimeout as delay} from 'node:timers/promises';
 
 const account = process.env.CLOUDFLARE_ACCOUNT_ID;
 const token = process.env.CLOUDFLARE_API_TOKEN;
@@ -27,8 +28,16 @@ if (!response.ok || !result.success) {
   throw new Error(`Workerの公開に失敗しました（HTTP ${response.status}; code ${codes}）。`);
 }
 const origin = 'https://daily-notice-api.orangemark0808.workers.dev';
-const health = await fetch(origin + '/health', {redirect: 'error', signal: AbortSignal.timeout(15000)});
-if (!health.ok || !(await health.json()).ok) throw new Error('公開後の稼働確認に失敗しました。');
+let healthy = false;
+for (let attempt = 0; attempt < 8; attempt++) {
+  try {
+    const health = await fetch(origin + '/health', {redirect: 'error', signal: AbortSignal.timeout(5000)});
+    const body = await health.json().catch(() => null);
+    if (health.ok && body?.ok === true) { healthy = true; break; }
+  } catch {}
+  if (attempt < 7) await delay(2000);
+}
+if (!healthy) throw new Error('公開後の稼働確認に失敗しました。');
 const unauthenticated = await fetch(origin + '/api/meals?tool=pan', {redirect: 'error', signal: AbortSignal.timeout(15000)});
 if (unauthenticated.status !== 401) throw new Error('本人認証の保護を確認できません。');
 console.log('daily-notice-apiを公開しました。稼働と未認証アクセスの拒否を確認しました。');
