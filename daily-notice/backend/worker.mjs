@@ -16,7 +16,11 @@ export function createWorker({fetcher=fetch,now=Date.now}={}){return {async fetc
  if(!env.FIREBASE_API_KEY||!env.FIREBASE_PROJECT_ID||!env.OWNER_EMAIL)return reply({error:'生成サーバーの接続設定を確認してください。'},503);
  const config={projectId:env.FIREBASE_PROJECT_ID,apiKey:env.FIREBASE_API_KEY,expectedEmail:env.OWNER_EMAIL};
  const reader=new FirebaseReader(config,{fetcher,now});
- try{await reader.verify(match[1],{uid:OWNER_UID});}catch{return reply({error:'ご本人のGoogleアカウントでログインしてください。'},401);}
+ try{await reader.verify(match[1],{uid:OWNER_UID});}catch(error){
+  const code=['invalid-token','account-mismatch','permission','reconnect','network','remote-data'].includes(error?.code)?error.code:'unknown';
+  console.warn('daily-notice authentication rejected',code);
+  return reply({error:code==='permission'?'生成サーバーのGoogle認証設定を確認してください。':'ご本人のGoogleアカウントでログインしてください。'},401);
+ }
  const store=new FirestoreMealStore({projectId:config.projectId,owner:OWNER_UID,idToken:match[1],fetcher});
  const service=new AiMealService({store,owner:OWNER_UID,apiKey:env.OPENAI_API_KEY||'',model:env.OPENAI_MODEL||'gpt-6.1-sol',readStock:async()=>{const value=await reader.read(match[1],OWNER_UID);if(!value.food)throw new MealError('source');return value.food;},fetcher,now});
  let tool=url.searchParams.get('tool');
