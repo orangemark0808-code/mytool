@@ -3,18 +3,21 @@ import {setTimeout as delay} from 'node:timers/promises';
 
 const account = process.env.CLOUDFLARE_ACCOUNT_ID;
 const token = process.env.CLOUDFLARE_API_TOKEN;
+const firebaseKey = process.env.FIREBASE_API_KEY;
 if (account !== '1329ff2a51a1994d2bc91d563267bdc4' || !token) {
   throw new Error('Cloudflareの公開設定を確認してください。');
 }
 const config = JSON.parse(await readFile('backend/wrangler.jsonc', 'utf8'));
 if (config.name !== 'daily-notice-api') throw new Error('公開先Workerが一致しません。');
+if (!/^AIza[A-Za-z0-9_-]{30,60}$/.test(firebaseKey ?? '')) throw new Error('既存のFirebase Web設定を確認してください。');
 const metadata = {
   main_module: 'worker.mjs',
   compatibility_date: config.compatibility_date,
   keep_bindings: ['secret_text'],
   observability: {enabled: true, redact_query_string: true,
     logs: {enabled: true, invocation_logs: false, persist: true}},
-  bindings: Object.entries(config.vars).map(([name, text]) => ({name, type: 'plain_text', text})),
+  bindings: [{name: 'FIREBASE_API_KEY', type: 'secret_text', text: firebaseKey},
+    ...Object.entries(config.vars).map(([name, text]) => ({name, type: 'plain_text', text}))],
 };
 const form = new FormData();
 form.set('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}), 'metadata.json');

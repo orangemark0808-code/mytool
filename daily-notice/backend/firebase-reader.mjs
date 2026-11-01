@@ -17,6 +17,7 @@ export class FirebaseReader {
             response = await this.fetcher(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(10000) });
         }
         catch {
+            console.warn('firebase transport failed');
             throw new LinkError('network');
         }
         if (response.status >= 300 && response.status < 400) {
@@ -25,6 +26,9 @@ export class FirebaseReader {
         }
         const data = await limitedJson(response);
         if (!response.ok) {
+            const reason=data?.error?.details?.find(item=>/^[A-Z_]{1,80}$/.test(item?.reason??''))?.reason;
+            const message=/^[A-Z_]{1,80}$/.test(data?.error?.message??'')?data.error.message:'upstream-error';
+            console.warn('firebase request rejected',response.status,reason??message);
             if (invalidTokens.has(data?.error?.message))
                 throw new LinkError('reconnect');
             if (response.status === 401 || response.status === 403)

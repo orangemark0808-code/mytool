@@ -14,6 +14,8 @@ Firebase IDトークンをGoogleのaccounts:lookupで検証し、本人UID・メ
 
 GitHubのRepository Secret `DAILY_NOTICE_CLOUDFLARE_API_TOKEN` には、CloudflareでこのWorkerだけを対象にした `Individual Workers Editor` トークンを登録します。OpenAIキーをGitHubへ登録する必要はありません。`OPENAI_API_KEY` と `FIREBASE_API_KEY` はCloudflareのランタイムSecretに保存し、通常のコード公開では保持します。
 
+FirebaseのWeb APIキーは、Pages公開でも使う既存のGitHub Secret `FIREBASE_API_KEY` と同じ値を公開時に同期します。OpenAIキーは同期対象に含めず、Cloudflareに保存済みの値を保持します。
+
 ## CLIでの公開
 
 ```sh
