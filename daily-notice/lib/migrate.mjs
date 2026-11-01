@@ -8,7 +8,7 @@ export function validateMigration(value){
  const meals={};for(const tool of ['pan','steamer','rede'])if(value.meals?.[tool]){const plan=parseSavedMealPlan(value.meals[tool]);if(!plan||plan.tool!==tool)throw Error('献立の形式を確認できませんでした。');meals[tool]=plan;}
  return {snapshot:value.snapshot,memo:{text:memo.text,revision:memo.revision,updatedAt:memo.updatedAt},meals};
 }
-export async function importMigration(raw){const value=validateMigration(raw),c=await ownerClient();return c.f.runTransaction(c.db,async tx=>{
+export async function importMigration(raw){if(raw?.format==='daily-notice-calendar-v1'){const c=await ownerClient();await c.f.runTransaction(c.db,async tx=>{const ref=privateRef(c,'Snapshot'),doc=await tx.get(ref);if(!doc.exists()||!validSnapshot(doc.data()?.snapshot))throw Error('予定・タスクを先に読み込んでください。');const current=doc.data().snapshot;if(raw.calendar?.error!==null)throw Error('予定の取得成功を確認できませんでした。');const snapshot=mergeSnapshots(current,{...current,date:raw.calendar.date,calendar:raw.calendar});tx.set(ref,{snapshot,importedAt:new Date().toISOString()});});return {calendarOnly:true,memoImported:false,mealCount:0};}const value=validateMigration(raw),c=await ownerClient();return c.f.runTransaction(c.db,async tx=>{
  const memoRef=privateRef(c,'Memo'),snapshotRef=privateRef(c,'Snapshot'),mealRefs=['pan','steamer','rede'].map(tool=>[tool,privateRef(c,'Meal'+tool)]);
  const [memo,snapshot,...plans]=await Promise.all([tx.get(memoRef),tx.get(snapshotRef),...mealRefs.map(([,ref])=>tx.get(ref))]);
  if(!memo.exists())tx.set(memoRef,value.memo);

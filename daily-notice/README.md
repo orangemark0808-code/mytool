@@ -41,6 +41,8 @@ Firestoreの `users/{本人UID}/meta/` に `dailyNoticeMemo`, `dailyNoticeSnapsh
 
 「設定・データ移行」から `daily-notice-export-v1` JSONを読み込めます。既存のメモと献立は上書きせず、予定とタスクは取得時刻を比較して新しい方を保持します。JSONの認証情報などは受け取っても保存しません。実データのJSONをGitHubへコミットしないでください。
 
+毎朝の更新では `daily-notice-calendar-v1` JSONを同じ移行欄へ渡せます。形式は `{ "format": "daily-notice-calendar-v1", "calendar": { "date": "YYYY-MM-DD", "lastSuccessAt": "取得日時のISO文字列", "lastAttemptAt": "取得日時のISO文字列", "error": null, "events": [] } }` です。タスク・メモ・献立を触らず、予定の取得時刻だけを比較して更新します。取得失敗は空の予定として渡しません。
+
 Googleカレンダー接続は既存Googleログインへ読み取りスコープを追加し、アクセストークンを画面のメモリーだけに持ちます。ページを閉じた後の更新は別途スケジューラーが必要です。バックアップや手動取得はChatGPTに依存しません。
 
 ## AI献立の生成
