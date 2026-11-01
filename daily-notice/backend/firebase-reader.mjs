@@ -8,7 +8,7 @@ const validUid = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.
 // All URLs are constructed here; callers cannot supply a host, path or query.
 // The only Firestore operations are a settings get and category-filtered queries.
 export class FirebaseReader {
-    constructor(config, { fetcher = fetch, now = Date.now } = {}) { this.config = config; this.fetcher = fetcher; this.now = now; }
+    constructor(config, { fetcher = (...args) => globalThis.fetch(...args), now = Date.now } = {}) { this.config = config; this.fetcher = fetcher; this.now = now; }
     async remote(url, options = {}) {
         let response;
         try {

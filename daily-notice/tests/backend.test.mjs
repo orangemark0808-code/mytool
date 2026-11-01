@@ -9,3 +9,15 @@ test('disabling while generation runs prevents a stale result from being saved',
 test('quota failure blocks further generation and retains the saved plan',async()=>{const m=memory(),store=new FirestoreMealStore({projectId:'test',owner,idToken:'fake',fetcher:m.fetcher}),epoch=await store.acquire(owner,id,'pan',100000,'2026-10-31');await store.fail(owner,id,epoch,'balance');assert.equal((await store.state(owner)).blocked,'balance');assert.equal(await store.acquire(owner,id+'2','pan',300000,'2026-10-31'),null);});
 test('owner identity and untrusted origins are rejected before any API call',async()=>{let calls=0;const worker=createWorker({fetcher:async()=>{calls++;throw Error();}});for(const [headers,status]of [[{'oai-authenticated-user-id':OWNER_UID},401],[{origin:'https://evil.test',Authorization:'Bearer fake'},403]]){const result=await worker.fetch(new Request('https://api.test/api/meals?tool=pan',{headers}),{});assert.equal(result.status,status);}assert.equal(calls,0);});
 test('a forged Firebase JWT is not trusted until Google validates its signature',async()=>{let calls=0;const now=Date.now(),enc=x=>Buffer.from(JSON.stringify(x)).toString('base64url'),token=[enc({alg:'RS256',kid:'kid'}),enc({aud:'project',iss:'https://securetoken.google.com/project',sub:OWNER_UID,exp:now/1000+300,iat:now/1000,auth_time:now/1000}),'forged'].join('.');const worker=createWorker({fetcher:async url=>{calls++;assert.match(url,/identitytoolkit.googleapis.com/);return Response.json({error:{message:'INVALID_ID_TOKEN'}},{status:400});},now:()=>now});const r=await worker.fetch(new Request('https://api.test/api/meals?tool=pan',{headers:{Authorization:'Bearer '+token}}),{FIREBASE_API_KEY:'public-web-key',FIREBASE_PROJECT_ID:'project',OWNER_EMAIL:'owner@example.test'});assert.equal(r.status,401);assert.equal(calls,1);});
+test('the Workers native fetch keeps its global receiver through authentication and storage',async()=>{
+ const original=globalThis.fetch,now=Date.now(),enc=x=>Buffer.from(JSON.stringify(x)).toString('base64url');
+ const token=[enc({alg:'RS256',kid:'kid'}),enc({aud:'project',iss:'https://securetoken.google.com/project',sub:OWNER_UID,exp:now/1000+300,iat:now/1000,auth_time:now/1000}),'signature'].join('.');
+ const m=memory();let calls=0;
+ globalThis.fetch=async function(url,init){assert.equal(this,globalThis);calls++;
+  if(url.startsWith('https://identitytoolkit.googleapis.com/'))return Response.json({users:[{localId:OWNER_UID,emailVerified:true,email:'owner@example.test',providerUserInfo:[{providerId:'google.com'}]}]});
+  return m.fetcher(url,init);
+ };
+ try{const worker=createWorker({now:()=>now});const result=await worker.fetch(new Request('https://api.test/api/meals?tool=pan',{headers:{Authorization:'Bearer '+token}}),{FIREBASE_API_KEY:'public-web-key',FIREBASE_PROJECT_ID:'project',OWNER_EMAIL:'owner@example.test',OPENAI_API_KEY:'test-only'});
+  assert.equal(result.status,200);assert.equal((await result.json()).configured,true);assert.equal(calls,3);
+ }finally{globalThis.fetch=original;}
+});

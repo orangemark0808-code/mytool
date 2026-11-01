@@ -3,7 +3,7 @@ import {limitedJson} from '../backend/security.mjs';
 const messages={invalid:'入力内容を確認してください。',source:'最新の食材を取得してからお試しください。量を確認できる食材が必要です。',disabled:'AI生成を停止しています。保存済みの献立は表示できます。',unconfigured:'AIの接続設定が必要です。保存済みの献立と従来候補は利用できます。',balance:'APIの利用残高・上限を確認してください。AI生成を一時停止しました。保存済みの献立は残しています。',busy:'ほかの端末で生成中か、生成直後です。少し待ってからお試しください。',limit:'本日のAI生成は10回までです。保存済みの献立を利用できます。',network:'AIに接続できませんでした。保存済みの献立を残しています。',configuration:'APIの接続設定を確認してください。', 'invalid-result':'生成した献立を確認できませんでした。保存済みの献立を残しています。',duplicate:'直前と同じ候補だったため、保存済みの献立を残しています。',stale:'生成中に設定が変わったため、保存済みの献立を残しています。'};
 export const mealMessage=code=>messages[code]||messages.network;
 export class AiMealService {
-  constructor({store,owner,apiKey='',model='gpt-6.1-sol',readStock,fetcher=fetch,now=Date.now}){this.store=store;this.owner=owner;this.apiKey=apiKey;this.model=model;this.readStock=readStock;this.fetcher=fetcher;this.now=now;}
+  constructor({store,owner,apiKey='',model='gpt-6.1-sol',readStock,fetcher=(...args)=>globalThis.fetch(...args),now=Date.now}){this.store=store;this.owner=owner;this.apiKey=apiKey;this.model=model;this.readStock=readStock;this.fetcher=fetcher;this.now=now;}
   async status(tool){const state=await this.store.state(this.owner);return {configured:Boolean(this.apiKey),enabled:Boolean(state.enabled),blocked:state.blocked||null,limitPerDay:10,saved:parseSavedMealPlan(await this.store.latest(this.owner,tool))};}
   async generate(tool,id){
     if(!['pan','steamer','rede'].includes(tool)||typeof id!=='string'||!/^[a-f0-9-]{36}$/i.test(id))throw new MealError('invalid');
