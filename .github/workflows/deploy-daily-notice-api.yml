@@ -37,12 +37,9 @@ jobs:
       - run: npm test
       - name: Deploy only the Daily Notice Worker
         env:
-          WRANGLER_SEND_METRICS: "false"
           CLOUDFLARE_ACCOUNT_ID: '1329ff2a51a1994d2bc91d563267bdc4'
           CLOUDFLARE_API_TOKEN: ${{ secrets.DAILY_NOTICE_CLOUDFLARE_API_TOKEN }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
-          export WRANGLER_OUTPUT_FILE_PATH="$RUNNER_TEMP/daily-notice-upload.jsonl"
-          npx --yes wrangler@4.156.0 versions upload --config backend/wrangler.jsonc
-          DAILY_NOTICE_VERSION=$(node ci/read-worker-version.mjs)
-          npx --yes wrangler@4.156.0 versions deploy "$DAILY_NOTICE_VERSION@100%" --yes --config backend/wrangler.jsonc
+          npx --yes esbuild@0.27.3 backend/worker.mjs --bundle --format=esm --platform=browser --target=es2022 --outfile=.worker-dist/worker.mjs
+          node ci/deploy-worker.mjs

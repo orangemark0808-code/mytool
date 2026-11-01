@@ -8,7 +8,9 @@ Firebase IDトークンをGoogleのaccounts:lookupで検証し、本人UID・メ
 
 ## GitHubからの自動公開
 
-リポジトリルートの `.github/workflows/deploy-daily-notice-api.yml` が、`main` の生成サーバー関連ファイルの変更をテストし、`daily-notice-api` へ公開します。GitHub Actionsの画面から手動実行もできます。フロントだけの変更は既存のPages公開ワークフローが扱います。公開は `versions upload` と `versions deploy` の2段階で、このWorkerのコードと設定だけを更新します。
+リポジトリルートの `.github/workflows/deploy-daily-notice-api.yml` が、`main` の生成サーバー関連ファイルの変更をテストし、`daily-notice-api` へ公開します。GitHub Actionsの画面から手動実行もできます。フロントだけの変更は既存のPages公開ワークフローが扱います。
+
+公開処理はesbuildで単一モジュールを作り、`ci/deploy-worker.mjs` からCloudflare公式のWorker Upload APIでこのWorkerだけを更新します。既存の `secret_text` バインディングを保持し、ドメイン・ルート・アカウント権限は変更しません。公開後に `/health` と未認証リクエストの401を確認します。
 
 GitHubのRepository Secret `DAILY_NOTICE_CLOUDFLARE_API_TOKEN` には、CloudflareでこのWorkerだけを対象にした `Individual Workers Editor` トークンを登録します。OpenAIキーをGitHubへ登録する必要はありません。`OPENAI_API_KEY` と `FIREBASE_API_KEY` はCloudflareのランタイムSecretに保存し、通常のコード公開では保持します。
 
@@ -16,13 +18,18 @@ GitHubのRepository Secret `DAILY_NOTICE_CLOUDFLARE_API_TOKEN` には、Cloudfla
 
 ```sh
 cd daily-notice
-npx wrangler deploy --config backend/wrangler.jsonc
+npx --yes esbuild@0.27.3 backend/worker.mjs --bundle --format=esm --platform=browser --target=es2022 --outfile=.worker-dist/worker.mjs
+node ci/deploy-worker.mjs
 npx wrangler secret put FIREBASE_API_KEY --config backend/wrangler.jsonc
 npx wrangler secret put OPENAI_API_KEY --config backend/wrangler.jsonc
 ```
+
+手動公開でも上記の限定トークンとアカウントIDを環境変数 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` から読みます。通常はGitHub Actionsを使ってください。
 
 キーを引数・ソース・ログ・公開設定ファイルへ貼り付けないでください。既存キーを引き継ぐ場合も、秘密値はCloudflareの暗号化Secretだけへ登録します。FirebaseのWeb APIキーは既存Web設定と同じものです。
 
 配信後、公開URLをフロントの `window.DAILY_NOTICE_API_ORIGIN` として設定します。管理用キーやOpenAIキーはこの公開設定へ含めません。
 
 Googleの公式仕様: https://firebase.google.com/docs/firestore/reference/rest/v1/Precondition
+
+Cloudflareの公式仕様: https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/
