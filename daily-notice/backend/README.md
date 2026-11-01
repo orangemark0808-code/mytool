@@ -8,7 +8,7 @@ Firebase IDトークンをGoogleのaccounts:lookupで検証し、本人UID・メ
 
 ## GitHubからの自動公開
 
-リポジトリルートの `.github/workflows/deploy-daily-notice-api.yml` が、`main` の生成サーバー関連ファイルの変更をテストし、`daily-notice-api` へ公開します。GitHub Actionsの画面から手動実行もできます。フロントだけの変更は既存のPages公開ワークフローが扱います。
+リポジトリルートの `.github/workflows/deploy-daily-notice-api.yml` が、`main` の生成サーバー関連ファイルの変更をテストし、`daily-notice-api` へ公開します。GitHub Actionsの画面から手動実行もできます。フロントだけの変更は既存のPages公開ワークフローが扱います。公開は `versions upload` と `versions deploy` の2段階で、このWorkerのコードと設定だけを更新します。
 
 GitHubのRepository Secret `DAILY_NOTICE_CLOUDFLARE_API_TOKEN` には、CloudflareでこのWorkerだけを対象にした `Individual Workers Editor` トークンを登録します。OpenAIキーをGitHubへ登録する必要はありません。`OPENAI_API_KEY` と `FIREBASE_API_KEY` はCloudflareのランタイムSecretに保存し、通常のコード公開では保持します。
 

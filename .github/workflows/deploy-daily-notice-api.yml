@@ -9,6 +9,7 @@ on:
       - 'daily-notice/lib/meal-*.mjs'
       - 'daily-notice/integrations/iroiro/**'
       - 'daily-notice/package*.json'
+      - 'daily-notice/ci/**'
       - '.github/workflows/deploy-daily-notice-api.yml'
   workflow_dispatch:
 
@@ -41,4 +42,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.DAILY_NOTICE_CLOUDFLARE_API_TOKEN }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
-          npx --yes wrangler@4.156.0 deploy --config backend/wrangler.jsonc
+          export WRANGLER_OUTPUT_FILE_PATH="$RUNNER_TEMP/daily-notice-upload.jsonl"
+          npx --yes wrangler@4.156.0 versions upload --config backend/wrangler.jsonc
+          DAILY_NOTICE_VERSION=$(node ci/read-worker-version.mjs)
+          npx --yes wrangler@4.156.0 versions deploy "$DAILY_NOTICE_VERSION@100%" --yes --config backend/wrangler.jsonc
