@@ -9,3 +9,4 @@
 - 秘密鍵、Google認証情報、実メモ・予定・タスク・献立のJSONをコミットしない。
 - 同じGitHub originの別アプリとも共有するFirebase認証を前提にする。権限はFirebaseルールでも強制する。
 - `.github/workflows/deploy-prompt-stock.yml` がビルドと公開を担当する。
+- 生成サーバーは `backend/`。リポジトリルートの `.github/workflows/deploy-daily-notice-api.yml` がテスト後にCloudflareの `daily-notice-api` だけを公開する。OpenAIキーはCloudflareのSecretから読み、公開コードやGitHubのログに出さない。

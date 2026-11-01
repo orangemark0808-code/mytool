@@ -6,6 +6,14 @@ Firebase IDトークンをGoogleのaccounts:lookupで検証し、本人UID・メ
 
 公開には本人のCloudflareアカウントが必要です。アカウントが未接続なら、そのログインが終わるまでデプロイしません。
 
+## GitHubからの自動公開
+
+リポジトリルートの `.github/workflows/deploy-daily-notice-api.yml` が、`main` の生成サーバー関連ファイルの変更をテストし、`daily-notice-api` へ公開します。GitHub Actionsの画面から手動実行もできます。フロントだけの変更は既存のPages公開ワークフローが扱います。
+
+GitHubのRepository Secret `DAILY_NOTICE_CLOUDFLARE_API_TOKEN` には、CloudflareでこのWorkerだけを対象にした `Individual Workers Editor` トークンを登録します。OpenAIキーをGitHubへ登録する必要はありません。`OPENAI_API_KEY` と `FIREBASE_API_KEY` はCloudflareのランタイムSecretに保存し、通常のコード公開では保持します。
+
+## CLIでの公開
+
 ```sh
 cd daily-notice
 npx wrangler deploy --config backend/wrangler.jsonc
