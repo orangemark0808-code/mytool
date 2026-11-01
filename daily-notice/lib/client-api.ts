@@ -1,5 +1,6 @@
 import {getSnapshot,getMemo,putMemo,mealStatus,setMealEnabled} from './pages-data.mjs';
 import {ownerClient} from './firebase-client.mjs';
+import {DAILY_NOTICE_API_ORIGIN} from './api-config';
 export async function clientRequest<T>(path:string,init?:RequestInit):Promise<T>{
   if(init?.signal?.aborted)throw new DOMException('Aborted','AbortError');
   const body=init?.body?JSON.parse(String(init.body)):null;
@@ -8,7 +9,7 @@ export async function clientRequest<T>(path:string,init?:RequestInit):Promise<T>
   if(path.startsWith('/api/meals')){
     const tool=body?.tool||new URL(path,'https://local.test').searchParams.get('tool');
     if(!['pan','steamer','rede'].includes(tool))throw Error('器具を選んでください。');
-    const origin=(window as any).DAILY_NOTICE_API_ORIGIN;
+    const origin=DAILY_NOTICE_API_ORIGIN;
     if(origin){
       const target=new URL(origin);
       if(target.protocol!=='https:'||target.username||target.password)throw Error('生成サーバーの接続設定を確認してください。');

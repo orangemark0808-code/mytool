@@ -47,11 +47,11 @@ Googleカレンダー接続は既存Googleログインへ読み取りスコー�
 
 ## AI献立の生成
 
-GitHub Pagesは静的配信のため、AI献立の新規生成はCloudflare Worker `daily-notice-api` が担当します。`public/runtime-config.js` に公開接続先を設定しています。保存済み献立と通常候補は新規生成せず表示できます。ページを開くだけではOpenAI APIを呼び出しません。
+GitHub Pagesは静的配信のため、AI献立の新規生成はCloudflare Worker `daily-notice-api` が担当します。`lib/api-config.ts` に公開接続先を設定しています。保存済み献立と通常候補は新規生成せず表示できます。ページを開くだけではOpenAI APIを呼び出しません。
 
 生成サーバーのコードも同じリポジトリの `backend/` から修正できます。`main` の関連ファイルを変更すると `.github/workflows/deploy-daily-notice-api.yml` がテスト後にCloudflareへ自動公開します。設定と手動公開の方法は `backend/README.md` を参照してください。
 
-サーバーはFirebase IDトークンの署名・audience・issuer・期限・本人UIDを検証し、食材をサーバー側で再取得して生成・検証・保存します。`window.DAILY_NOTICE_API_ORIGIN` にはHTTPSのそのサーバーだけを設定します。OpenAIキーをここへ設定しないでください。既存Sitesの認証ヘッダーをそのまま信用する実装にはしません。
+サーバーはFirebase IDトークンの署名・audience・issuer・期限・本人UIDを検証し、食材をサーバー側で再取得して生成・検証・保存します。`lib/api-config.ts の DAILY_NOTICE_API_ORIGIN` にはHTTPSのそのサーバーだけを設定します。OpenAIキーをここへ設定しないでください。既存Sitesの認証ヘッダーをそのまま信用する実装にはしません。
 
 ## 他のAIへの依頼例
 

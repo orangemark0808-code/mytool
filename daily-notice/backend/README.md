@@ -28,7 +28,7 @@ npx wrangler secret put OPENAI_API_KEY --config backend/wrangler.jsonc
 
 キーを引数・ソース・ログ・公開設定ファイルへ貼り付けないでください。既存キーを引き継ぐ場合も、秘密値はCloudflareの暗号化Secretだけへ登録します。FirebaseのWeb APIキーは既存Web設定と同じものです。
 
-配信後、公開URLをフロントの `window.DAILY_NOTICE_API_ORIGIN` として設定します。管理用キーやOpenAIキーはこの公開設定へ含めません。
+配信後、公開URLをフロントの `lib/api-config.ts の DAILY_NOTICE_API_ORIGIN` として設定します。管理用キーやOpenAIキーはこの公開設定へ含めません。
 
 Googleの公式仕様: https://firebase.google.com/docs/firestore/reference/rest/v1/Precondition
 
