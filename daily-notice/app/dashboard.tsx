@@ -23,6 +23,10 @@ const TASKS = "https://orangemark0808-code.github.io/mytool/iroiro/";
 const CALENDAR = "https://calendar.google.com/calendar/r";
 const clock = (value: string) => new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(value));
 const stamp = (value: string | null) => value ? `${japanDate(value).slice(5).replace("-", "/")} ${clock(value)}` : "未取得";
+const updateStamp = (value: string) => {
+  const date = japanDate(value);
+  return `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日 ${clock(value)}`;
+};
 const eventDay = (event: Event) => event.allDay ? event.start.slice(0, 10) : japanDate(event.start);
 const eventTime = (event: Event, day: string) => event.allDay ? "終日" : `${eventDay(event) < day ? "前日から" : clock(event.start)}–${japanDate(event.end) > day ? "翌日まで" : clock(event.end)}`;
 
@@ -176,10 +180,15 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
 
   return <div className="board">
     <header className="site-header">
-      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-10-31-01">2026-10-31-01</span></div>
+      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-11-01-01">2026-11-01-01</span></div>
       <MoonWidget sky={sky} />
       <div className="header-tools"><nav aria-label="表示する項目">{[["schedule", "予定"], ["tasks", "タスク"], ["meals", "メニュー"], ["memo", "メモ"]].map(([id, label]) => <a key={id} href={`#${id}`} aria-current={activeNav === id ? "location" : undefined} onClick={() => setActiveNav(id)}>{label}</a>)}</nav>
-        <p className="fetch-meta"><span>FETCHED</span> {snapshot.calendar.lastSuccessAt === snapshot.tasks.lastSuccessAt ? stamp(snapshot.calendar.lastSuccessAt) : `予定 ${stamp(snapshot.calendar.lastSuccessAt)} / タスク ${stamp(snapshot.tasks.lastSuccessAt)}`}</p></div>
+        <div className="fetch-meta">
+          <span className="fetch-meta-heading">最終更新（日本時間）</span>
+          <dl>{([["予定", snapshot.calendar.lastSuccessAt], ["タスク", snapshot.tasks.lastSuccessAt]] as const).map(([label, value]) =>
+            <div className="fetch-meta-row" key={label}><dt>{label}</dt><dd>{value ? <time dateTime={value}>{updateStamp(value)}</time> : "未取得"}</dd></div>
+          )}</dl>
+        </div></div>
     </header>
     <main>
       <div id="account-settings-slot" />
