@@ -1,5 +1,11 @@
 # AI献立の生成サーバー
 
+## 予定の自動更新
+
+`calendar-sync.mjs` はGoogle Calendarの読み取り専用権限で本人の予定を取得し、Firebase Authenticationで本人を確認してからFirestoreの既存スナップショットを条件付き更新します。取得エラーや競合時にはタスクなどを消しません。GoogleのクライアントID・クライアントシークレット・リフレッシュトークンはCloudflareの `GOOGLE_CALENDAR_CLIENT_ID`、`GOOGLE_CALENDAR_CLIENT_SECRET`、`GOOGLE_CALENDAR_REFRESH_TOKEN` という暗号化Secretに保存します。認証情報や予定の内容をリポジトリやログに記載しないでください。
+
+CloudflareのCron Trigger `25 20 * * *` は日本時間の毎朝5:25です。CronはCloudflareのWorker設定で管理し、GitHub Actionsのコード公開とは別に確認してください。日時の正確な実行は保証されません。カレンダーの接続が失効した場合はGoogleで再認証が必要です。
+
 GitHub Pagesとは分離したCloudflare Workerです。ChatGPTログインやSites専用の認証ヘッダーには依存しません。コードは同じGitHubリポジトリから修正できます。
 
 Firebase IDトークンをGoogleのaccounts:lookupで検証し、本人UID・メール・Googleプロバイダー・audience・issuer・期限を確認します。食材はサーバーがFirestoreから再取得します。保存先はPagesと同じ本人専用meta領域です。Firestoreの条件付きatomic commitで、複数端末の同時生成・リクエスト重複・1日10回制限を扱います。

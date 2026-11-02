@@ -3,8 +3,12 @@ import {FirestoreMealStore} from './firestore-store.mjs';
 import {AiMealService,mealMessage} from '../lib/ai-meal-service.mjs';
 import {MealError} from '../lib/ai-meal-contract.mjs';
 import {limitedJson} from './security.mjs';
+import {syncCalendar} from './calendar-sync.mjs';
 export const OWNER_UID='hTULUx4EdSUTDej6ZA4EznFwjSC3';
-export function createWorker({fetcher=(...args)=>globalThis.fetch(...args),now=Date.now}={}){return {async fetch(request,env){
+export function createWorker({fetcher=(...args)=>globalThis.fetch(...args),now=Date.now}={}){return {async scheduled(_controller,env){
+ try { await syncCalendar(env,{owner:OWNER_UID,fetcher,now}); }
+ catch { console.error('daily-notice scheduled calendar update failed'); throw Error('calendar-update-failed'); }
+},async fetch(request,env){
  const origin='https://orangemark0808-code.github.io',cors={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type','Vary':'Origin','Cache-Control':'private, no-store'};
  const reply=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{...cors,'Content-Type':'application/json; charset=utf-8'}});
  const url=new URL(request.url);
