@@ -668,7 +668,7 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
   .list-sort-field { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
   .list-sort-field select { font-size: 16px; }
 }
-@media (max-width: 700px), (max-width: 1366px) and (pointer: coarse) {
+@media (max-width: 700px) {
   .compact-editor .editor-pane > .toolbar-wrap {
     display: none;
     position: fixed;
