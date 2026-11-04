@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-11-04-2';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-04-2';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, seedTemplates, isTemplateDraft, applyTemplateText, FIXED_CATEGORY_NAMES, TEMPLATE_CATEGORY_NAME, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-11-04-3';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-04-3';
 
-const VERSION = '2026-11-04-2';
+const VERSION = '2026-11-04-3';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const SORT_KEY = 'orangemania-journal-list-sort-v1';
 const COMPACT_EDITOR_QUERY = '(max-width: 700px)';
@@ -42,7 +42,7 @@ function activeCategories() { return orderedCategories(state.categories); }
 function noteStatusLabel(draft) { return draft.noteStatus === 'published' ? '投稿済' : '未投稿'; }
 function categoryBadgeKind(draft) {
   const name = categoryName(draft.category, draft.categoryName);
-  return name === '日記' ? 'diary' : name === 'note用' ? 'note' : 'other';
+  return name === '日記' ? 'diary' : name === 'note用' ? 'note' : name === TEMPLATE_CATEGORY_NAME ? 'template' : 'other';
 }
 function categoryName(id, fallback = '') {
   if (!id) return '未分類';
@@ -416,7 +416,7 @@ function updateNoteStatusControls() {
 }
 function renderCategoryManageList() {
   const categories = activeCategories();
-  const fixed = (category) => category && ['日記', 'note用'].includes(category.name);
+  const fixed = (category) => category && FIXED_CATEGORY_NAMES.includes(category.name);
   $('categoryManageList').innerHTML = categories.length ? categories.map((category, index) => `<li class="category-manage-row"><span class="category-manage-name">${escapeHtml(category.name)}</span><div class="category-manage-actions"><button type="button" data-move-up="${escapeHtml(category.id)}" ${fixed(category) || index === 0 || fixed(categories[index - 1]) ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を上へ">↑</button><button type="button" data-move-down="${escapeHtml(category.id)}" ${fixed(category) || index === categories.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を下へ">↓</button><button type="button" class="delete" data-delete-category="${escapeHtml(category.id)}" aria-label="${escapeHtml(category.name)}を削除">×</button></div></li>`).join('') : '<li class="empty">カテゴリがありません。</li>';
 }
 function changedCategories() { state.categoriesDirty = true; persistLocal([]); renderCategoryOptions(); renderCategoryManageList(); renderList(); refreshSyncStatus(); void syncCategories(); }
@@ -428,7 +428,7 @@ function addCategory(name) {
 function moveCategory(id, direction) {
   const categories = activeCategories(), index = categories.findIndex((category) => category.id === id), other = index + direction;
   if (index < 0 || other < 0 || other >= categories.length) return;
-  if ([categories[index], categories[other]].some((category) => ['日記', 'note用'].includes(category.name))) return;
+  if ([categories[index], categories[other]].some((category) => FIXED_CATEGORY_NAMES.includes(category.name))) return;
   [categories[index], categories[other]] = [categories[other], categories[index]];
   for (const [order, category] of categories.entries()) { category.order = order; category.updatedAt = new Date().toISOString(); }
   changedCategories();
@@ -621,6 +621,45 @@ function restoreHistory(index) {
   bodyInput.value = item.value; bodyInput.setSelectionRange(item.start, item.end); bodyInput.scrollTop = item.scrollTop;
   state.historyIndex = index; updatePreview(); scheduleSave(); updateHistoryButtons(); bodyInput.focus({ preventScroll: true });
 }
+function templateChoices() {
+  const category = activeCategories().find((item) => item.name === TEMPLATE_CATEGORY_NAME); if (!category) return [];
+  return state.drafts.filter((draft) => draft.category === category.id && !draft.deletedAt && draft.id !== state.currentId && draft.body.trim());
+}
+function closeTemplatePanel(focus = false) {
+  $('templatePanel').classList.add('hidden'); $('templateButton').setAttribute('aria-expanded', 'false'); state.pendingTemplateId = null;
+  if (focus) $('templateButton').focus();
+}
+function renderTemplatePanel() {
+  const panel = $('templatePanel'), pending = state.pendingTemplateId && state.drafts.find((draft) => draft.id === state.pendingTemplateId);
+  if (pending) {
+    panel.innerHTML = `<p class="template-message">本文に文字があります。「${escapeHtml(pending.title)}」を本文の末尾に追加しますか？</p><div class="template-actions"><button type="button" class="primary-button" data-template-append="${escapeHtml(pending.id)}">末尾に追加する</button><button type="button" class="secondary-button" data-template-cancel>やめる</button></div>`;
+    return;
+  }
+  const choices = templateChoices();
+  panel.innerHTML = `<div class="template-head"><strong>テンプレートを選ぶ</strong><button type="button" class="small-button" data-template-close>閉じる</button></div>` + (choices.length
+    ? `<ul class="template-list">${choices.map((draft) => `<li><button type="button" class="template-choice" data-template-id="${escapeHtml(draft.id)}">${escapeHtml(draft.title)}</button></li>`).join('')}</ul>`
+    : '<p class="template-message">テンプレートがありません。カテゴリ「テンプレート」で記事を作ると、ここに表示されます。</p>');
+}
+function openTemplatePanel() {
+  if (!state.user || state.view !== 'editor') return;
+  const panel = $('templatePanel');
+  if (!panel.classList.contains('hidden')) return closeTemplatePanel(true);
+  ensureStandardCategories(); state.pendingTemplateId = null; renderTemplatePanel();
+  panel.classList.remove('hidden'); $('templateButton').setAttribute('aria-expanded', 'true');
+}
+function insertTemplate(id) {
+  const template = state.drafts.find((draft) => draft.id === id && !draft.deletedAt); if (!template) return;
+  finishComposition();
+  const result = applyTemplateText(bodyInput.value, template.body);
+  bodyInput.value = result.text; bodyInput.setSelectionRange(result.caret, result.caret); bodyInput.scrollTop = 0;
+  updatePreview(); recordHistory(); scheduleSave(); closeTemplatePanel();
+  toast(result.appended ? 'テンプレートを末尾に追加しました' : 'テンプレートを読み込みました');
+  bodyInput.focus({ preventScroll: true });
+}
+function chooseTemplate(id) {
+  if (bodyInput.value.trim()) { state.pendingTemplateId = id; renderTemplatePanel(); $('templatePanel').querySelector?.('[data-template-append]')?.focus(); return; }
+  insertTemplate(id);
+}
 function applyEdit(text, start = bodyInput.selectionStart, end = bodyInput.selectionEnd) { bodyInput.setRangeText(text, start, end, 'end'); bodyInput.focus({ preventScroll: true }); updatePreview(); recordHistory(); scheduleSave(); }
 function toolbar(action) {
   if (state.composing) return;
@@ -663,31 +702,49 @@ function openJournalList() {
 }
 function loadDraft(id) {
   if (state.bulkAssigning || state.bulkPurging) return;
+  closeTemplatePanel();
   finishComposition();
   const draft = state.drafts.find((item) => item.id === id && !item.deletedAt); if (!draft) return;
   state.currentId = state.editorDraftId = id; titleInput.value = draft.title === '無題の記事' ? '' : draft.title; bodyInput.value = draft.body;
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([]); showView('editor'); bodyInput.focus({ preventScroll: true });
 }
-function newDraft() {
-  if (!state.user || state.bulkAssigning || state.bulkPurging) return;
-  finishComposition(); setEditorMode('edit');
-  const now = new Date().toISOString();
-  let categoriesChanged = false;
-  for (const standard of defaultCategories()) {
+function ensureStandardCategories(now = new Date().toISOString()) {
+  let categoriesChanged = false, templateAdded = false;
+  for (const standard of standardCategories()) {
     if (activeCategories().some((category) => category.name === standard.name)) continue;
     const existing = state.categories.find((category) => category.id === standard.id);
     if (existing && existing.name === standard.name) Object.assign(existing, { deleted: false, updatedAt: now, order: standard.order });
     else state.categories.push({ ...standard, id: existing ? crypto.randomUUID() : standard.id, updatedAt: now });
-    categoriesChanged = true;
+    categoriesChanged = true; if (standard.name === TEMPLATE_CATEGORY_NAME) templateAdded = true;
   }
-  if (categoriesChanged) { state.categoriesDirty = true; void syncCategories(); }
+  if (templateAdded) seedTemplateDrafts(now);
+  if (categoriesChanged) { state.categoriesDirty = true; renderCategoryOptions(); renderCategoryManageList(); void syncCategories(); }
+  return categoriesChanged;
+}
+function seedTemplateDrafts(now) {
+  const category = activeCategories().find((item) => item.name === TEMPLATE_CATEGORY_NAME); if (!category) return;
+  const added = [];
+  for (const seed of seedTemplates()) {
+    if (state.drafts.some((draft) => draft.id === seed.id)) continue;
+    const draft = editedDraft(normalizeDraft({ id: seed.id, title: seed.title, body: seed.body, category: category.id, categoryName: category.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
+    state.drafts.push(draft); added.push(draft.id);
+  }
+  if (!added.length) return;
+  persistLocal(added); renderList(); refreshSyncStatus(); for (const id of added) queueSave(id);
+}
+function newDraft() {
+  if (!state.user || state.bulkAssigning || state.bulkPurging) return;
+  finishComposition(); setEditorMode('edit');
+  const now = new Date().toISOString();
+  ensureStandardCategories(now);
   const diary = activeCategories().find((category) => category.name === '日記');
   const draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: '無題の記事', body: '', category: diary.id, categoryName: diary.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
   state.drafts.unshift(draft); state.currentId = state.editorDraftId = draft.id; titleInput.value = bodyInput.value = '';
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); titleInput.focus();
 }
 function setListCategoryFilter(value) {
-  if (!['all', 'diary', 'note'].includes(value)) return;
+  if (!['all', 'diary', 'note', 'template'].includes(value)) return;
+  if (value === 'template' && state.user && !state.showTrash) ensureStandardCategories();
   state.listTagEditor = null;
   if (state.categoryFilter !== value) state.noteStatusFilter = 'all';
   state.categoryFilter = value; renderList();
@@ -700,7 +757,7 @@ function setListNoteFilter(value) {
 function renderListFilters() {
   $('listFilters').classList.toggle('hidden', state.showTrash);
   $('listNoteFilters').classList.toggle('hidden', state.categoryFilter !== 'note');
-  for (const [id, value] of [['filterAll', 'all'], ['filterDiary', 'diary'], ['filterNote', 'note']]) $(id).setAttribute('aria-pressed', String(state.categoryFilter === value));
+  for (const [id, value] of [['filterAll', 'all'], ['filterDiary', 'diary'], ['filterNote', 'note'], ['filterTemplate', 'template']]) $(id).setAttribute('aria-pressed', String(state.categoryFilter === value));
   for (const [id, value] of [['filterNoteAll', 'all'], ['filterUnpublished', 'unpublished'], ['filterPublished', 'published']]) $(id).setAttribute('aria-pressed', String(state.noteStatusFilter === value));
 }
 function draftTitleMarkup(draft) {
@@ -748,7 +805,7 @@ function openListTagEditor(id, kind) {
   state.listTagEditor = { id, kind }; renderList(); $(listTagId(id, kind, 'select'))?.focus({ preventScroll: false });
 }
 function focusListTag(id, kind) {
-  const filter = state.categoryFilter === 'note' ? 'filterNote' : state.categoryFilter === 'diary' ? 'filterDiary' : 'filterAll';
+  const filter = state.categoryFilter === 'note' ? 'filterNote' : state.categoryFilter === 'diary' ? 'filterDiary' : state.categoryFilter === 'template' ? 'filterTemplate' : 'filterAll';
   (document.getElementById(listTagId(id, kind, 'trigger')) || $(filter))?.focus({ preventScroll: true });
 }
 function closeListTagEditor(focus = true) {
@@ -1013,6 +1070,14 @@ $('draftList').addEventListener('click', (event) => {
   if (button.dataset.delete && confirm('このJournalをごみ箱へ移しますか？あとで復元できます。')) deleteDraft(button.dataset.delete);
 });
 for (const [id, mode] of [['editTab', 'edit'], ['previewTab', 'preview'], ['splitTab', 'split']]) $(id).addEventListener('click', () => setEditorMode(mode));
+$('templateButton').addEventListener('click', openTemplatePanel);
+$('templatePanel').addEventListener('click', (event) => {
+  const button = event.target.closest('button'); if (!button) return;
+  if (button.dataset.templateId) chooseTemplate(button.dataset.templateId);
+  else if (button.dataset.templateAppend) insertTemplate(button.dataset.templateAppend);
+  else if (button.hasAttribute('data-template-cancel')) { state.pendingTemplateId = null; renderTemplatePanel(); }
+  else if (button.hasAttribute('data-template-close')) closeTemplatePanel(true);
+});
 categorySelect.addEventListener('change', () => { updateNoteStatusControls(); scheduleSave(); });
 noteStatusSelect.addEventListener('change', scheduleSave);
 $('editCreatedAtButton').addEventListener('click', openCreatedAtEditor);

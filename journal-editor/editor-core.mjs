@@ -199,8 +199,40 @@ export function defaultCategories() {
   ];
 }
 
+export const TEMPLATE_CATEGORY_NAME = 'テンプレート';
+export const FIXED_CATEGORY_NAMES = ['日記', 'note用', TEMPLATE_CATEGORY_NAME];
+
+export function templateCategory() {
+  return { id: 'journal-template', name: TEMPLATE_CATEGORY_NAME, order: 2, updatedAt: '2026-01-01T00:00:00.000Z', deleted: false };
+}
+
+export function standardCategories() {
+  return [...defaultCategories(), templateCategory()];
+}
+
+/* テンプレートカテゴリに最初に用意する記事。IDを固定し、複数端末で同時に作っても同じ記事になる。 */
+export function seedTemplates() {
+  return [
+    { id: 'template-seed-no-spoiler', title: 'ドラマ感想（ネタバレなし）', body: "【ドラマ感想】作品名｜共感を呼ぶ一言キャッチコピー\n\n作品名／配信先／全◯話／ジャンル\nおすすめ度：★★★★☆\n\n### 観る前の私\n**観ようと思ったきっかけ**\n（なんとなく、話題だったから、疲れていたから、など）\n\n### あらすじ（ネタバレなし）\n（導入部分まで。3〜4行）\n\n### 私の感想\n**いちばん心が動いたところ**\n（どの場面で、どう感じたか）\n\n**自分の経験と重なったところ**\n（「私もこういうことあった」を一言でも入れる）\n\n**ここがちょっと気になった**\n（正直な気持ち。軽めでOK）\n\n### 一言ツッコミ\n- 「◯◯、そこは気づけよ！」\n- 「◯◯、絶対あとで伏線になるやつ」\n- 「◯◯、さすがに強すぎん？」\n\n### こんな人に刺さると思う\n- ◯◯な気持ちになったことがある人\n- ◯◯な夜に観たい人\n\n### 最後に\n（余韻の一言＋読者への問いかけ）\n「みなさんはどう感じましたか？ よかったらコメントで教えてください」" },
+    { id: 'template-seed-spoiler', title: 'ドラマ感想（ネタバレあり）', body: "【ネタバレあり】【ドラマ感想】作品名｜共感を呼ぶ一言キャッチコピー\n\n⚠️ この記事は結末までのネタバレを含みます。未視聴の方はご注意ください。\n\n作品名／配信先／全◯話／ジャンル\nおすすめ度：★★★★☆\n\n### まず結論\n（ネタバレなしで一言だけ。「観てよかった」「好き嫌い分かれそう」など）\n\n### あらすじ（全体）\n（結末まで含めて、5〜6行で簡潔に）\n\n### 私の感想\n**あのシーンで泣いた／震えた／声が出た**\n（場面を具体的に。感情を先に書く）\n\n**あの展開、私はこう受け取った**\n（自分なりの解釈）\n\n**登場人物への気持ち**\n（共感できた人、できなかった人）\n\n**ラストについて**\n（納得できたか、モヤモヤしたか）\n\n### 伏線・気づいたこと\n- ◯話の◯◯は、最終話の◯◯につながってたんだ\n- 見返して気づいたこと\n\n### 一言ツッコミ\n- 「◯◯、結局そうなるんかい！」\n- 「◯◯、あの時点で気づいてたよね？」\n\n### 観た人と語りたいこと\n（読者に問いかける）\n「あのラスト、みなさんはどう解釈しましたか？」\n\n### 最後に\n（余韻の一言）" },
+  ];
+}
+
+export function isTemplateDraft(draft, categories) {
+  if (!draft?.category) return false;
+  return (categories.find((category) => category.id === draft.category)?.name || draft.categoryName) === TEMPLATE_CATEGORY_NAME;
+}
+
+/* テンプレートを本文へ入れる。本文が空なら置き換え、あれば末尾に追加する。 */
+export function applyTemplateText(body, template) {
+  if (!body.trim()) return { text: template, caret: 0, appended: false };
+  const separator = body.endsWith('\n\n') ? '' : body.endsWith('\n') ? '\n' : '\n\n';
+  const text = body + separator + template;
+  return { text, caret: body.length + separator.length, appended: true };
+}
+
 export function orderedCategories(records) {
-  const priority = (category) => category.name === '日記' ? 0 : category.name === 'note用' ? 1 : 2;
+  const priority = (category) => category.name === '日記' ? 0 : category.name === 'note用' ? 1 : category.name === TEMPLATE_CATEGORY_NAME ? 2 : 3;
   return records.filter((category) => !category.deleted).sort((a, b) => priority(a) - priority(b) || a.order - b.order || a.id.localeCompare(b.id));
 }
 

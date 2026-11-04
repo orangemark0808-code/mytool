@@ -809,7 +809,7 @@ test('new diary is available even if its former standard category was deleted', 
   const h = harness();
   h.run('state.categories=defaultCategories().map(c=>({...c,deleted:true}));newDraft();');
   assert.equal(h.run('currentDraft().categoryName'), '日記');
-  assert.equal(h.run('activeCategories().length'), 2);
+  assert.equal(h.run('activeCategories().length'), 3);
   assert.equal(h.run("state.drafts.find(d=>d.id==='d').category"), 'unknown-category');
 });
 test('bulk diary controls count only active uncategorized articles', () => {
@@ -1094,4 +1094,51 @@ test('creation date save safely stops if finishing IME applies a deferred deleti
   assert.equal(h.run('state.view'), 'list');
   assert.equal(h.run('state.drafts[0].createdAt'), h.draft.createdAt);
   assert.ok(h.run('state.drafts[0].deletedAt'));
+});
+
+test('opening the template picker creates the template category and seeds two editable templates once', () => {
+  const h = harness(); h.run("$('templatePanel').classList.add('hidden');");
+  h.events.get('templateButton:click')();
+  assert.equal(h.run("activeCategories().some(c=>c.name==='テンプレート')"), true);
+  assert.equal(h.run("state.drafts.filter(d=>d.categoryName==='テンプレート').length"), 2);
+  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), false);
+  assert.match(h.elements.get('templatePanel').innerHTML, /ドラマ感想（ネタバレなし）/);
+  assert.match(h.elements.get('templatePanel').innerHTML, /ドラマ感想（ネタバレあり）/);
+  h.events.get('templateButton:click')();
+  h.events.get('templateButton:click')();
+  assert.equal(h.run("state.drafts.filter(d=>d.categoryName==='テンプレート').length"), 2);
+});
+
+test('choosing a template fills an empty body and can be undone', () => {
+  const h = harness(); h.run("bodyInput.value='';resetHistory();$('templatePanel').classList.add('hidden');");
+  h.events.get('templateButton:click')();
+  h.events.get('templatePanel:click')({ target: { closest: () => ({ dataset: { templateId: 'template-seed-spoiler' }, hasAttribute: () => false }) } });
+  assert.ok(h.run('bodyInput.value').startsWith('【ネタバレあり】'));
+  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
+  assert.equal(h.run('currentDraft().title'), 'Synthetic');
+  h.run("toolbar('undo');");
+  assert.equal(h.run('bodyInput.value'), '');
+});
+
+test('choosing a template with existing text asks first and never overwrites', () => {
+  const h = harness(); h.run("$('templatePanel').classList.add('hidden');");
+  h.events.get('templateButton:click')();
+  const click = (dataset, attrs = {}) => h.events.get('templatePanel:click')({ target: { closest: () => ({ dataset, hasAttribute: (name) => Boolean(attrs[name]) }) } });
+  click({ templateId: 'template-seed-no-spoiler' });
+  assert.equal(h.run('bodyInput.value'), 'original');
+  assert.match(h.elements.get('templatePanel').innerHTML, /末尾に追加しますか/);
+  click({}, { 'data-template-cancel': true });
+  assert.equal(h.run('bodyInput.value'), 'original');
+  click({ templateId: 'template-seed-no-spoiler' });
+  click({ templateAppend: 'template-seed-no-spoiler' });
+  const body = h.run('bodyInput.value');
+  assert.ok(body.startsWith('original\n\n【ドラマ感想】'));
+  assert.equal(h.run('bodyInput.selectionStart'), 'original\n\n'.length);
+});
+
+test('template filter button lists only template-category articles', () => {
+  const h = harness();
+  h.run("setListCategoryFilter('template');");
+  assert.equal(h.run('state.categoryFilter'), 'template');
+  assert.equal(h.run("state.drafts.filter(d=>categoryBadgeKind(d)==='template').length"), 2);
 });
