@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { storageKey, normalizeDraft, remotePayload, remoteVersion, contentKey, editedDraft, reconcileDrafts, recoveryCopy, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, applyWriteResult, defaultCategories, orderedCategories, isNoteDraft, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from '../editor-core.mjs';
 import { markdownToHtml } from '../markdown.mjs';
+import * as core from '../editor-core.mjs';
 
 function remote(body = 'server text', extra = {}) {
   return normalizeDraft({ id: 'article', title: 'Test', body, category: null, createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z', revision: 'server-v1', ...extra }, { remote: true });
@@ -363,4 +364,28 @@ test('older offline baselines save without creating a false conflict after upgra
   assert.equal(result.kind, 'saved');
   assert.equal(fs.data.size, 1);
   assert.equal(fs.data.get(original.id).body, local.body);
+});
+
+test('template category is standard, ordered after note, and seeds two drama templates', () => {
+  const names = core.standardCategories().map((category) => category.name);
+  assert.deepEqual(names, ['日記', 'note用', 'テンプレート']);
+  assert.deepEqual(core.defaultCategories().map((category) => category.name), ['日記', 'note用']);
+  const ordered = core.orderedCategories([{ id: 'x', name: '自作', order: 0 }, core.templateCategory(), ...core.defaultCategories()]);
+  assert.deepEqual(ordered.map((category) => category.name), ['日記', 'note用', 'テンプレート', '自作']);
+  const seeds = core.seedTemplates();
+  assert.equal(seeds.length, 2);
+  assert.equal(new Set(seeds.map((seed) => seed.id)).size, 2);
+  assert.ok(seeds[0].body.includes('観る前の私') && !seeds[0].body.includes('ネタバレを含みます'));
+  assert.ok(seeds[1].body.startsWith('【ネタバレあり】') && seeds[1].body.includes('ネタバレを含みます'));
+  assert.ok(seeds.every((seed) => seed.body.includes('作品名／配信先／全◯話／ジャンル') && seed.body.includes('おすすめ度')));
+});
+
+test('applying a template replaces an empty body and appends to an existing one', () => {
+  assert.deepEqual(core.applyTemplateText('', 'T'), { text: 'T', caret: 0, appended: false });
+  assert.deepEqual(core.applyTemplateText(' \n ', 'T'), { text: 'T', caret: 0, appended: false });
+  assert.deepEqual(core.applyTemplateText('abc', 'T'), { text: 'abc\n\nT', caret: 5, appended: true });
+  assert.deepEqual(core.applyTemplateText('abc\n', 'T'), { text: 'abc\n\nT', caret: 5, appended: true });
+  assert.deepEqual(core.applyTemplateText('abc\n\n', 'T'), { text: 'abc\n\nT', caret: 5, appended: true });
+  assert.equal(core.isTemplateDraft({ category: 'journal-template' }, [core.templateCategory()]), true);
+  assert.equal(core.isTemplateDraft({ category: 'journal-diary' }, core.standardCategories()), false);
 });
