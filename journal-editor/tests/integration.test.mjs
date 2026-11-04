@@ -338,21 +338,20 @@ test('PC keeps the normal editing layout and split view', () => {
   assert.equal(h.run('state.mode'), 'split');
 });
 
-test('using a mouse on a touch-capable PC restores desktop editing controls', () => {
+test('a wide touch device such as an iPad keeps the desktop editing layout', () => {
   const h = harness(); h.context.window.matchMedia = (query) => ({ matches: query.includes('pointer: coarse') });
   h.context.document.activeElement = h.elements.get('bodyInput');
   h.events.get('window:pointerdown')({ pointerType: 'touch' });
-  assert.equal(h.context.document.body.classList.contains('compact-editor'), true);
-  h.events.get('window:pointerdown')({ pointerType: 'mouse' });
+  h.events.get('bodyInput:focus')();
   assert.equal(h.context.document.body.classList.contains('compact-editor'), false);
   assert.equal(h.context.document.body.classList.contains('editor-typing'), false);
   h.run("setEditorMode('split');");
   assert.equal(h.run('state.mode'), 'split');
 });
 
-test('tablet and phone focused editing preserves IME input and Done restores controls', () => {
+test('phone focused editing preserves IME input and Done restores controls', () => {
   const h = harness();
-  h.context.window.matchMedia = (query) => ({ matches: query.includes('pointer: coarse') });
+  h.context.window.matchMedia = (query) => ({ matches: query.includes('max-width: 700px') });
   h.events.get('bodyInput:focus')();
   assert.equal(h.context.document.body.classList.contains('editor-typing'), true);
   h.events.get('bodyInput:compositionstart')();
