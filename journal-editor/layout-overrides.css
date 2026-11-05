@@ -427,6 +427,9 @@ h1, h2, h3, h4, h5, h6, .draft-title, .legacy-details summary {
 .category-badge[data-category-kind="diary"] { color: #fff; background: #ef7d22; border-color: #ef7d22; }
 .category-badge[data-category-kind="note"] { background: #e8f3ec; color: #24583b; }
 .template-button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font-size: 14px; }
+/* カテゴリとテンプレートボタンは常に同じ行に並べる。 */
+.category-row { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
+.category-row .template-button { flex: none; }
 .template-button:hover, .template-button[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-light); }
 .template-panel { flex: 1 0 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .template-panel.hidden { display: none; }
@@ -673,7 +676,8 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 
 @media (max-width: 700px) {
   .article-meta .title-field { flex-basis: auto; width: 100%; }
-  .article-meta .category-field { width: 100%; justify-content: flex-start; }
+  .article-meta .category-row { width: 100%; }
+  .article-meta .category-field { justify-content: flex-start; }
   .list-tools { align-items: stretch; flex-direction: column; gap: 12px; }
   .list-sort-field { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
   .list-sort-field select { font-size: 16px; }
@@ -767,3 +771,8 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .created-at-form input { min-height: 44px; max-width: 100%; box-sizing: border-box; font-size: 16px; }
 #createdAtHelp { align-self: center; font-size: 12px; }
 .created-at-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* タッチ操作のタブレット（iPad など）はタイトルを1行使い、次の行にカテゴリとテンプレートを並べる。 */
+@media (min-width: 701px) and (pointer: coarse) {
+  .article-meta .title-field { flex-basis: 100%; max-width: none; }
+}
