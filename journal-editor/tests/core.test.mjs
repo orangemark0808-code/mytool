@@ -398,3 +398,19 @@ test('untitled articles are shown as Non Title, including older 無題の記事 
   assert.equal(core.isUntitledTitle('Non Title'), true);
   assert.equal(core.isUntitledTitle('Title'), false);
 });
+
+test('categories keep their book; fixed books and unknown categories resolve safely', async () => {
+  const core = await import('../editor-core.mjs');
+  const records = core.normalizeCategories([...defaultCategories(), { id: 'c1', name: 'ドラマ', order: 2, book: 'note' }, { id: 'c2', name: '旅行', order: 3 }, { id: 'c3', name: '日記', order: 4, book: 'note' }]);
+  assert.equal(records.find((c) => c.id === 'c1').book, 'note');
+  assert.equal(records.find((c) => c.id === 'c2').book, 'diary');
+  assert.equal(core.categoryBook(records.find((c) => c.id === 'c3')), 'diary');
+  assert.equal(core.draftBook({ category: 'c1' }, records), 'note');
+  assert.equal(core.draftBook({ category: null }, records), 'diary');
+  assert.equal(core.draftBook({ category: 'gone', categoryName: 'note用' }, records), 'note');
+  assert.equal(core.draftSubcategory({ category: 'journal-note' }, records), null);
+  assert.equal(core.draftSubcategory({ category: 'c1' }, records), 'c1');
+  assert.deepEqual(core.bookSubcategories(records, 'note').map((c) => c.id), ['c1']);
+  const merged = mergeCategories(records, [{ ...records.find((c) => c.id === 'c1'), book: 'diary', updatedAt: '2027-01-01T00:00:00.000Z' }]);
+  assert.equal(merged.find((c) => c.id === 'c1').book, 'diary');
+});

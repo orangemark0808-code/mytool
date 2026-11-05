@@ -776,3 +776,52 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 @media (min-width: 701px) and (pointer: coarse) {
   .article-meta .title-field { flex-basis: 100%; max-width: none; }
 }
+
+/* v2026-11-05-5：入口を「日記」「note」の2つに分けたホーム画面と、入口の中のカテゴリ */
+.template-button[hidden], .list-home-button[hidden], .list-filter-group.hidden { display: none !important; }
+.home-view { padding-bottom: 32px; }
+.home-view .view-heading { padding-bottom: 14px; margin-bottom: 18px; }
+.home-view .view-heading h1 { margin-bottom: 3px; font-family: inherit; font-size: 18px; line-height: 1.35; }
+.home-view .view-heading p { margin: 0; font-size: 14px; }
+.book-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.book-card { position: relative; display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); overflow: hidden; }
+.book-card::before { content: ""; display: block; height: 10px; background: #ef7d22; }
+.book-card[data-book-kind="note"]::before { background: #3f8a5c; }
+.book-open { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 6px; width: 100%; min-height: 150px; padding: 18px 18px 8px; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.book-open:hover .book-name, .book-open:focus-visible .book-name { color: var(--accent); }
+.book-card[data-book-kind="note"] .book-open:hover .book-name, .book-card[data-book-kind="note"] .book-open:focus-visible .book-name { color: #24583b; }
+.book-name { font-family: var(--font-sans); font-size: 22px; font-weight: 700; color: var(--heading); }
+.book-count { font-size: 30px; font-weight: 700; line-height: 1.1; color: var(--heading); }
+.book-count small { margin-left: 3px; font-size: 14px; font-weight: 600; }
+.book-meta { font-size: 13px; line-height: 1.5; }
+.book-subs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.book-subs span { padding: 2px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-subtle); font-size: 12px; }
+.book-new { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; margin: 8px 18px 18px; border-radius: 14px; }
+.book-card[data-book-kind="note"] .book-new { border-color: #3f8a5c; background: #3f8a5c; }
+.book-new svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.home-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.home-links .secondary-button { min-height: 44px; padding: 10px 16px; border-radius: 14px; font-size: 14px; }
+.list-view .view-heading .list-heading-text { flex: 1; min-width: 0; }
+.list-view[data-book="diary"] #listTitle { color: #c25e10; }
+.list-view[data-book="note"] #listTitle { color: #24583b; }
+.list-home-button { flex: none; }
+.category-manage-book { padding: 14px 0 6px; border-bottom: 1px solid var(--border); }
+.category-manage-book h3 { margin: 0 0 4px; padding-left: 10px; border-left: 4px solid #ef7d22; font-size: 15px; }
+.category-manage-book[data-book-kind="note"] h3 { border-left-color: #3f8a5c; }
+.category-manage-book ul { list-style: none; margin: 0; padding: 0; }
+.category-manage-book .category-manage-row:last-child { border-bottom: 0; }
+.category-manage-empty { padding: 10px 4px; font-size: 14px; }
+.category-manage-actions button.category-book-move { width: auto; padding: 0 10px; font-size: 12px; white-space: nowrap; }
+.category-add-form select { flex: none; min-height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font-size: 14px; }
+@media (max-width: 560px) {
+  .book-cards { gap: 10px; }
+  .book-open { min-height: 132px; padding: 14px 14px 6px; }
+  .book-name { font-size: 19px; }
+  .book-count { font-size: 26px; }
+  .book-new { margin: 6px 12px 14px; }
+  .category-add-form { flex-wrap: wrap; }
+  .category-add-form input { flex: 1 1 100%; order: -1; }
+}
+.list-view .view-heading, .compact-editor .list-view .view-heading { gap: 12px; }
+.list-filter-group .filter-label { display: inline-flex; align-items: center; min-width: 4.5em; font-size: 12px; font-weight: 700; color: var(--heading); }
+@media (max-width: 560px) { .list-filter-group .filter-label { flex-basis: 100%; min-width: 0; margin-bottom: -2px; } }

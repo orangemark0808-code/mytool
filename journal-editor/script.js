@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, retireTemplateCategory, RETIRED_TEMPLATE_CATEGORY_ID, applyTemplateText, FIXED_CATEGORY_NAMES, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown, UNTITLED_TITLE, isUntitledTitle, displayTitle } from './editor-core.mjs?v=2026-11-05-4';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-4';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, retireTemplateCategory, RETIRED_TEMPLATE_CATEGORY_ID, applyTemplateText, FIXED_CATEGORY_NAMES, orderedCategories, isNoteDraft, BOOKS, BOOK_LABELS, BOOK_CATEGORY_NAMES, categoryBook, isBookCategory, draftBook, draftSubcategory, bookSubcategories, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown, UNTITLED_TITLE, isUntitledTitle, displayTitle } from './editor-core.mjs?v=2026-11-05-5';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-5';
 
-const VERSION = '2026-11-05-4';
+const VERSION = '2026-11-05-5';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const SORT_KEY = 'orangemania-journal-list-sort-v1';
 const COMPACT_EDITOR_QUERY = '(max-width: 700px)';
@@ -10,7 +10,7 @@ const $ = (id) => document.getElementById(id);
 const titleInput = $('titleInput'), bodyInput = $('bodyInput'), categorySelect = $('categorySelect'), noteStatusSelect = $('noteStatusSelect');
 const state = {
   drafts: [], categories: [], currentId: null, editorDraftId: null, createdAtEditorId: null, user: null, view: 'list', mode: 'edit',
-  searchQuery: '', categoryFilter: 'all', noteStatusFilter: 'all', showTrash: false, history: [], historyIndex: -1, composing: false,
+  searchQuery: '', categoryFilter: 'all', subFilter: 'all', noteStatusFilter: 'all', showTrash: false, history: [], historyIndex: -1, composing: false,
   listSort: readListSort(),
   pointerType: null,
   previewDirty: true, saveTimers: new Map(), writes: new Map(), session: 0,
@@ -40,9 +40,27 @@ function changeListSort(value) {
 }
 function activeCategories() { return orderedCategories(state.categories); }
 function noteStatusLabel(draft) { return draft.noteStatus === 'published' ? '投稿済' : '未投稿'; }
-function categoryBadgeKind(draft) {
-  const name = categoryName(draft.category, draft.categoryName);
-  return name === '日記' ? 'diary' : name === 'note用' ? 'note' : 'other';
+function categoryBadgeKind(draft) { return draftBook(draft, state.categories); }
+function bookCategory(book) { return activeCategories().find((category) => category.name === BOOK_CATEGORY_NAMES[book]); }
+// 「日記」「note / ドラマ感想」のように、入口と小分けをまとめた表示名。
+function draftCategoryLabel(draft, short = false) {
+  const book = draftBook(draft, state.categories), sub = draftSubcategory(draft, state.categories);
+  if (!sub) return BOOK_LABELS[book];
+  const name = categoryName(sub, draft.categoryName) + (state.categories.some((item) => item.id === sub && !item.deleted) ? '' : '（確認待ち）');
+  return short ? name : `${BOOK_LABELS[book]} / ${name}`;
+}
+function categoryOptionsMarkup(selectedId, draft) {
+  const option = (value, label) => `<option value="${escapeHtml(value)}" ${value === (selectedId || '') ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+  let markup = selectedId ? '' : option('', '日記（未分類）');
+  const known = new Set();
+  for (const book of BOOKS) {
+    const base = bookCategory(book), items = [];
+    if (base) { known.add(base.id); items.push(option(base.id, BOOK_LABELS[book])); }
+    for (const category of bookSubcategories(state.categories, book)) { known.add(category.id); items.push(option(category.id, `${BOOK_LABELS[book]} / ${category.name}`)); }
+    if (items.length) markup += `<optgroup label="${BOOK_LABELS[book]}">${items.join('')}</optgroup>`;
+  }
+  if (selectedId && !known.has(selectedId)) markup += option(selectedId, `${categoryName(selectedId, draft?.category === selectedId ? draft.categoryName : '')}（確認待ち）`);
+  return markup;
 }
 function categoryName(id, fallback = '') {
   if (!id) return '未分類';
@@ -211,7 +229,7 @@ function scheduleSave() {
   if (!draft || draft.deletedAt || !state.user || state.view !== 'editor' || state.editorDraftId !== draft.id) return;
   const category = categorySelect.value || null;
   const categoryLabel = category ? categoryName(category, draft.category === category ? draft.categoryName : '') : '';
-  const noteStatus = categoryLabel === 'note用' ? (noteStatusSelect.value === 'published' ? 'published' : 'unpublished') : draft.noteStatus;
+  const noteStatus = isNoteDraft({ category, categoryName: categoryLabel }, state.categories) ? (noteStatusSelect.value === 'published' ? 'published' : 'unpublished') : draft.noteStatus;
   const changes = { title: titleInput.value.trim() || (isUntitledTitle(draft.title) ? draft.title : UNTITLED_TITLE), body: bodyInput.value, category, categoryName: categoryLabel, noteStatus };
   if (draft.title === changes.title && draft.body === changes.body && draft.category === changes.category && draft.categoryName === changes.categoryName && draft.noteStatus === changes.noteStatus) return;
   draft = editedDraft(draft, changes);
@@ -364,12 +382,12 @@ async function handleAuth(user) {
   $('purgeConfirmation').classList.add('hidden'); $('purgeTitles').innerHTML = ''; $('purgeResult').textContent = '';
   state.legacyReviewShown = false;
   state.serverDrafts = []; state.serverCategories = [];
-  state.searchQuery = ''; state.categoryFilter = state.noteStatusFilter = 'all'; $('searchInput').value = '';
+  state.searchQuery = ''; state.categoryFilter = state.subFilter = state.noteStatusFilter = 'all'; $('searchInput').value = '';
   titleInput.value = bodyInput.value = ''; resetHistory(); updatePreview();
   $('loginButton').hidden = Boolean(user); $('logoutButton').hidden = !user;
   $('authGate').classList.toggle('hidden', Boolean(user)); document.querySelector('.header-actions').classList.toggle('hidden', !user);
   if (!user) {
-    for (const view of ['editor', 'list', 'settings']) $(`${view}View`).classList.add('hidden');
+    for (const view of ['home', 'editor', 'list', 'settings']) $(`${view}View`).classList.add('hidden');
     titleInput.value = bodyInput.value = ''; resetHistory(); updatePreview(); updateToolbarVisibility(); refreshSyncStatus(); return;
   }
   try {
@@ -377,7 +395,7 @@ async function handleAuth(user) {
     state.purgedIds = new Set(Array.isArray(account.purgedIds) ? account.purgedIds.filter((id) => typeof id === 'string') : []);
     state.currentId = account.currentId || null; state.categoriesDirty = account.categoriesDirty || false; state.legacyImported = account.legacyImported || false;
   } catch { state.storageReadFailed = true; state.categories = defaultCategories(); toast('端末の保存データを読み込めませんでした。元データは保持しています'); }
-  updateStorageUi(); showView('list'); updateMigrationPanel(); refreshSyncStatus(); startRemoteSync();
+  updateStorageUi(); showView('home'); updateMigrationPanel(); refreshSyncStatus(); startRemoteSync();
 }
 async function logout() {
   scheduleSave();
@@ -401,42 +419,59 @@ function signInWithGoogle() {
 
 function renderCategoryOptions(selectedId = currentDraft()?.category) {
   if (state.composing) return;
-  const draft = currentDraft(), categories = activeCategories();
-  const options = categories.map((category) => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name)}</option>`);
-  if (selectedId && !categories.some((category) => category.id === selectedId)) options.push(`<option value="${escapeHtml(selectedId)}">${escapeHtml(categoryName(selectedId, draft?.categoryName))}（確認待ち）</option>`);
-  options.push('<option value="">未分類</option>');
-  categorySelect.innerHTML = options.join(''); categorySelect.value = selectedId || '';
+  categorySelect.innerHTML = categoryOptionsMarkup(selectedId || null, currentDraft()); categorySelect.value = selectedId || '';
   updateNoteStatusControls();
 }
 function updateNoteStatusControls() {
   const draft = currentDraft();
   const selected = { category: categorySelect.value || null, categoryName: draft?.category === categorySelect.value ? draft.categoryName : '' };
-  $('noteStatusField').hidden = !isNoteDraft(selected, state.categories);
+  const note = isNoteDraft(selected, state.categories);
+  $('noteStatusField').hidden = !note;
+  // テンプレート（ドラマ感想）は note の記事だけで使う。日記は本文に集中できる画面にする。
+  $('templateButton').hidden = !note;
+  if (!note && !$('templatePanel').classList.contains('hidden')) closeTemplatePanel();
   noteStatusSelect.value = draft?.noteStatus === 'published' ? 'published' : 'unpublished';
 }
 function renderCategoryManageList() {
-  const categories = activeCategories();
-  const fixed = (category) => category && FIXED_CATEGORY_NAMES.includes(category.name);
-  $('categoryManageList').innerHTML = categories.length ? categories.map((category, index) => `<li class="category-manage-row"><span class="category-manage-name">${escapeHtml(category.name)}</span><div class="category-manage-actions"><button type="button" data-move-up="${escapeHtml(category.id)}" ${fixed(category) || index === 0 || fixed(categories[index - 1]) ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を上へ">↑</button><button type="button" data-move-down="${escapeHtml(category.id)}" ${fixed(category) || index === categories.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を下へ">↓</button><button type="button" class="delete" data-delete-category="${escapeHtml(category.id)}" aria-label="${escapeHtml(category.name)}を削除">×</button></div></li>`).join('') : '<li class="empty">カテゴリがありません。</li>';
+  $('categoryManageList').innerHTML = BOOKS.map((book) => {
+    const items = bookSubcategories(state.categories, book), other = book === 'diary' ? 'note' : 'diary';
+    const rows = items.length ? items.map((category, index) => `<li class="category-manage-row"><span class="category-manage-name">${escapeHtml(category.name)}</span><div class="category-manage-actions"><button type="button" data-move-up="${escapeHtml(category.id)}" ${index === 0 ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を上へ">↑</button><button type="button" data-move-down="${escapeHtml(category.id)}" ${index === items.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(category.name)}を下へ">↓</button><button type="button" class="category-book-move" data-move-book="${escapeHtml(category.id)}" aria-label="${escapeHtml(category.name)}を${BOOK_LABELS[other]}へ移す">${BOOK_LABELS[other]}へ</button><button type="button" class="delete" data-delete-category="${escapeHtml(category.id)}" aria-label="${escapeHtml(category.name)}を削除">×</button></div></li>`).join('') : '<li class="category-manage-empty">まだありません。</li>';
+    return `<li class="category-manage-book" data-book-kind="${book}"><h3>${BOOK_LABELS[book]}のカテゴリ</h3><ul>${rows}</ul></li>`;
+  }).join('');
 }
 function changedCategories() { state.categoriesDirty = true; persistLocal([]); renderCategoryOptions(); renderCategoryManageList(); renderList(); refreshSyncStatus(); void syncCategories(); }
-function addCategory(name) {
-  const trimmed = name.trim().slice(0, 30); if (!trimmed) return;
-  if (activeCategories().some((category) => category.name === trimmed)) return toast('同じ名前のカテゴリがあります');
-  state.categories.push({ id: crypto.randomUUID(), name: trimmed, order: activeCategories().length, updatedAt: new Date().toISOString(), deleted: false }); changedCategories();
+function addCategory(name, book = 'diary') {
+  const trimmed = name.trim().slice(0, 30); if (!trimmed) return false;
+  if (!BOOKS.includes(book)) book = 'diary';
+  if (FIXED_CATEGORY_NAMES.includes(trimmed) || activeCategories().some((category) => category.name === trimmed)) { toast('同じ名前のカテゴリがあります'); return false; }
+  const order = Math.max(-1, ...state.categories.map((category) => Number.isFinite(category.order) ? category.order : 0)) + 1;
+  state.categories.push({ id: crypto.randomUUID(), name: trimmed, order, updatedAt: new Date().toISOString(), deleted: false, book }); changedCategories();
+  toast(`${BOOK_LABELS[book]}に「${trimmed}」を追加しました`); return true;
 }
 function moveCategory(id, direction) {
-  const categories = activeCategories(), index = categories.findIndex((category) => category.id === id), other = index + direction;
-  if (index < 0 || other < 0 || other >= categories.length) return;
-  if ([categories[index], categories[other]].some((category) => FIXED_CATEGORY_NAMES.includes(category.name))) return;
-  [categories[index], categories[other]] = [categories[other], categories[index]];
-  for (const [order, category] of categories.entries()) { category.order = order; category.updatedAt = new Date().toISOString(); }
+  const target = state.categories.find((category) => category.id === id && !category.deleted);
+  if (!target || isBookCategory(target)) return;
+  const siblings = bookSubcategories(state.categories, categoryBook(target)), index = siblings.indexOf(target), other = siblings[index + direction];
+  if (index < 0 || !other) return;
+  const categories = activeCategories(), a = categories.indexOf(target), b = categories.indexOf(other);
+  [categories[a], categories[b]] = [categories[b], categories[a]];
+  const now = new Date().toISOString();
+  for (const [order, category] of categories.entries()) if (category.order !== order) { category.order = order; category.updatedAt = now; }
   changedCategories();
 }
+// 小分けカテゴリを日記⇔noteの間で移す。記事はカテゴリについていくので、記事自体は書き換えない。
+function moveCategoryBook(id) {
+  const category = state.categories.find((item) => item.id === id && !item.deleted);
+  if (!category || isBookCategory(category)) return;
+  category.book = categoryBook(category) === 'note' ? 'diary' : 'note'; category.updatedAt = new Date().toISOString();
+  changedCategories(); toast(`「${category.name}」を${BOOK_LABELS[category.book]}へ移しました`);
+}
 function deleteCategory(id) {
-  const category = state.categories.find((item) => item.id === id); if (!category) return;
+  const category = state.categories.find((item) => item.id === id); if (!category || isBookCategory(category)) return;
+  const base = bookCategory(categoryBook(category));
   category.deleted = true; category.updatedAt = new Date().toISOString(); const affected = [];
-  state.drafts = state.drafts.map((draft) => { if (draft.category !== id) return draft; affected.push(draft.id); return editedDraft(draft, { category: null, categoryName: '' }); });
+  if (state.subFilter === id) state.subFilter = 'all';
+  state.drafts = state.drafts.map((draft) => { if (draft.category !== id) return draft; affected.push(draft.id); return editedDraft(draft, base ? { category: base.id, categoryName: base.name } : { category: null, categoryName: '' }); });
   persistLocal(affected); changedCategories(); for (const draftId of affected) queueSave(draftId);
 }
 function uncategorizedDrafts() { return state.drafts.filter((draft) => !draft.category && !draft.deletedAt); }
@@ -635,7 +670,6 @@ function renderTemplatePanel() {
   const start = state.templateStart;
   const choices = templateOptions().map((template) => `<li><button type="button" class="template-choice" data-template-id="${escapeHtml(template.id)}">ドラマ感想（${escapeHtml(template.label)}）</button></li>`).join('');
   panel.innerHTML = `<div class="template-head"><strong>${start ? '書き方を選ぶ' : 'テンプレートを選ぶ'}</strong><button type="button" class="small-button" data-template-close>閉じる</button></div>`
-    + (start ? '<p class="template-message">テンプレートを選ぶとカテゴリは note用 になります。</p>' : '')
     + `<ul class="template-list">${start ? '<li><button type="button" class="template-choice" data-template-blank>白紙</button></li>' : ''}${choices}</ul>`;
 }
 function openTemplatePanel() {
@@ -656,8 +690,8 @@ function openStartPanel() {
 function insertTemplate(id) {
   const template = findTemplate(id); if (!template) return;
   finishComposition();
-  if (state.templateStart) {
-    const note = activeCategories().find((category) => category.name === 'note用');
+  if (state.templateStart && !isNoteDraft({ category: categorySelect.value || null, categoryName: '' }, state.categories)) {
+    const note = bookCategory('note');
     if (note) { categorySelect.value = note.id; updateNoteStatusControls(); }
   }
   const result = applyTemplateText(bodyInput.value, template.body);
@@ -696,19 +730,45 @@ function showView(view) {
   if (view !== 'editor') finishComposition();
   state.listTagEditor = null; closeCreatedAtEditor();
   $('bulkDiaryConfirmation').classList.add('hidden');
-  state.view = view; for (const name of ['editor', 'list', 'settings']) $(`${name}View`).classList.toggle('hidden', name !== view);
+  state.view = view; for (const name of ['home', 'editor', 'list', 'settings']) $(`${name}View`).classList.toggle('hidden', name !== view);
+  $('homeNavButton').classList.toggle('active', view === 'home');
   $('draftsButton').classList.toggle('active', view === 'list'); $('settingsButton').classList.toggle('active', view === 'settings');
+  if (view === 'home') renderHome();
   if (view === 'list') renderList(); if (view === 'settings') { renderCategoryManageList(); updateMigrationPanel(); }
   closeMore(); updateToolbarVisibility();
 }
-function openJournalList() {
+// 記事一覧を開く。book は 'diary'・'note'・'all'（すべて）。省略すると今の入口のまま。
+function openJournalList(book = state.categoryFilter, { trash = false } = {}) {
   if (!state.user || state.bulkAssigning || state.bulkPurging) return;
   finishComposition();
-  state.showTrash = false; state.listTagEditor = null;
+  if (!['all', ...BOOKS].includes(book)) book = 'all';
+  state.showTrash = trash; state.listTagEditor = null;
   state.searchQuery = ''; $('searchInput').value = '';
-  state.categoryFilter = state.noteStatusFilter = 'all';
+  if (state.categoryFilter !== book) state.subFilter = 'all';
+  state.categoryFilter = book; state.noteStatusFilter = 'all';
+  if (state.subFilter !== 'all' && state.subFilter !== 'none' && !bookSubcategories(state.categories, book).some((category) => category.id === state.subFilter)) state.subFilter = 'all';
   state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = '';
   showView('list');
+}
+function openHome() {
+  if (!state.user || state.bulkAssigning || state.bulkPurging) return;
+  finishComposition();
+  state.showTrash = false; state.listTagEditor = null; state.selectedTrash.clear(); cancelPurge(false); $('purgeResult').textContent = '';
+  showView('home');
+}
+function renderHome() {
+  const active = state.drafts.filter((draft) => !draft.deletedAt);
+  $('bookCards').innerHTML = BOOKS.map((book) => {
+    const drafts = active.filter((draft) => draftBook(draft, state.categories) === book);
+    const latest = drafts.reduce((value, draft) => (Date.parse(draft.updatedAt) || 0) > (Date.parse(value) || 0) ? draft.updatedAt : value, '');
+    const subs = bookSubcategories(state.categories, book);
+    const extra = book === 'note' ? `<span class="book-meta">未投稿 ${drafts.filter((draft) => draft.noteStatus !== 'published').length}件</span>` : '';
+    const chips = subs.length ? `<span class="book-subs">${subs.slice(0, 6).map((category) => `<span>${escapeHtml(category.name)}</span>`).join('')}${subs.length > 6 ? `<span>ほか${subs.length - 6}</span>` : ''}</span>` : '';
+    return `<article class="book-card" data-book-kind="${book}"><button class="book-open" type="button" data-open-book="${book}" aria-label="${BOOK_LABELS[book]}を開く（${drafts.length}件）"><span class="book-name">${BOOK_LABELS[book]}</span><span class="book-count">${drafts.length}<small>件</small></span><span class="book-meta">${latest ? `最終更新 ${formatDateTime(latest)}` : 'まだ記事はありません'}</span>${extra}${chips}</button><button class="primary-button book-new" type="button" data-new-book="${book}" aria-label="${BOOK_LABELS[book]}を新しく書く"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>書く</button></article>`;
+  }).join('');
+  const trashCount = state.drafts.filter((draft) => draft.deletedAt).length;
+  $('homeTrashButton').textContent = `ごみ箱（${trashCount}件）`;
+  $('homeAllButton').textContent = `すべてのJournal・検索（${active.length}件）`;
 }
 function loadDraft(id) {
   if (state.bulkAssigning || state.bulkPurging) return;
@@ -730,15 +790,26 @@ function ensureStandardCategories(now = new Date().toISOString()) {
   if (categoriesChanged) { state.categoriesDirty = true; renderCategoryOptions(); renderCategoryManageList(); void syncCategories(); }
   return categoriesChanged;
 }
-function newDraft() {
+// 今いる場所から、新しい記事を入れる入口を決める。ホームなどでは日記。
+function contextBook() {
+  if (state.view === 'list' && BOOKS.includes(state.categoryFilter) && !state.showTrash) return state.categoryFilter;
+  if (state.view === 'editor' && currentDraft()) return draftBook(currentDraft(), state.categories);
+  return 'diary';
+}
+function newDraft(book = contextBook()) {
   if (!state.user || state.bulkAssigning || state.bulkPurging) return;
+  if (!BOOKS.includes(book)) book = 'diary';
   finishComposition(); setEditorMode('edit');
   const now = new Date().toISOString();
   ensureStandardCategories(now);
-  const diary = activeCategories().find((category) => category.name === '日記');
-  const draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: UNTITLED_TITLE, body: '', category: diary.id, categoryName: diary.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
+  // 一覧でカテゴリを絞り込んでいれば、そのカテゴリに入れる。
+  const sub = state.view === 'list' && state.categoryFilter === book && bookSubcategories(state.categories, book).find((category) => category.id === state.subFilter);
+  const target = sub || bookCategory(book);
+  if (BOOKS.includes(book)) { state.categoryFilter = book; if (!sub) state.subFilter = 'all'; }
+  const draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: UNTITLED_TITLE, body: '', category: target.id, categoryName: target.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
   state.drafts.unshift(draft); state.currentId = state.editorDraftId = draft.id; titleInput.value = bodyInput.value = '';
-  renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); openStartPanel();
+  renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor');
+  if (book === 'note') openStartPanel();
 }
 /* 以前のカテゴリ「テンプレート」が残っていれば、サーバーの記事とカテゴリを読み終えてから一度だけ片付ける。 */
 function retireOldTemplateCategory() {
@@ -756,11 +827,10 @@ function retireOldTemplateCategory() {
   if (state.categoryFilter !== 'all' && !['diary', 'note'].includes(state.categoryFilter)) state.categoryFilter = 'all';
   persistLocal(result.changedIds); changedCategories(); for (const id of result.changedIds) queueSave(id);
 }
-function setListCategoryFilter(value) {
-  if (!['all', 'diary', 'note'].includes(value)) return;
-  state.listTagEditor = null;
-  if (state.categoryFilter !== value) state.noteStatusFilter = 'all';
-  state.categoryFilter = value; renderList();
+function setListSubFilter(value) {
+  if (!BOOKS.includes(state.categoryFilter)) return;
+  if (value !== 'all' && value !== 'none' && !bookSubcategories(state.categories, state.categoryFilter).some((category) => category.id === value)) return;
+  state.listTagEditor = null; state.subFilter = value; renderList();
 }
 function setListNoteFilter(value) {
   if (state.categoryFilter !== 'note' || !['all', 'unpublished', 'published'].includes(value)) return;
@@ -768,9 +838,14 @@ function setListNoteFilter(value) {
   state.noteStatusFilter = value; renderList();
 }
 function renderListFilters() {
-  $('listFilters').classList.toggle('hidden', state.showTrash);
-  $('listNoteFilters').classList.toggle('hidden', state.categoryFilter !== 'note');
-  for (const [id, value] of [['filterAll', 'all'], ['filterDiary', 'diary'], ['filterNote', 'note']]) $(id).setAttribute('aria-pressed', String(state.categoryFilter === value));
+  const book = BOOKS.includes(state.categoryFilter) ? state.categoryFilter : null;
+  const subs = book ? bookSubcategories(state.categories, book) : [];
+  if (state.subFilter !== 'all' && state.subFilter !== 'none' && !subs.some((category) => category.id === state.subFilter)) state.subFilter = 'all';
+  const button = (value, label) => `<button type="button" data-sub-filter="${escapeHtml(value)}" aria-pressed="${state.subFilter === value}">${escapeHtml(label)}</button>`;
+  $('listSubFilters').innerHTML = subs.length ? '<span class="filter-label">カテゴリ</span>' + button('all', 'すべて') + subs.map((category) => button(category.id, category.name)).join('') + button('none', '分類なし') : '';
+  $('listSubFilters').classList.toggle('hidden', !subs.length);
+  $('listFilters').classList.toggle('hidden', state.showTrash || (!subs.length && book !== 'note'));
+  $('listNoteFilters').classList.toggle('hidden', book !== 'note');
   for (const [id, value] of [['filterNoteAll', 'all'], ['filterUnpublished', 'unpublished'], ['filterPublished', 'published']]) $(id).setAttribute('aria-pressed', String(state.noteStatusFilter === value));
 }
 function draftTitleMarkup(draft) {
@@ -793,7 +868,7 @@ function listTagId(id, kind, part) { return `list-tag-${part}-${kind}-${encodeUR
 function listTagMarkup(draft, kind) {
   const category = kind === 'category';
   if (!category && !isNoteDraft(draft, state.categories)) return '';
-  const label = category ? categoryName(draft.category, draft.categoryName) : noteStatusLabel(draft);
+  const label = category ? draftCategoryLabel(draft, BOOKS.includes(state.categoryFilter) && !state.showTrash) : noteStatusLabel(draft);
   const badge = `<span class="${category ? 'category-badge' : 'note-status-badge'}" ${category ? `data-category-kind="${categoryBadgeKind(draft)}"` : `data-note-status="${draft.noteStatus === 'published' ? 'published' : 'unpublished'}"`}>${escapeHtml(label)}`;
   if (state.showTrash) return `${badge}</span>`;
   const open = state.listTagEditor?.id === draft.id && state.listTagEditor.kind === kind;
@@ -801,12 +876,8 @@ function listTagMarkup(draft, kind) {
   const disabled = state.bulkAssigning || state.bulkPurging || state.storageReadFailed;
   let options = '';
   if (open) {
-    if (category) {
-      const categories = activeCategories();
-      options = categories.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === draft.category ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
-      if (draft.category && !categories.some((item) => item.id === draft.category)) options += `<option value="${escapeHtml(draft.category)}" selected>${escapeHtml(label)}（確認待ち）</option>`;
-      options += `<option value="" ${!draft.category ? 'selected' : ''}>未分類</option>`;
-    } else options = `<option value="unpublished" ${draft.noteStatus !== 'published' ? 'selected' : ''}>未投稿</option><option value="published" ${draft.noteStatus === 'published' ? 'selected' : ''}>投稿済</option>`;
+    if (category) options = categoryOptionsMarkup(draft.category, draft);
+    else options = `<option value="unpublished" ${draft.noteStatus !== 'published' ? 'selected' : ''}>未投稿</option><option value="published" ${draft.noteStatus === 'published' ? 'selected' : ''}>投稿済</option>`;
   }
   return `<div class="list-tag-field"><button id="${escapeHtml(listTagId(draft.id, kind, 'trigger'))}" class="list-tag-button" type="button" data-open-list-tag="${escapeHtml(draft.id)}" data-tag-kind="${kind}" title="${category ? 'カテゴリ' : '投稿状況'}を変更" aria-label="${category ? 'カテゴリ' : '投稿状況'}を変更：${escapeHtml(label)}" aria-expanded="${open}" ${open ? `aria-controls="${escapeHtml(selectId)}"` : ''} ${disabled ? 'disabled' : ''}>${badge}<svg class="tag-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></span></button>${open ? `<div class="list-tag-popover" role="group" aria-label="${category ? 'カテゴリ' : '投稿状況'}を変更"><select id="${escapeHtml(selectId)}" data-list-tag-select="${escapeHtml(draft.id)}" data-tag-kind="${kind}" aria-label="${escapeHtml(draftAccessibleTitle(draft))}の${category ? 'カテゴリ' : '投稿状況'}">${options}</select><button class="secondary-button" type="button" data-close-list-tag="true">閉じる</button></div>` : ''}</div>`;
 }
@@ -818,8 +889,7 @@ function openListTagEditor(id, kind) {
   state.listTagEditor = { id, kind }; renderList(); $(listTagId(id, kind, 'select'))?.focus({ preventScroll: false });
 }
 function focusListTag(id, kind) {
-  const filter = state.categoryFilter === 'note' ? 'filterNote' : state.categoryFilter === 'diary' ? 'filterDiary' : 'filterAll';
-  (document.getElementById(listTagId(id, kind, 'trigger')) || $(filter))?.focus({ preventScroll: true });
+  (document.getElementById(listTagId(id, kind, 'trigger')) || $('searchInput'))?.focus({ preventScroll: true });
 }
 function closeListTagEditor(focus = true) {
   const editor = state.listTagEditor; state.listTagEditor = null; renderList();
@@ -833,7 +903,7 @@ function changeListTag(id, kind, value) {
     if (value && !activeCategories().some((item) => item.id === value) && value !== draft.category) return toast('カテゴリが変更・削除されています。選択し直してください');
     if ((value || null) === draft.category) return closeListTagEditor();
     changes = { category: value || null, categoryName: value ? categoryName(value) : '' };
-    message = `カテゴリを${value ? changes.categoryName : '未分類'}に変更しました`;
+    message = `カテゴリを${draftCategoryLabel({ ...draft, ...changes })}に変更しました`;
   } else if (kind === 'status' && isNoteDraft(draft, state.categories) && ['unpublished', 'published'].includes(value)) {
     if (value === draft.noteStatus) return closeListTagEditor();
     changes = { noteStatus: value }; message = `投稿状況を${value === 'published' ? '投稿済' : '未投稿'}に変更しました`;
@@ -918,9 +988,10 @@ function renderList() {
   const pinTime = (draft) => state.showTrash ? 0 : Date.parse(draft.pinnedAt) || 0;
   let drafts = state.drafts.filter((draft) => Boolean(draft.deletedAt) === state.showTrash)
     .sort((a, b) => pinTime(b) - pinTime(a) || (Date.parse(b[sortField]) || 0) - (Date.parse(a[sortField]) || 0) || a.id.localeCompare(b.id));
-  if (!state.showTrash && state.categoryFilter !== 'all') drafts = drafts.filter((draft) => categoryBadgeKind(draft) === state.categoryFilter);
+  if (!state.showTrash && state.categoryFilter !== 'all') drafts = drafts.filter((draft) => draftBook(draft, state.categories) === state.categoryFilter);
+  if (!state.showTrash && BOOKS.includes(state.categoryFilter) && state.subFilter !== 'all') drafts = drafts.filter((draft) => (draftSubcategory(draft, state.categories) || 'none') === state.subFilter);
   if (!state.showTrash && state.categoryFilter === 'note' && state.noteStatusFilter !== 'all') drafts = drafts.filter((draft) => draft.noteStatus === state.noteStatusFilter);
-  if (query) drafts = drafts.filter((draft) => [displayTitle(draft.title), draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
+  if (query) drafts = drafts.filter((draft) => [displayTitle(draft.title), draft.body, draftCategoryLabel(draft), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
   if (state.listTagEditor && !drafts.some((draft) => draft.id === state.listTagEditor.id && !draft.deletedAt && (state.listTagEditor.kind === 'category' || isNoteDraft(draft, state.categories)))) state.listTagEditor = null;
   state.visibleTrashIds = state.showTrash ? drafts.map((draft) => draft.id) : [];
   const trashCount = state.drafts.filter((draft) => draft.deletedAt).length;
@@ -932,10 +1003,13 @@ function renderList() {
   $('trashButton').classList.toggle('list-back-button', state.showTrash);
   $('trashCount').textContent = String(trashCount); $('trashCount').hidden = state.showTrash || trashCount === 0;
   $('trashButton').disabled = state.bulkPurging; $('searchInput').disabled = state.bulkPurging;
-  $('listTitle').textContent = state.showTrash ? 'ごみ箱' : 'Journal一覧';
+  $('listTitle').textContent = state.showTrash ? 'ごみ箱' : BOOKS.includes(state.categoryFilter) ? BOOK_LABELS[state.categoryFilter] : 'すべてのJournal';
+  $('listHomeButton').hidden = state.showTrash; $('listHomeButton').disabled = state.bulkPurging;
+  $('listView').setAttribute('data-book', state.showTrash ? 'trash' : state.categoryFilter);
+  if (state.view === 'home') renderHome();
   const orderLabel = sortField === 'updatedAt' ? '更新日の新しい順' : '作成日の新しい順';
   $('listOrderDescription').textContent = !state.showTrash && drafts.some((draft) => draft.pinnedAt) ? `ピン止めを先頭・${orderLabel}` : orderLabel;
-  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''} ${!state.showTrash && draft.pinnedAt ? 'pinned' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draftAccessibleTitle(draft))}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}</div><div class="draft-label-row">${draftStateMarkup(draft)}${listTagMarkup(draft, 'category')}${listTagMarkup(draft, 'status')}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span class="${sortField === 'createdAt' ? 'sort-date' : ''}">作成 ${formatDateTime(draft.createdAt)}</span><span class="${sortField === 'updatedAt' ? 'sort-date' : ''}">更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `${pinButtonMarkup(draft)}<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && state.categoryFilter !== 'all') ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''} ${!state.showTrash && draft.pinnedAt ? 'pinned' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draftAccessibleTitle(draft))}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}</div><div class="draft-label-row">${draftStateMarkup(draft)}${listTagMarkup(draft, 'category')}${listTagMarkup(draft, 'status')}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span class="${sortField === 'createdAt' ? 'sort-date' : ''}">作成 ${formatDateTime(draft.createdAt)}</span><span class="${sortField === 'updatedAt' ? 'sort-date' : ''}">更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `${pinButtonMarkup(draft)}<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && (state.categoryFilter !== 'all' || state.subFilter !== 'all')) ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
   updateTrashControls();
 }
 function pinButtonId(id) { return `pin-button-${encodeURIComponent(id)}`; }
@@ -1061,8 +1135,16 @@ document.addEventListener('click', (event) => {
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMore(); });
 $('markdownCopyButton').addEventListener('click', () => copyMarkdown().catch(() => toast('コピーできませんでした。.md保存も利用できます')));
 $('downloadButton').addEventListener('click', download); $('backupButton').addEventListener('click', backup);
-for (const id of ['newButton', 'listNewButton']) $(id).addEventListener('click', newDraft);
-for (const id of ['homeButton', 'draftsButton']) $(id).addEventListener('click', openJournalList);
+for (const id of ['newButton', 'listNewButton']) $(id).addEventListener('click', () => newDraft());
+for (const id of ['homeButton', 'homeNavButton', 'listHomeButton']) $(id).addEventListener('click', openHome);
+$('draftsButton').addEventListener('click', () => openJournalList());
+$('homeAllButton').addEventListener('click', () => openJournalList('all'));
+$('homeTrashButton').addEventListener('click', () => openJournalList('all', { trash: true }));
+$('bookCards').addEventListener('click', (event) => {
+  const button = event.target.closest('button'); if (!button) return;
+  if (button.dataset.openBook) openJournalList(button.dataset.openBook);
+  if (button.dataset.newBook) newDraft(button.dataset.newBook);
+});
 $('settingsButton').addEventListener('click', () => showView('settings'));
 $('bulkDiaryButton').addEventListener('click', requestBulkDiaryConversion);
 $('bulkDiaryConfirmButton').addEventListener('click', convertUncategorizedToDiary);
@@ -1117,14 +1199,15 @@ $('purgeCancelButton').addEventListener('click', () => cancelPurge());
 $('purgeConfirmButton').addEventListener('click', purgeSelectedDrafts);
 $('listFilters').addEventListener('click', (event) => {
   const button = event.target.closest('button'); if (!button) return;
-  if (button.dataset.categoryFilter) setListCategoryFilter(button.dataset.categoryFilter);
+  if (button.dataset.subFilter) setListSubFilter(button.dataset.subFilter);
   if (button.dataset.noteFilter) setListNoteFilter(button.dataset.noteFilter);
 });
-$('categoryAddForm').addEventListener('submit', (event) => { event.preventDefault(); addCategory($('categoryNameInput').value); $('categoryNameInput').value = ''; });
+$('categoryAddForm').addEventListener('submit', (event) => { event.preventDefault(); if (addCategory($('categoryNameInput').value, $('categoryBookSelect').value)) $('categoryNameInput').value = ''; });
 $('categoryManageList').addEventListener('click', (event) => {
   const button = event.target.closest('button'); if (!button) return;
   if (button.dataset.moveUp) moveCategory(button.dataset.moveUp, -1); if (button.dataset.moveDown) moveCategory(button.dataset.moveDown, 1);
-  if (button.dataset.deleteCategory && confirm('カテゴリを削除しますか？このカテゴリのJournalは未分類になります。')) deleteCategory(button.dataset.deleteCategory);
+  if (button.dataset.moveBook) moveCategoryBook(button.dataset.moveBook);
+  if (button.dataset.deleteCategory && confirm('カテゴリを削除しますか？このカテゴリの記事は日記・noteの「分類なし」に戻ります。')) deleteCategory(button.dataset.deleteCategory);
 });
 window.addEventListener('online', retrySync); window.addEventListener('offline', invalidateSyncConfirmation);
 window.addEventListener('pageshow', (event) => { if (event.persisted) retrySync(); });

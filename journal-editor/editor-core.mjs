@@ -200,8 +200,8 @@ export function applyWriteResult(drafts, sent, result, activeId) {
 
 export function defaultCategories() {
   return [
-    { id: 'journal-diary', name: '日記', order: 0, updatedAt: '2026-01-01T00:00:00.000Z', deleted: false },
-    { id: 'journal-note', name: 'note用', order: 1, updatedAt: '2026-01-01T00:00:00.000Z', deleted: false },
+    { id: 'journal-diary', name: '日記', order: 0, updatedAt: '2026-01-01T00:00:00.000Z', deleted: false, book: 'diary' },
+    { id: 'journal-note', name: 'note用', order: 1, updatedAt: '2026-01-01T00:00:00.000Z', deleted: false, book: 'note' },
   ];
 }
 
@@ -251,9 +251,39 @@ export function orderedCategories(records) {
   return records.filter((category) => !category.deleted).sort((a, b) => priority(a) - priority(b) || a.order - b.order || a.id.localeCompare(b.id));
 }
 
+/* 入口（冊子）は「日記」と「note」の2つ。カテゴリ「日記」「note用」がそれぞれの入口そのもので、
+   追加したカテゴリはどちらかの入口の中の小分けになる。未分類や未取得のカテゴリの記事は日記に入る。 */
+export const BOOKS = ['diary', 'note'];
+export const BOOK_LABELS = { diary: '日記', note: 'note' };
+export const BOOK_CATEGORY_NAMES = { diary: '日記', note: 'note用' };
+export function categoryBook(category) {
+  if (!category) return 'diary';
+  if (category.name === '日記') return 'diary';
+  if (category.name === 'note用') return 'note';
+  return category.book === 'note' ? 'note' : 'diary';
+}
+export function isBookCategory(category) {
+  return Boolean(category) && FIXED_CATEGORY_NAMES.includes(category.name);
+}
+export function draftBook(draft, categories) {
+  if (!draft?.category) return 'diary';
+  const category = categories.find((item) => item.id === draft.category);
+  if (category) return categoryBook(category);
+  return draft.categoryName === 'note用' ? 'note' : 'diary';
+}
+/* 記事の小分けカテゴリのID。入口そのもの（日記・note用）や未分類なら null。 */
+export function draftSubcategory(draft, categories) {
+  if (!draft?.category) return null;
+  const category = categories.find((item) => item.id === draft.category);
+  if (!category) return draft.categoryName && !FIXED_CATEGORY_NAMES.includes(draft.categoryName) ? draft.category : null;
+  return isBookCategory(category) ? null : category.id;
+}
+export function bookSubcategories(categories, book) {
+  return orderedCategories(categories).filter((category) => !isBookCategory(category) && categoryBook(category) === book);
+}
+
 export function isNoteDraft(draft, categories) {
-  if (!draft?.category) return false;
-  return (categories.find((category) => category.id === draft.category)?.name || draft.categoryName) === 'note用';
+  return draftBook(draft, categories) === 'note';
 }
 
 export function normalizeCategories(records) {
@@ -261,6 +291,7 @@ export function normalizeCategories(records) {
     id: record.id, name: typeof record.name === 'string' ? record.name.trim().slice(0, 30) : '無題のカテゴリ',
     order: Number.isFinite(record.order) ? record.order : index,
     updatedAt: validDate(record.updatedAt) || '2026-01-01T00:00:00.000Z', deleted: Boolean(record.deleted),
+    book: record.book === 'note' ? 'note' : 'diary',
   }));
 }
 
