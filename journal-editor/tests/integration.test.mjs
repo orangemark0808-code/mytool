@@ -1096,23 +1096,55 @@ test('creation date save safely stops if finishing IME applies a deferred deleti
   assert.ok(h.run('state.drafts[0].deletedAt'));
 });
 
-test('opening the template picker creates the template category and seeds two editable templates once', () => {
-  const h = harness(); h.run("$('templatePanel').classList.add('hidden');");
+function templateHarness(body = 'original') {
+  const h = harness();
+  h.run(`ensureStandardCategories();bodyInput.value=${JSON.stringify(body)};resetHistory();`);
+  const templateId = h.run("activeCategories().find(c=>c.name==='テンプレート').id");
+  h.elements.get('categorySelect').value = templateId;
+  h.events.get('categorySelect:change')();
+  return h;
+}
+const panelClick = (h, dataset, attrs = {}) => h.events.get('templatePanel:click')({ target: { closest: () => ({ dataset, hasAttribute: (name) => Boolean(attrs[name]) }) } });
+
+test('template picker is hidden unless the category is テンプレート', () => {
+  const h = harness();
+  h.run('ensureStandardCategories();');
+  const diaryId = h.run("activeCategories().find(c=>c.name==='日記').id");
+  h.elements.get('categorySelect').value = diaryId;
+  h.events.get('categorySelect:change')();
+  assert.equal(h.elements.get('templateButton').hidden, true);
+  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
   h.events.get('templateButton:click')();
-  assert.equal(h.run("activeCategories().some(c=>c.name==='テンプレート')"), true);
-  assert.equal(h.run("state.drafts.filter(d=>d.categoryName==='テンプレート').length"), 2);
+  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
+});
+
+test('choosing the template category shows spoiler / no-spoiler choices and creates no articles', () => {
+  const h = templateHarness();
+  assert.equal(h.elements.get('templateButton').hidden, false);
   assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), false);
-  assert.match(h.elements.get('templatePanel').innerHTML, /ドラマ感想（ネタバレなし）/);
-  assert.match(h.elements.get('templatePanel').innerHTML, /ドラマ感想（ネタバレあり）/);
-  h.events.get('templateButton:click')();
-  h.events.get('templateButton:click')();
-  assert.equal(h.run("state.drafts.filter(d=>d.categoryName==='テンプレート').length"), 2);
+  const html = h.elements.get('templatePanel').innerHTML;
+  assert.match(html, /ネタバレなし/);
+  assert.match(html, /ネタバレあり/);
+  assert.equal(h.run('state.drafts.length'), 1);
+  const diaryId = h.run("activeCategories().find(c=>c.name==='日記').id");
+  h.elements.get('categorySelect').value = diaryId;
+  h.events.get('categorySelect:change')();
+  assert.equal(h.elements.get('templateButton').hidden, true);
+  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
+});
+
+test('template choices never list articles written in the template category', () => {
+  const h = harness();
+  h.run("ensureStandardCategories();const c=activeCategories().find(c=>c.name==='テンプレート');state.drafts.push(editedDraft(normalizeDraft({id:'mine',title:'【ネタバレあり】【ドラマ感想】NCIS',body:'x',category:c.id,categoryName:c.name,createdAt:'2026-10-01T00:00:00Z',updatedAt:'2026-10-01T00:00:00Z'}),{}));");
+  const templateId = h.run("activeCategories().find(c=>c.name==='テンプレート').id");
+  h.elements.get('categorySelect').value = templateId;
+  h.events.get('categorySelect:change')();
+  assert.doesNotMatch(h.elements.get('templatePanel').innerHTML, /NCIS/);
 });
 
 test('choosing a template fills an empty body and can be undone', () => {
-  const h = harness(); h.run("bodyInput.value='';resetHistory();$('templatePanel').classList.add('hidden');");
-  h.events.get('templateButton:click')();
-  h.events.get('templatePanel:click')({ target: { closest: () => ({ dataset: { templateId: 'template-seed-spoiler' }, hasAttribute: () => false }) } });
+  const h = templateHarness('');
+  panelClick(h, { templateId: 'drama-spoiler' });
   assert.ok(h.run('bodyInput.value').startsWith('【ネタバレあり】'));
   assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
   assert.equal(h.run('currentDraft().title'), 'Synthetic');
@@ -1121,16 +1153,14 @@ test('choosing a template fills an empty body and can be undone', () => {
 });
 
 test('choosing a template with existing text asks first and never overwrites', () => {
-  const h = harness(); h.run("$('templatePanel').classList.add('hidden');");
-  h.events.get('templateButton:click')();
-  const click = (dataset, attrs = {}) => h.events.get('templatePanel:click')({ target: { closest: () => ({ dataset, hasAttribute: (name) => Boolean(attrs[name]) }) } });
-  click({ templateId: 'template-seed-no-spoiler' });
+  const h = templateHarness();
+  panelClick(h, { templateId: 'drama-no-spoiler' });
   assert.equal(h.run('bodyInput.value'), 'original');
   assert.match(h.elements.get('templatePanel').innerHTML, /末尾に追加しますか/);
-  click({}, { 'data-template-cancel': true });
+  panelClick(h, {}, { 'data-template-cancel': true });
   assert.equal(h.run('bodyInput.value'), 'original');
-  click({ templateId: 'template-seed-no-spoiler' });
-  click({ templateAppend: 'template-seed-no-spoiler' });
+  panelClick(h, { templateId: 'drama-no-spoiler' });
+  panelClick(h, { templateAppend: 'drama-no-spoiler' });
   const body = h.run('bodyInput.value');
   assert.ok(body.startsWith('original\n\n【ドラマ感想】'));
   assert.equal(h.run('bodyInput.selectionStart'), 'original\n\n'.length);
@@ -1140,5 +1170,6 @@ test('template filter button lists only template-category articles', () => {
   const h = harness();
   h.run("setListCategoryFilter('template');");
   assert.equal(h.run('state.categoryFilter'), 'template');
-  assert.equal(h.run("state.drafts.filter(d=>categoryBadgeKind(d)==='template').length"), 2);
+  assert.equal(h.run("activeCategories().some(c=>c.name==='テンプレート')"), true);
+  assert.equal(h.run("state.drafts.filter(d=>categoryBadgeKind(d)==='template').length"), 0);
 });

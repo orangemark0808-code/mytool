@@ -428,6 +428,7 @@ h1, h2, h3, h4, h5, h6, .draft-title, .legacy-details summary {
 .category-badge[data-category-kind="note"] { background: #e8f3ec; color: #24583b; }
 .category-badge[data-category-kind="template"] { background: #efeafa; color: #4b3a8a; }
 .template-button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font-size: 14px; }
+.template-button[hidden] { display: none; }
 .template-button:hover, .template-button[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-light); }
 .template-panel { flex: 1 0 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .template-panel.hidden { display: none; }
