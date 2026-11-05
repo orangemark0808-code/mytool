@@ -365,6 +365,31 @@ export function enterEdit(value, start, end, shift = false) {
   return { start, end, text: `\n${match[1]}${prefix}` };
 }
 
+/* 画像は「![説明](journal-image:ID)」の1行で本文に入れる。画像そのものは縮小して
+   Firestore の users/{uid}/blogEditorMigrations/journalImage-ID に保存する（既存のルールで読み書きできる場所）。 */
+export const IMAGE_DOC_PREFIX = 'journalImage-';
+export const IMAGE_MAX_SIDE = 1600;
+export const IMAGE_MAX_DATA_LENGTH = 700000;
+const IMAGE_LINES = /^!\[[^\]\n]*\]\(journal-image:[A-Za-z0-9-]{8,64}\)[ \t]*$/gm;
+export function imageMarkdown(id, alt = '画像') {
+  return `![${String(alt).replace(/[[\]\n]/g, '') || '画像'}](journal-image:${id})`;
+}
+export function imageIdsIn(body) {
+  return Array.from(String(body).matchAll(/^!\[[^\]\n]*\]\(journal-image:([A-Za-z0-9-]{8,64})\)[ \t]*$/gm), (match) => match[1]);
+}
+/* 画像の行を、前後に空行をはさんで選択範囲に入れる。 */
+export function imageInsertion(body, start, end, markdown) {
+  const before = body.slice(0, start), after = body.slice(end);
+  const lead = !before || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+  const trail = after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+  return { text: lead + markdown + trail, start, end };
+}
+/* 書き出しや一覧の抜粋では、画像の行を「［画像］」にする（noteなど他の場所では画像を別に入れる）。 */
+export function replaceImageLines(body, label = '［画像］') {
+  return String(body).replace(IMAGE_LINES, label);
+}
+
 export function exportMarkdown(title, body) {
+  body = replaceImageLines(body);
   return title.trim() ? `# ${title.trim()}\n\n${body}` : body;
 }

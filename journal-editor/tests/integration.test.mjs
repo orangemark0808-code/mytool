@@ -1305,3 +1305,52 @@ test('home cards count each book and the write button creates in that book', () 
   assert.equal(h.run('state.view'), 'editor');
   assert.equal(h.run('currentDraft().category'), 'journal-note');
 });
+
+function imageHarness() {
+  const h = harness(); connect(h);
+  h.context.savedImages = new Map();
+  h.run("imageStore={ready:()=>true,put:async(id,record)=>{savedImages.set(id,record);},get:async(id)=>savedImages.get(id)||null};shrinkImage=async()=>({data:'data:image/jpeg;base64,AAAA',width:10,height:8});");
+  return h;
+}
+
+test('adding an image saves it to the image store and inserts its line at the cursor', async () => {
+  const h = imageHarness();
+  h.run("bodyInput.value='ab';bodyInput.selectionStart=bodyInput.selectionEnd=1;");
+  await h.run("addImages([{type:'image/png'},{type:'text/plain'}])");
+  assert.equal(h.context.savedImages.size, 1);
+  const [[id, record]] = [...h.context.savedImages];
+  assert.equal(record.data, 'data:image/jpeg;base64,AAAA');
+  assert.equal(record.kind, 'journalImage');
+  assert.equal(h.run('bodyInput.value'), `a\n\n![画像](journal-image:${id})\n\nb`);
+  assert.equal(h.run('currentDraft().body'), `a\n\n![画像](journal-image:${id})\n\nb`);
+  assert.equal(h.run('currentDraft().pendingSync'), true);
+  assert.equal(await h.run(`loadImage(${JSON.stringify(id)})`), 'data:image/jpeg;base64,AAAA');
+  assert.equal(h.run('state.imageUploading'), false);
+  // 一覧の抜粋とMarkdownの書き出しでは［画像］になる。
+  assert.equal(h.run('exportMarkdown(titleInput.value, bodyInput.value)'), '# Synthetic\n\na\n\n［画像］\n\nb');
+});
+
+test('images are not added offline, and a failed save leaves the text unchanged', async () => {
+  const h = imageHarness();
+  h.run("bodyInput.value='ab';navigator.onLine=false;");
+  await h.run("addImages([{type:'image/jpeg'}])");
+  assert.equal(h.context.savedImages.size, 0);
+  assert.equal(h.elements.get('toast').textContent, '画像はオンラインでログイン中に追加できます');
+  h.run("navigator.onLine=true;imageStore.put=async()=>{throw new Error('denied');};");
+  await h.run("addImages([{type:'image/jpeg'}])");
+  assert.equal(h.run('bodyInput.value'), 'ab');
+  assert.equal(h.run('state.imageUploading'), false);
+  assert.match(h.elements.get('toast').textContent, /1枚は保存できませんでした/);
+});
+
+test('an image finishing after switching articles goes to the end of the original article', async () => {
+  const h = imageHarness();
+  let release;
+  h.context.gate = new Promise((resolve) => { release = resolve; });
+  h.run("imageStore.put=async(id,record)=>{await gate;savedImages.set(id,record);};bodyInput.value='original';");
+  const adding = h.run("addImages([{type:'image/png'}])");
+  h.run("openHome();");
+  release(); await adding;
+  const [id] = [...h.context.savedImages.keys()];
+  assert.equal(h.run("state.drafts.find(d=>d.id==='d').body"), `original\n\n![画像](journal-image:${id})\n\n`);
+});
