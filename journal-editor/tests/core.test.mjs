@@ -414,3 +414,23 @@ test('categories keep their book; fixed books and unknown categories resolve saf
   const merged = mergeCategories(records, [{ ...records.find((c) => c.id === 'c1'), book: 'diary', updatedAt: '2027-01-01T00:00:00.000Z' }]);
   assert.equal(merged.find((c) => c.id === 'c1').book, 'diary');
 });
+
+test('image lines: insertion on their own line, export placeholder and safe preview markup', async () => {
+  const core = await import('../editor-core.mjs');
+  const { markdownToHtml } = await import('../markdown.mjs');
+  const line = core.imageMarkdown('12345678-abcd', '旅[行]\n');
+  assert.equal(line, '![旅行](journal-image:12345678-abcd)');
+  assert.deepEqual(core.imageInsertion('ab', 1, 1, 'X'), { text: '\n\nX\n\n', start: 1, end: 1 });
+  assert.deepEqual(core.imageInsertion('', 0, 0, 'X'), { text: 'X\n\n', start: 0, end: 0 });
+  assert.deepEqual(core.imageInsertion('a\n\nb', 3, 3, 'X'), { text: 'X\n\n', start: 3, end: 3 });
+  assert.deepEqual(core.imageIdsIn(`a\n${line}\n![x](journal-image:87654321-ffff)`), ['12345678-abcd', '87654321-ffff']);
+  assert.equal(core.exportMarkdown('T', `前\n\n${line}\n\n後`), '# T\n\n前\n\n［画像］\n\n後');
+  assert.equal(core.replaceImageLines(`本文の途中 ${line}`), `本文の途中 ${line}`);
+  const html = markdownToHtml(`![<b>alt</b>](journal-image:12345678-abcd)`);
+  assert.match(html, /<figure class="journal-image" data-journal-image="12345678-abcd">/);
+  assert.match(html, /alt="&lt;b&gt;alt&lt;\/b&gt;"/);
+  assert.match(html, /data-save-image="12345678-abcd"/);
+  // IDに使えない文字を含む行は画像にしない。
+  assert.ok(!markdownToHtml('![x](journal-image:"><script>)').includes('<figure'));
+  assert.ok(!markdownToHtml('```\n![x](journal-image:12345678-abcd)\n```').includes('<figure'));
+});

@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, retireTemplateCategory, RETIRED_TEMPLATE_CATEGORY_ID, applyTemplateText, FIXED_CATEGORY_NAMES, orderedCategories, isNoteDraft, BOOKS, BOOK_LABELS, BOOK_CATEGORY_NAMES, categoryBook, isBookCategory, draftBook, draftSubcategory, bookSubcategories, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown, UNTITLED_TITLE, isUntitledTitle, displayTitle } from './editor-core.mjs?v=2026-11-05-5';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-5';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, retireTemplateCategory, RETIRED_TEMPLATE_CATEGORY_ID, applyTemplateText, IMAGE_DOC_PREFIX, IMAGE_MAX_SIDE, IMAGE_MAX_DATA_LENGTH, imageMarkdown, imageInsertion, replaceImageLines, FIXED_CATEGORY_NAMES, orderedCategories, isNoteDraft, BOOKS, BOOK_LABELS, BOOK_CATEGORY_NAMES, categoryBook, isBookCategory, draftBook, draftSubcategory, bookSubcategories, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown, UNTITLED_TITLE, isUntitledTitle, displayTitle } from './editor-core.mjs?v=2026-11-05-6';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-6';
 
-const VERSION = '2026-11-05-5';
+const VERSION = '2026-11-05-6';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const SORT_KEY = 'orangemania-journal-list-sort-v1';
 const COMPACT_EDITOR_QUERY = '(max-width: 700px)';
@@ -23,7 +23,16 @@ const state = {
   draftListenerFailed: false, categoryListenerFailed: false, listenerGeneration: 0,
   legacyImported: false, legacyReviewShown: false, snapshotCount: 0, serverDrafts: [], serverCategories: [], bulkAssigning: false,
   selectedTrash: new Set(), purgeTargets: [], bulkPurging: false, visibleTrashIds: [], purgedIds: new Set(), listTagEditor: null,
+  imageUploading: false,
 };
+// 画像の保存先。確認サーバーでは架空の保存先に差し替える。
+let imageStore = {
+  ready: () => Boolean(state.firebaseReady && state.firebase?.setDoc),
+  put: (id, record) => state.firebase.setDoc(imageRef(id), record),
+  get: async (id) => { const snapshot = await state.firebase.getDoc(imageRef(id)); return snapshot.exists() ? snapshot.data() : null; },
+};
+const imageCache = new Map();
+function imageRef(id, uid = state.user.uid) { return state.firebase.doc(state.db, 'users', uid, 'blogEditorMigrations', IMAGE_DOC_PREFIX + id); }
 
 function currentDraft() { return state.drafts.find((draft) => draft.id === state.currentId); }
 function isCompactEditor() {
@@ -378,7 +387,7 @@ async function handleAuth(user) {
   state.legacyImported = state.categoriesDirty = state.showTrash = false;
   state.bulkAssigning = false; $('bulkDiaryResult').textContent = ''; $('bulkDiaryConfirmation').classList.add('hidden');
   state.selectedTrash.clear(); state.purgeTargets = []; state.bulkPurging = false; state.visibleTrashIds = [];
-  state.listTagEditor = null;
+  state.listTagEditor = null; imageCache.clear(); state.imageUploading = false;
   $('purgeConfirmation').classList.add('hidden'); $('purgeTitles').innerHTML = ''; $('purgeResult').textContent = '';
   state.legacyReviewShown = false;
   state.serverDrafts = []; state.serverCategories = [];
@@ -642,7 +651,92 @@ function updateDraftTimestamps(draft = currentDraft()) {
   }
 }
 function updatePreview() { $('characterCount').textContent = `${Array.from(bodyInput.value).length}文字`; state.previewDirty = true; if (state.mode !== 'edit' && state.view === 'editor') renderPreview(); }
-function renderPreview() { if (!state.previewDirty) return; $('preview').innerHTML = bodyInput.value.trim() ? markdownToHtml(bodyInput.value) : '<p class="placeholder">本文を入力すると、ここにプレビューが表示されます。</p>'; state.previewDirty = false; }
+function renderPreview() { if (!state.previewDirty) return; $('preview').innerHTML = bodyInput.value.trim() ? markdownToHtml(bodyInput.value) : '<p class="placeholder">本文を入力すると、ここにプレビューが表示されます。</p>'; state.previewDirty = false; showPreviewImages(); }
+function loadImage(id) {
+  if (!imageCache.has(id)) {
+    if (!state.user || !imageStore.ready()) return Promise.resolve(null);
+    const uid = state.user.uid;
+    const loading = imageStore.get(id).then((record) => typeof record?.data === 'string' && record.data.startsWith('data:image/') ? record.data : null)
+      .catch((error) => { console.error('Image load failed:', error.code || error.name); return null; })
+      .then((url) => { if (!url && imageCache.get(id) === loading) imageCache.delete(id); return state.user?.uid === uid ? url : null; });
+    imageCache.set(id, loading);
+  }
+  return imageCache.get(id);
+}
+function showPreviewImages() {
+  for (const figure of $('preview').querySelectorAll?.('[data-journal-image]') || []) {
+    const id = figure.dataset.journalImage;
+    void loadImage(id).then((url) => {
+      if (!figure.isConnected) return;
+      const status = figure.querySelector('.journal-image-status');
+      if (url) { figure.querySelector('img').src = url; figure.classList.add('loaded'); if (status) status.textContent = ''; }
+      else { figure.classList.add('failed'); if (status) status.textContent = navigator.onLine ? '画像を読み込めませんでした' : 'オフラインのため画像を表示できません'; }
+    });
+  }
+}
+// 端末で縮小してJPEGにする。1枚がFirestoreの上限（1MiB）に収まるまで画質と大きさを下げる。
+async function shrinkImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => { const element = new Image(); element.onload = () => resolve(element); element.onerror = () => reject(new Error('Unreadable image')); element.src = url; });
+    const width = image.naturalWidth, height = image.naturalHeight;
+    if (!width || !height) throw new Error('Unreadable image');
+    let scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(width, height));
+    for (let attempt = 0; attempt < 6; attempt++, scale *= 0.75) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(width * scale)); canvas.height = Math.max(1, Math.round(height * scale));
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      for (const quality of [0.82, 0.7, 0.6]) {
+        const data = canvas.toDataURL('image/jpeg', quality);
+        if (data.startsWith('data:image/jpeg') && data.length <= IMAGE_MAX_DATA_LENGTH) return { data, width: canvas.width, height: canvas.height };
+      }
+    }
+    throw new Error('Image too large');
+  } finally { URL.revokeObjectURL(url); }
+}
+async function addImages(files) {
+  const images = Array.from(files || []).filter((file) => file?.type?.startsWith('image/'));
+  if (!images.length) return;
+  const draft = currentDraft();
+  if (!draft || draft.deletedAt || state.view !== 'editor' || state.editorDraftId !== draft.id) return;
+  if (!state.user || !navigator.onLine || !imageStore.ready()) return toast('画像はオンラインでログイン中に追加できます');
+  if (state.imageUploading) return toast('画像を保存しています。終わってからもう一度お試しください');
+  state.imageUploading = true; toast(`画像を保存しています（${images.length}枚）…`);
+  const session = state.session, added = []; let failed = 0;
+  try {
+    for (const file of images) {
+      try {
+        const shrunk = await shrinkImage(file), id = crypto.randomUUID();
+        await imageStore.put(id, { kind: 'journalImage', data: shrunk.data, width: shrunk.width, height: shrunk.height, createdAt: new Date().toISOString(), schemaVersion: SCHEMA_VERSION });
+        if (session !== state.session) return;
+        imageCache.set(id, Promise.resolve(shrunk.data)); added.push(imageMarkdown(id));
+      } catch (error) { failed++; console.error('Image upload failed:', error.code || error.name || error.message); }
+    }
+    if (session !== state.session) return;
+    if (added.length) insertImages(draft.id, added.join('\n\n'));
+    toast(failed ? `${added.length}枚を追加しました。${failed}枚は保存できませんでした` : `画像を${added.length}枚追加しました`);
+  } finally { if (session === state.session) state.imageUploading = false; }
+}
+// 保存中に別の記事へ移っていたら、その記事の末尾に入れる。
+function insertImages(id, markdown) {
+  if (state.view === 'editor' && state.editorDraftId === id && state.currentId === id) {
+    const edit = imageInsertion(bodyInput.value, bodyInput.selectionStart, bodyInput.selectionEnd, markdown);
+    return applyEdit(edit.text, edit.start, edit.end);
+  }
+  const draft = state.drafts.find((item) => item.id === id && !item.deletedAt); if (!draft) return;
+  const body = draft.body + imageInsertion(draft.body, draft.body.length, draft.body.length, markdown).text;
+  state.drafts = state.drafts.map((item) => item.id === id ? editedDraft(item, { body }) : item);
+  persistLocal([id]); refreshSyncStatus(); queueSave(id); renderList();
+}
+async function saveImage(id) {
+  const url = await loadImage(id);
+  if (!url) return toast('画像を読み込めませんでした');
+  const [head, base64] = url.split(','), type = head.match(/^data:([^;]+)/)?.[1] || 'image/jpeg';
+  const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  downloadFile(bytes, `journal-image-${stamp}.${type === 'image/png' ? 'png' : 'jpg'}`, type);
+}
 function snapshot() { return { value: bodyInput.value, start: bodyInput.selectionStart, end: bodyInput.selectionEnd, scrollTop: bodyInput.scrollTop }; }
 function updateHistoryButtons() { $('undoButton').disabled = state.historyIndex <= 0; $('redoButton').disabled = state.historyIndex >= state.history.length - 1; }
 function resetHistory() { state.history = [snapshot()]; state.historyIndex = 0; updateHistoryButtons(); }
@@ -706,6 +800,7 @@ function chooseTemplate(id) {
 }
 function applyEdit(text, start = bodyInput.selectionStart, end = bodyInput.selectionEnd) { bodyInput.setRangeText(text, start, end, 'end'); bodyInput.focus({ preventScroll: true }); updatePreview(); recordHistory(); scheduleSave(); }
 function toolbar(action) {
+  if (action === 'image') { $('imageFileInput').click(); return; }
   if (state.composing) return;
   if (action === 'undo') { if (state.historyIndex > 0) restoreHistory(state.historyIndex - 1); return; }
   if (action === 'redo') { if (state.historyIndex < state.history.length - 1) restoreHistory(state.historyIndex + 1); return; }
@@ -1009,7 +1104,7 @@ function renderList() {
   if (state.view === 'home') renderHome();
   const orderLabel = sortField === 'updatedAt' ? '更新日の新しい順' : '作成日の新しい順';
   $('listOrderDescription').textContent = !state.showTrash && drafts.some((draft) => draft.pinnedAt) ? `ピン止めを先頭・${orderLabel}` : orderLabel;
-  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''} ${!state.showTrash && draft.pinnedAt ? 'pinned' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draftAccessibleTitle(draft))}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}</div><div class="draft-label-row">${draftStateMarkup(draft)}${listTagMarkup(draft, 'category')}${listTagMarkup(draft, 'status')}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(draft.body.replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span class="${sortField === 'createdAt' ? 'sort-date' : ''}">作成 ${formatDateTime(draft.createdAt)}</span><span class="${sortField === 'updatedAt' ? 'sort-date' : ''}">更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `${pinButtonMarkup(draft)}<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && (state.categoryFilter !== 'all' || state.subFilter !== 'all')) ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
+  $('draftList').innerHTML = drafts.length ? drafts.map((draft) => `<article class="draft-row ${state.showTrash ? 'trash-row' : ''} ${draft.id === state.currentId ? 'active' : ''} ${!state.showTrash && draft.pinnedAt ? 'pinned' : ''}">${state.showTrash ? `<label class="trash-select"><input type="checkbox" data-trash-select="${escapeHtml(draft.id)}" aria-label="${escapeHtml(draftAccessibleTitle(draft))}を選択" ${state.selectedTrash.has(draft.id) ? 'checked' : ''} ${state.bulkPurging ? 'disabled' : ''} /></label>` : ''}<div><div class="draft-title-row">${draftTitleMarkup(draft)}</div><div class="draft-label-row">${draftStateMarkup(draft)}${listTagMarkup(draft, 'category')}${listTagMarkup(draft, 'status')}${draft.pendingSync ? '<span class="pending-badge">未同期</span>' : ''}</div><div class="draft-excerpt">${escapeHtml(replaceImageLines(draft.body).replace(/\n/g, ' ').trim().slice(0, 90) || '本文はまだありません。')}</div><div class="draft-dates"><span class="${sortField === 'createdAt' ? 'sort-date' : ''}">作成 ${formatDateTime(draft.createdAt)}</span><span class="${sortField === 'updatedAt' ? 'sort-date' : ''}">更新 ${formatDateTime(draft.updatedAt)}</span></div></div><div class="draft-actions">${state.showTrash ? `<button class="small-button" data-restore="${escapeHtml(draft.id)}" type="button" ${state.bulkPurging ? 'disabled' : ''}>復元</button>` : `${pinButtonMarkup(draft)}<button class="small-button delete draft-icon-button" data-delete="${escapeHtml(draft.id)}" type="button" aria-label="ごみ箱へ" title="ごみ箱へ"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>`}</div></article>`).join('') : `<div class="empty">${query || (!state.showTrash && (state.categoryFilter !== 'all' || state.subFilter !== 'all')) ? 'この条件に一致するJournalはありません。' : state.showTrash ? 'ごみ箱は空です。' : '下書きはまだありません。'}</div>`;
   updateTrashControls();
 }
 function pinButtonId(id) { return `pin-button-${encodeURIComponent(id)}`; }
@@ -1121,6 +1216,12 @@ for (const input of [titleInput, bodyInput]) {
   input.addEventListener('blur', () => { if (state.composingInput === input) finishComposition(); if (input === bodyInput) updateTypingFocus(false); });
 }
 bodyInput.addEventListener('keydown', onBodyKeydown);
+const hasImageFiles = (transfer) => Array.from(transfer?.files || []).some((file) => file.type?.startsWith('image/'));
+bodyInput.addEventListener('paste', (event) => { if (hasImageFiles(event.clipboardData)) { event.preventDefault(); void addImages(event.clipboardData.files); } });
+bodyInput.addEventListener('dragover', (event) => { if (Array.from(event.dataTransfer?.types || []).includes('Files')) event.preventDefault(); });
+bodyInput.addEventListener('drop', (event) => { if (hasImageFiles(event.dataTransfer)) { event.preventDefault(); void addImages(event.dataTransfer.files); } });
+$('imageFileInput').addEventListener('change', (event) => { const files = Array.from(event.target.files || []); event.target.value = ''; void addImages(files); });
+$('preview').addEventListener('click', (event) => { const button = event.target.closest?.('[data-save-image]'); if (button) void saveImage(button.dataset.saveImage); });
 bodyInput.addEventListener('focus', () => updateTypingFocus(true));
 $('finishInputButton').addEventListener('click', () => { finishComposition(); bodyInput.blur(); updateTypingFocus(false); });
 $('listSortSelect').addEventListener('change', (event) => changeListSort(event.target.value));

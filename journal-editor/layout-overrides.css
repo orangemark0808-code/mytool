@@ -825,3 +825,13 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .list-view .view-heading, .compact-editor .list-view .view-heading { gap: 12px; }
 .list-filter-group .filter-label { display: inline-flex; align-items: center; min-width: 4.5em; font-size: 12px; font-weight: 700; color: var(--heading); }
 @media (max-width: 560px) { .list-filter-group .filter-label { flex-basis: 100%; min-width: 0; margin-bottom: -2px; } }
+
+/* v2026-11-05-6：本文の画像 */
+.journal-image { margin: 1.2em 0; }
+.journal-image img { display: block; max-width: 100%; height: auto; min-height: 60px; margin: 0 auto; border-radius: 10px; background: var(--surface-subtle); }
+.journal-image.failed img { display: none; }
+.journal-image figcaption { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; font-family: var(--font-sans); font-size: 13px; }
+.journal-image .journal-image-status { margin-right: auto; }
+.journal-image.failed figcaption { justify-content: flex-start; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; }
+.journal-image.failed [data-save-image] { display: none; }
+.journal-image [data-save-image] { min-height: 36px; }

@@ -4,6 +4,14 @@ Googleログイン後、Journalを端末内に保存し、Firestoreへ同期す�
 
 公開URL: https://orangemark0808-code.github.io/mytool/journal-editor/
 
+## 2026-11-05の改善（v2026-11-05-6）：本文に画像を入れられるようにしました
+
+- 編集画面の「その他」→「画像」から写真を選べます（複数可）。PCでは本文への貼り付け・ドラッグでも追加できます。オンラインでログイン中に使えます。
+- 画像は端末で長い辺1600px以下のJPEGに縮小し（1枚およそ500KB以下）、Firestoreの`users/{uid}/blogEditorMigrations/journalImage-{ID}`に保存します。カテゴリと同じ、すでに読み書きが許可されている場所なので、Firebaseのルール変更は不要です。無料枠（1GiB）で数千枚が目安です。
+- 本文には`![画像](journal-image:ID)`の1行が入り、プレビューで画像を表示します。他の端末でも同期後に表示できます。プレビューの「画像を端末に保存」で画像をダウンロードできます（noteへは画像を別にアップロードしてください）。
+- 「Markdownをコピー」と「.md保存」、一覧の抜粋では、画像の行を「［画像］」と表示します。
+- 記事を完全削除しても画像はクラウドに残ります。JSONバックアップには画像は含まれません（本文の画像の行は含まれます）。
+
 ## 2026-11-05の改善（v2026-11-05-5）：入口を「日記」と「note」の2つに分けました
 
 - 開くと最初にホームを表示します。「日記」「note」の2枚のカードに件数・最終更新日・カテゴリを表示し、カードを押すとその記事だけの一覧、「書く」を押すとその入口の新しい記事を作ります。ホームからは「すべてのJournal・検索」とごみ箱も開けます。
@@ -119,7 +127,7 @@ node journal-editor/tests/preview-server.mjs
 
 ブラウザで`http://localhost:8765/`を開きます。この確認サーバーは架空の長文を表示し、Firebase設定・認証情報・実際のJournalを読み込みません。公開用成果物には確認サーバーやテストを含めません。
 
-`?scenario=legacy-matched`でクラウドと同じ旧データ、`?scenario=legacy-difference`で内容の異なる旧データの案内、`?scenario=books`でホームと入口の中のカテゴリ、`?scenario=badges`でタグ・作成日順・ピン止め、`?scenario=trash`で完全削除の確認画面を検証できます。trashの削除はメモリ上のモックに限定され、Firebaseには接続しません。旧形式のlocalStorageは書き換えず、確認画面内だけで架空のデータを使用します。
+`?scenario=legacy-matched`でクラウドと同じ旧データ、`?scenario=legacy-difference`で内容の異なる旧データの案内、`?scenario=books`でホームと入口の中のカテゴリ、`?scenario=images`で画像の表示と追加（端末内だけの架空の保存先）、`?scenario=badges`でタグ・作成日順・ピン止め、`?scenario=trash`で完全削除の確認画面を検証できます。trashの削除はメモリ上のモックに限定され、Firebaseには接続しません。旧形式のlocalStorageは書き換えず、確認画面内だけで架空のデータを使用します。
 
 ### 画面サイズごとの確認（スクリーンショット）
 
@@ -127,7 +135,7 @@ node journal-editor/tests/preview-server.mjs
 node journal-editor/tests/screenshots.mjs
 ```
 
-確認サーバーを自動で起動し、Android（Pixel 7）・iPad Pro 11（縦・横）・PC（1280px）の画面サイズで、編集画面・ホーム・日記／noteの一覧・カテゴリでの絞り込み・新規作成（日記／note）・noteの編集画面・カテゴリ管理・すべての記事一覧を撮影して`journal-editor/tests/screenshots/`に保存します（Gitには含めません）。画面のエラーや横方向のはみ出しがあれば一覧で表示します。架空データだけを使い、Firebaseには接続しません。Playwrightが必要です（Claude Codeのクラウド環境では最初から使えます）。実機のSafari・Chromeとは細かな差が出ることがあるため、公開後に実機で最終確認してください。
+確認サーバーを自動で起動し、Android（Pixel 7）・iPad Pro 11（縦・横）・PC（1280px）の画面サイズで、編集画面・ホーム・日記／noteの一覧・カテゴリでの絞り込み・新規作成（日記／note）・noteの編集画面・カテゴリ管理・すべての記事一覧・画像の表示と追加を撮影して`journal-editor/tests/screenshots/`に保存します（Gitには含めません）。画面のエラーや横方向のはみ出しがあれば一覧で表示します。架空データだけを使い、Firebaseには接続しません。Playwrightが必要です（Claude Codeのクラウド環境では最初から使えます）。実機のSafari・Chromeとは細かな差が出ることがあるため、公開後に実機で最終確認してください。
 
 実際のログインを試す場合は、元の案内どおりHTTPサーバー経由で起動してください。`index.html`の直接起動（file://）は対応していません。
 

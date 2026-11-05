@@ -40,6 +40,19 @@ const scenes = [
   ['note-editor', '?scenario=books', async (page) => { await page.click('[data-open-book="note"]'); await page.click('[data-edit="n1"]'); await page.evaluate(() => document.activeElement?.blur()); }],
   ['settings-categories', '?scenario=books', async (page) => { await page.click('#settingsButton'); await page.evaluate(() => document.querySelector('.category-panel').scrollIntoView()); }],
   ['all-list', '?scenario=badges', async () => {}],
+  ['image-preview', '?scenario=images', click('#previewTab')],
+  // 実際の縮小処理を通すため、ブラウザで作った大きめのPNGを「画像」から選ぶ。
+  ['image-added', '?scenario=images', async (page) => {
+    const data = await page.evaluate(() => { const canvas = Object.assign(document.createElement('canvas'), { width: 3000, height: 2000 }); const context = canvas.getContext('2d'); const gradient = context.createLinearGradient(0, 0, 3000, 2000); gradient.addColorStop(0, '#ef7d22'); gradient.addColorStop(1, '#3f8a5c'); context.fillStyle = gradient; context.fillRect(0, 0, 3000, 2000); context.fillStyle = '#fff'; context.font = '200px sans-serif'; context.fillText('追加した画像', 200, 1100); return canvas.toDataURL('image/png').split(',')[1]; });
+    await page.evaluate(() => { const body = document.getElementById('bodyInput'); body.setSelectionRange(body.value.length, body.value.length); });
+    await page.setInputFiles('#imageFileInput', { name: 'sample.png', mimeType: 'image/png', buffer: Buffer.from(data, 'base64') });
+    await page.waitForFunction(() => (document.getElementById('bodyInput').value.match(/journal-image:/g) || []).length === 2, null, { timeout: 10000 });
+    // 追加後は本文にカーソルが戻り、スマホでは入力モードになるので「完了」で抜けてからプレビューを開く。
+    await page.evaluate(() => { document.getElementById('finishInputButton').click(); document.getElementById('previewTab').click(); });
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { const figures = document.querySelectorAll('.journal-image'); figures[figures.length - 1]?.scrollIntoView(); });
+    await page.waitForTimeout(400);
+  }],
 ];
 
 async function startServer() {

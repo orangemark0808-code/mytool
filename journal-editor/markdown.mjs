@@ -32,6 +32,13 @@ export function markdownToHtml(markdown) {
       continue;
     }
     if (/^\s*```/.test(line)) { flush(); code = []; continue; }
+    const image = line.match(/^!\[([^\]\n]*)\]\(journal-image:([A-Za-z0-9-]{8,64})\)[ \t]*$/);
+    if (image) {
+      // 画像の中身はあとから script.js が読み込んで src に入れる。
+      flush();
+      html += `<figure class="journal-image" data-journal-image="${image[2]}"><img alt="${escapeHtml(image[1] || '画像')}" /><figcaption><span class="journal-image-status">画像を読み込んでいます…</span><button type="button" class="small-button" data-save-image="${image[2]}">画像を端末に保存</button></figcaption></figure>`;
+      continue;
+    }
     const heading = line.match(/^(#{1,6})\s+(.+)/);
     const quoted = line.match(/^>\s?(.*)/);
     const bullet = line.match(/^[-*+]\s+(.+)/);

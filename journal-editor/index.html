@@ -7,8 +7,8 @@
     <title>Journal Editor</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ef7d22'/%3E%3Cpath d='M23 17h20M37 17v25a10 10 0 0 1-20 0' fill='none' stroke='white' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Nunito:wght@300;400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=2026-11-05-5" />
-    <link rel="stylesheet" href="layout-overrides.css?v=2026-11-05-5" />
+    <link rel="stylesheet" href="style.css?v=2026-11-05-6" />
+    <link rel="stylesheet" href="layout-overrides.css?v=2026-11-05-6" />
   </head>
   <body>
     <header class="app-header">
@@ -76,6 +76,7 @@
                 <button class="toolbar-bold" data-action="bold" type="button" aria-label="太字" title="太字">B</button>
                 <button id="moreButton" type="button" aria-expanded="false" aria-controls="toolbarMore">その他</button>
                 <div id="toolbarMore" class="toolbar-more">
+                <button data-action="image" type="button" aria-label="画像を追加" title="画像を追加（貼り付け・ドラッグでも追加できます）"><span class="desktop-command">画像</span><span class="mobile-command">画像</span></button>
                 <button data-action="heading" type="button" aria-label="見出し" title="見出し"><span class="desktop-command">H2</span><span class="mobile-command">見出し</span></button>
                 <button data-action="subheading" type="button" aria-label="小見出し" title="小見出し"><span class="desktop-command">H3</span><span class="mobile-command">小見出し</span></button>
                 <button data-action="bullet" type="button" aria-label="箇条書き" title="箇条書き"><span class="desktop-command">•</span><span class="mobile-command">箇条書き</span></button>
@@ -88,6 +89,7 @@
               <div class="toolbar-footer"><div id="editorSyncStatus" class="toolbar-save-status"></div><button id="finishInputButton" class="secondary-button" type="button">完了</button></div>
             </div>
             <div class="editor-stack" id="editorStack">
+              <input id="imageFileInput" type="file" accept="image/*" multiple hidden />
               <textarea id="bodyInput" aria-label="Journalの本文" wrap="soft" placeholder="ここから書き始めます。&#10;&#10;Markdownで見出し、太字、リンクなどを入力できます。" spellcheck="true"></textarea>
             </div>
           </section>
@@ -150,6 +152,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="firebase-config.js"></script>
     <script src="firebase-config.local.js"></script>
-    <script type="module" src="script.js?v=2026-11-05-5"></script>
+    <script type="module" src="script.js?v=2026-11-05-6"></script>
   </body>
 </html>
