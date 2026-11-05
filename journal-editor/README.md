@@ -109,6 +109,14 @@ node journal-editor/tests/preview-server.mjs
 
 `?scenario=legacy-matched`でクラウドと同じ旧データ、`?scenario=legacy-difference`で内容の異なる旧データの案内、`?scenario=badges`でタグ・作成日順・ピン止め、`?scenario=trash`で完全削除の確認画面を検証できます。trashの削除はメモリ上のモックに限定され、Firebaseには接続しません。旧形式のlocalStorageは書き換えず、確認画面内だけで架空のデータを使用します。
 
+### 画面サイズごとの確認（スクリーンショット）
+
+```powershell
+node journal-editor/tests/screenshots.mjs
+```
+
+確認サーバーを自動で起動し、Android（Pixel 7）・iPad Pro 11（縦・横）・PC（1280px）の画面サイズで、編集画面・新規作成の「書き方を選ぶ」・テンプレート選択・note用選択時・記事一覧を撮影して`journal-editor/tests/screenshots/`に保存します（Gitには含めません）。画面のエラーや横方向のはみ出しがあれば一覧で表示します。架空データだけを使い、Firebaseには接続しません。Playwrightが必要です（Claude Codeのクラウド環境では最初から使えます）。実機のSafari・Chromeとは細かな差が出ることがあるため、公開後に実機で最終確認してください。
+
 実際のログインを試す場合は、元の案内どおりHTTPサーバー経由で起動してください。`index.html`の直接起動（file://）は対応していません。
 
 ```powershell
