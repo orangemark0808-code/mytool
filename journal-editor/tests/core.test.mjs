@@ -366,14 +366,14 @@ test('older offline baselines save without creating a false conflict after upgra
   assert.equal(fs.data.get(original.id).body, local.body);
 });
 
-test('template category is standard, ordered after note, and seeds two drama templates', () => {
+test('template category is standard, ordered after note, and offers spoiler / no-spoiler templates', () => {
   const names = core.standardCategories().map((category) => category.name);
   assert.deepEqual(names, ['日記', 'note用', 'テンプレート']);
   assert.deepEqual(core.defaultCategories().map((category) => category.name), ['日記', 'note用']);
   const ordered = core.orderedCategories([{ id: 'x', name: '自作', order: 0 }, core.templateCategory(), ...core.defaultCategories()]);
   assert.deepEqual(ordered.map((category) => category.name), ['日記', 'note用', 'テンプレート', '自作']);
-  const seeds = core.seedTemplates();
-  assert.equal(seeds.length, 2);
+  const seeds = core.templateOptions();
+  assert.deepEqual(seeds.map((seed) => seed.label), ['ネタバレなし', 'ネタバレあり']);
   assert.equal(new Set(seeds.map((seed) => seed.id)).size, 2);
   assert.ok(seeds[0].body.includes('観る前の私') && !seeds[0].body.includes('ネタバレを含みます'));
   assert.ok(seeds[1].body.startsWith('【ネタバレあり】') && seeds[1].body.includes('ネタバレを含みます'));

@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, seedTemplates, isTemplateDraft, applyTemplateText, FIXED_CATEGORY_NAMES, TEMPLATE_CATEGORY_NAME, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-11-04-3';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-04-3';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, isTemplateDraft, applyTemplateText, FIXED_CATEGORY_NAMES, TEMPLATE_CATEGORY_NAME, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-11-05-1';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-1';
 
-const VERSION = '2026-11-04-3';
+const VERSION = '2026-11-05-1';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const SORT_KEY = 'orangemania-journal-list-sort-v1';
 const COMPACT_EDITOR_QUERY = '(max-width: 700px)';
@@ -413,6 +413,9 @@ function updateNoteStatusControls() {
   const selected = { category: categorySelect.value || null, categoryName: draft?.category === categorySelect.value ? draft.categoryName : '' };
   $('noteStatusField').hidden = !isNoteDraft(selected, state.categories);
   noteStatusSelect.value = draft?.noteStatus === 'published' ? 'published' : 'unpublished';
+  const template = isTemplateDraft(selected, state.categories);
+  $('templateButton').hidden = !template;
+  if (!template) closeTemplatePanel();
 }
 function renderCategoryManageList() {
   const categories = activeCategories();
@@ -621,34 +624,29 @@ function restoreHistory(index) {
   bodyInput.value = item.value; bodyInput.setSelectionRange(item.start, item.end); bodyInput.scrollTop = item.scrollTop;
   state.historyIndex = index; updatePreview(); scheduleSave(); updateHistoryButtons(); bodyInput.focus({ preventScroll: true });
 }
-function templateChoices() {
-  const category = activeCategories().find((item) => item.name === TEMPLATE_CATEGORY_NAME); if (!category) return [];
-  return state.drafts.filter((draft) => draft.category === category.id && !draft.deletedAt && draft.id !== state.currentId && draft.body.trim());
-}
+function findTemplate(id) { return templateOptions().find((template) => template.id === id); }
 function closeTemplatePanel(focus = false) {
   $('templatePanel').classList.add('hidden'); $('templateButton').setAttribute('aria-expanded', 'false'); state.pendingTemplateId = null;
   if (focus) $('templateButton').focus();
 }
 function renderTemplatePanel() {
-  const panel = $('templatePanel'), pending = state.pendingTemplateId && state.drafts.find((draft) => draft.id === state.pendingTemplateId);
+  const panel = $('templatePanel'), pending = state.pendingTemplateId && findTemplate(state.pendingTemplateId);
   if (pending) {
-    panel.innerHTML = `<p class="template-message">本文に文字があります。「${escapeHtml(pending.title)}」を本文の末尾に追加しますか？</p><div class="template-actions"><button type="button" class="primary-button" data-template-append="${escapeHtml(pending.id)}">末尾に追加する</button><button type="button" class="secondary-button" data-template-cancel>やめる</button></div>`;
+    panel.innerHTML = `<p class="template-message">本文に文字があります。「${escapeHtml(pending.label)}」のテンプレートを本文の末尾に追加しますか？</p><div class="template-actions"><button type="button" class="primary-button" data-template-append="${escapeHtml(pending.id)}">末尾に追加する</button><button type="button" class="secondary-button" data-template-cancel>やめる</button></div>`;
     return;
   }
-  const choices = templateChoices();
-  panel.innerHTML = `<div class="template-head"><strong>テンプレートを選ぶ</strong><button type="button" class="small-button" data-template-close>閉じる</button></div>` + (choices.length
-    ? `<ul class="template-list">${choices.map((draft) => `<li><button type="button" class="template-choice" data-template-id="${escapeHtml(draft.id)}">${escapeHtml(draft.title)}</button></li>`).join('')}</ul>`
-    : '<p class="template-message">テンプレートがありません。カテゴリ「テンプレート」で記事を作ると、ここに表示されます。</p>');
+  panel.innerHTML = `<div class="template-head"><strong>テンプレートの種類を選ぶ</strong><button type="button" class="small-button" data-template-close>閉じる</button></div>`
+    + `<ul class="template-list">${templateOptions().map((template) => `<li><button type="button" class="template-choice" data-template-id="${escapeHtml(template.id)}">${escapeHtml(template.label)}</button></li>`).join('')}</ul>`;
 }
 function openTemplatePanel() {
-  if (!state.user || state.view !== 'editor') return;
+  if (!state.user || state.view !== 'editor' || $('templateButton').hidden) return;
   const panel = $('templatePanel');
   if (!panel.classList.contains('hidden')) return closeTemplatePanel(true);
-  ensureStandardCategories(); state.pendingTemplateId = null; renderTemplatePanel();
+  state.pendingTemplateId = null; renderTemplatePanel();
   panel.classList.remove('hidden'); $('templateButton').setAttribute('aria-expanded', 'true');
 }
 function insertTemplate(id) {
-  const template = state.drafts.find((draft) => draft.id === id && !draft.deletedAt); if (!template) return;
+  const template = findTemplate(id); if (!template) return;
   finishComposition();
   const result = applyTemplateText(bodyInput.value, template.body);
   bodyInput.value = result.text; bodyInput.setSelectionRange(result.caret, result.caret); bodyInput.scrollTop = 0;
@@ -709,28 +707,16 @@ function loadDraft(id) {
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([]); showView('editor'); bodyInput.focus({ preventScroll: true });
 }
 function ensureStandardCategories(now = new Date().toISOString()) {
-  let categoriesChanged = false, templateAdded = false;
+  let categoriesChanged = false;
   for (const standard of standardCategories()) {
     if (activeCategories().some((category) => category.name === standard.name)) continue;
     const existing = state.categories.find((category) => category.id === standard.id);
     if (existing && existing.name === standard.name) Object.assign(existing, { deleted: false, updatedAt: now, order: standard.order });
     else state.categories.push({ ...standard, id: existing ? crypto.randomUUID() : standard.id, updatedAt: now });
-    categoriesChanged = true; if (standard.name === TEMPLATE_CATEGORY_NAME) templateAdded = true;
+    categoriesChanged = true;
   }
-  if (templateAdded) seedTemplateDrafts(now);
   if (categoriesChanged) { state.categoriesDirty = true; renderCategoryOptions(); renderCategoryManageList(); void syncCategories(); }
   return categoriesChanged;
-}
-function seedTemplateDrafts(now) {
-  const category = activeCategories().find((item) => item.name === TEMPLATE_CATEGORY_NAME); if (!category) return;
-  const added = [];
-  for (const seed of seedTemplates()) {
-    if (state.drafts.some((draft) => draft.id === seed.id)) continue;
-    const draft = editedDraft(normalizeDraft({ id: seed.id, title: seed.title, body: seed.body, category: category.id, categoryName: category.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
-    state.drafts.push(draft); added.push(draft.id);
-  }
-  if (!added.length) return;
-  persistLocal(added); renderList(); refreshSyncStatus(); for (const id of added) queueSave(id);
 }
 function newDraft() {
   if (!state.user || state.bulkAssigning || state.bulkPurging) return;
@@ -1078,7 +1064,10 @@ $('templatePanel').addEventListener('click', (event) => {
   else if (button.hasAttribute('data-template-cancel')) { state.pendingTemplateId = null; renderTemplatePanel(); }
   else if (button.hasAttribute('data-template-close')) closeTemplatePanel(true);
 });
-categorySelect.addEventListener('change', () => { updateNoteStatusControls(); scheduleSave(); });
+categorySelect.addEventListener('change', () => {
+  updateNoteStatusControls(); scheduleSave();
+  if (!$('templateButton').hidden && $('templatePanel').classList.contains('hidden')) openTemplatePanel();
+});
 noteStatusSelect.addEventListener('change', scheduleSave);
 $('editCreatedAtButton').addEventListener('click', openCreatedAtEditor);
 $('createdAtForm').addEventListener('submit', saveCreatedAt);
