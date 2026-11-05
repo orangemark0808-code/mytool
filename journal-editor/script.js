@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, isTemplateDraft, applyTemplateText, FIXED_CATEGORY_NAMES, TEMPLATE_CATEGORY_NAME, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-11-05-1';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-1';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, isTemplateDraft, applyTemplateText, FIXED_CATEGORY_NAMES, TEMPLATE_CATEGORY_NAME, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown, UNTITLED_TITLE, isUntitledTitle, displayTitle } from './editor-core.mjs?v=2026-11-05-2';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-2';
 
-const VERSION = '2026-11-05-1';
+const VERSION = '2026-11-05-2';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const SORT_KEY = 'orangemania-journal-list-sort-v1';
 const COMPACT_EDITOR_QUERY = '(max-width: 700px)';
@@ -212,7 +212,7 @@ function scheduleSave() {
   const category = categorySelect.value || null;
   const categoryLabel = category ? categoryName(category, draft.category === category ? draft.categoryName : '') : '';
   const noteStatus = categoryLabel === 'note用' ? (noteStatusSelect.value === 'published' ? 'published' : 'unpublished') : draft.noteStatus;
-  const changes = { title: titleInput.value.trim() || '無題の記事', body: bodyInput.value, category, categoryName: categoryLabel, noteStatus };
+  const changes = { title: titleInput.value.trim() || (isUntitledTitle(draft.title) ? draft.title : UNTITLED_TITLE), body: bodyInput.value, category, categoryName: categoryLabel, noteStatus };
   if (draft.title === changes.title && draft.body === changes.body && draft.category === changes.category && draft.categoryName === changes.categoryName && draft.noteStatus === changes.noteStatus) return;
   draft = editedDraft(draft, changes);
   state.drafts = state.drafts.map((item) => item.id === draft.id ? draft : item);
@@ -239,7 +239,7 @@ function applyRemoteDrafts(remote, authoritative, onlyId = null, confirmedMissin
   }
   if (visible && previous && next && !next.deletedAt && contentKey(previous) !== contentKey(next) && !previous.pendingSync && !state.composing) {
     const start = bodyInput.selectionStart, end = bodyInput.selectionEnd, scroll = bodyInput.scrollTop;
-    titleInput.value = next.title === '無題の記事' ? '' : next.title; bodyInput.value = next.body;
+    titleInput.value = isUntitledTitle(next.title) ? '' : next.title; bodyInput.value = next.body;
     bodyInput.setSelectionRange(Math.min(start, next.body.length), Math.min(end, next.body.length)); bodyInput.scrollTop = scroll;
     renderCategoryOptions(); updatePreview(); recordHistory(); toast('別端末での変更を反映しました');
   }
@@ -703,7 +703,7 @@ function loadDraft(id) {
   closeTemplatePanel();
   finishComposition();
   const draft = state.drafts.find((item) => item.id === id && !item.deletedAt); if (!draft) return;
-  state.currentId = state.editorDraftId = id; titleInput.value = draft.title === '無題の記事' ? '' : draft.title; bodyInput.value = draft.body;
+  state.currentId = state.editorDraftId = id; titleInput.value = isUntitledTitle(draft.title) ? '' : draft.title; bodyInput.value = draft.body;
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([]); showView('editor'); bodyInput.focus({ preventScroll: true });
 }
 function ensureStandardCategories(now = new Date().toISOString()) {
@@ -724,7 +724,7 @@ function newDraft() {
   const now = new Date().toISOString();
   ensureStandardCategories(now);
   const diary = activeCategories().find((category) => category.name === '日記');
-  const draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: '無題の記事', body: '', category: diary.id, categoryName: diary.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
+  const draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: UNTITLED_TITLE, body: '', category: diary.id, categoryName: diary.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
   state.drafts.unshift(draft); state.currentId = state.editorDraftId = draft.id; titleInput.value = bodyInput.value = '';
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); titleInput.focus();
 }
@@ -751,9 +751,9 @@ function draftTitleMarkup(draft) {
   return state.showTrash ? `<span class="draft-title">${title}</span>` : `<button class="draft-title draft-title-button" type="button" data-edit="${escapeHtml(draft.id)}" title="記事を編集">${title}</button>`;
 }
 function draftDisplayTitle(draft) {
-  const suffix = draft.title.match(/(?:（(?:競合コピー|復元)）)+$/u);
-  if (!suffix || suffix.index === 0) return { title: draft.title, labels: [] };
-  return { title: draft.title.slice(0, suffix.index), labels: [...new Set(Array.from(suffix[0].matchAll(/（(競合コピー|復元)）/gu), (match) => match[1]))] };
+  const title = displayTitle(draft.title), suffix = title.match(/(?:（(?:競合コピー|復元)）)+$/u);
+  if (!suffix || suffix.index === 0) return { title, labels: [] };
+  return { title: title.slice(0, suffix.index), labels: [...new Set(Array.from(suffix[0].matchAll(/（(競合コピー|復元)）/gu), (match) => match[1]))] };
 }
 function draftStateMarkup(draft) {
   return draftDisplayTitle(draft).labels.map((label) => `<span class="article-state-badge">${label}</span>`).join('');
@@ -846,7 +846,7 @@ function requestPurge() {
   state.purgeTargets = state.drafts.filter((draft) => draft.deletedAt && state.selectedTrash.has(draft.id))
     .map(({ id, title, deletedAt, baseVersion }) => ({ id, title, deletedAt, baseVersion }));
   if (!state.purgeTargets.length) return;
-  $('purgeTitles').innerHTML = state.purgeTargets.map((draft) => `<li>${escapeHtml(draft.title)}</li>`).join('');
+  $('purgeTitles').innerHTML = state.purgeTargets.map((draft) => `<li>${escapeHtml(displayTitle(draft.title))}</li>`).join('');
   $('purgeConfirmButton').textContent = `${state.purgeTargets.length}件を完全削除する`;
   $('purgeConfirmation').classList.remove('hidden'); updateTrashControls(); $('purgeCancelButton').focus();
 }
@@ -893,7 +893,7 @@ function renderList() {
     .sort((a, b) => pinTime(b) - pinTime(a) || (Date.parse(b[sortField]) || 0) - (Date.parse(a[sortField]) || 0) || a.id.localeCompare(b.id));
   if (!state.showTrash && state.categoryFilter !== 'all') drafts = drafts.filter((draft) => categoryBadgeKind(draft) === state.categoryFilter);
   if (!state.showTrash && state.categoryFilter === 'note' && state.noteStatusFilter !== 'all') drafts = drafts.filter((draft) => draft.noteStatus === state.noteStatusFilter);
-  if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
+  if (query) drafts = drafts.filter((draft) => [displayTitle(draft.title), draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
   if (state.listTagEditor && !drafts.some((draft) => draft.id === state.listTagEditor.id && !draft.deletedAt && (state.listTagEditor.kind === 'category' || isNoteDraft(draft, state.categories)))) state.listTagEditor = null;
   state.visibleTrashIds = state.showTrash ? drafts.map((draft) => draft.id) : [];
   const trashCount = state.drafts.filter((draft) => draft.deletedAt).length;

@@ -42,7 +42,7 @@ function matchesRemoteVersion(draft, baseVersion) {
 export function normalizeDraft(raw, { remote = false, id = raw?.id } = {}) {
   const draft = {
     id: String(id || crypto.randomUUID()),
-    title: typeof raw?.title === 'string' ? raw.title : '無題の記事',
+    title: typeof raw?.title === 'string' ? raw.title : UNTITLED_TITLE,
     body: typeof raw?.body === 'string' ? raw.body : '',
     category: typeof raw?.category === 'string' && raw.category ? raw.category : null,
     categoryName: typeof raw?.categoryName === 'string' ? raw.categoryName : '',
@@ -102,9 +102,15 @@ export function recoveryCopy(draft, suffix = '競合コピー', id = crypto.rand
   }, now);
 }
 function recoveryTitle(title, suffix) {
-  const base = (title || '無題の記事').replace(/(?:（(?:競合コピー|復元)）)+$/u, '');
-  return `${base || '無題の記事'}（${suffix}）`;
+  const base = (title || UNTITLED_TITLE).replace(/(?:（(?:競合コピー|復元)）)+$/u, '');
+  return `${base || UNTITLED_TITLE}（${suffix}）`;
 }
+
+/* 題名なしの記事。以前の「無題の記事」も題名なしとして扱い、表示は Non Title にそろえる。 */
+export const UNTITLED_TITLE = 'Non Title';
+const LEGACY_UNTITLED_TITLE = '無題の記事';
+export function isUntitledTitle(title) { return title === UNTITLED_TITLE || title === LEGACY_UNTITLED_TITLE; }
+export function displayTitle(title) { return title === LEGACY_UNTITLED_TITLE || title.startsWith(`${LEGACY_UNTITLED_TITLE}（`) ? UNTITLED_TITLE + title.slice(LEGACY_UNTITLED_TITLE.length) : title; }
 
 // All reads precede writes, and retries reuse the same copy ID. A stale client
 // must never overwrite a newer server revision or resurrect a deleted article.

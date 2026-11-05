@@ -389,3 +389,14 @@ test('applying a template replaces an empty body and appends to an existing one'
   assert.equal(core.isTemplateDraft({ category: 'journal-template' }, [core.templateCategory()]), true);
   assert.equal(core.isTemplateDraft({ category: 'journal-diary' }, core.standardCategories()), false);
 });
+
+test('untitled articles are shown as Non Title, including older 無題の記事 data', () => {
+  assert.equal(core.normalizeDraft({ id: 'x' }).title, 'Non Title');
+  assert.equal(core.displayTitle('無題の記事'), 'Non Title');
+  assert.equal(core.displayTitle('無題の記事（競合コピー）'), 'Non Title（競合コピー）');
+  assert.equal(core.displayTitle('無題の記事について'), '無題の記事について');
+  assert.equal(core.displayTitle('NCIS'), 'NCIS');
+  assert.equal(core.isUntitledTitle('無題の記事'), true);
+  assert.equal(core.isUntitledTitle('Non Title'), true);
+  assert.equal(core.isUntitledTitle('Title'), false);
+});
