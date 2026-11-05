@@ -301,7 +301,7 @@ test('list sorting switches dates, keeps pins first and never edits article reco
 });
 
 test('sort preference survives trash and filters; trash keeps its own updated order', () => {
-  const h = harness(); h.run("changeListSort('updatedAt');setListCategoryFilter('diary');");
+  const h = harness(); h.run("changeListSort('updatedAt');openJournalList('diary');");
   assert.equal(h.run('state.listSort'), 'updatedAt');
   h.events.get('trashButton:click')();
   assert.equal(h.elements.get('draftList').classList.contains('card-list'), false);
@@ -309,7 +309,7 @@ test('sort preference survives trash and filters; trash keeps its own updated or
   assert.equal(h.elements.get('backToListLabel').hidden, false);
   assert.equal(h.elements.get('trashButton').classList.contains('list-back-button'), true);
   assert.equal(h.elements.get('listOrderDescription').textContent, '更新日の新しい順');
-  h.events.get('homeButton:click')();
+  h.events.get('draftsButton:click')();
   assert.equal(h.elements.get('draftList').classList.contains('card-list'), true);
   assert.equal(h.elements.get('listSortField').hidden, false);
   assert.equal(h.elements.get('backToListLabel').hidden, true);
@@ -398,22 +398,39 @@ test('editor fields belonging to a different article cannot be saved into curren
   assert.equal(h.run('currentDraft().title'), 'Synthetic');
 });
 
-for (const button of ['homeButton', 'draftsButton']) {
-  test(`${button} exits trash, clears deletion review and opens the complete journal list`, () => {
+test('draftsButton exits trash, clears deletion review and reopens the current book list', () => {
+  const h = harness();
+  h.run("showView('list');state.showTrash=true;state.searchQuery='trash-only';$('searchInput').value='trash-only';state.categoryFilter='diary';state.noteStatusFilter='published';state.selectedTrash.add('d');state.purgeTargets=[fixture];$('purgeConfirmation').classList.remove('hidden');renderList();");
+  const before = h.run('JSON.stringify(state.drafts)');
+  h.events.get('draftsButton:click')();
+  assert.equal(h.run('state.showTrash'), false);
+  assert.equal(h.elements.get('listTitle').textContent, '日記');
+  assert.equal(h.elements.get('searchInput').value, '');
+  assert.equal(h.run('state.categoryFilter'), 'diary');
+  assert.equal(h.run('state.noteStatusFilter'), 'all');
+  assert.equal(h.run('state.selectedTrash.size'), 0);
+  assert.equal(h.run('state.purgeTargets.length'), 0);
+  assert.equal(h.elements.get('purgeConfirmation').classList.contains('hidden'), true);
+  assert.match(h.elements.get('draftList').innerHTML, /Synthetic/);
+  assert.equal(h.run('JSON.stringify(state.drafts)'), before);
+});
+
+for (const button of ['homeButton', 'homeNavButton', 'listHomeButton']) {
+  test(`${button} exits trash and opens the home screen with both books`, () => {
     const h = harness();
-    h.run("showView('list');state.showTrash=true;state.searchQuery='trash-only';$('searchInput').value='trash-only';state.categoryFilter='note';state.noteStatusFilter='published';state.selectedTrash.add('d');state.purgeTargets=[fixture];$('purgeConfirmation').classList.remove('hidden');renderList();");
-    const before = h.run('JSON.stringify(state.drafts)');
+    h.run("showView('list');state.showTrash=true;state.selectedTrash.add('d');state.purgeTargets=[fixture];$('purgeConfirmation').classList.remove('hidden');renderList();");
     h.events.get(`${button}:click`)();
+    assert.equal(h.run('state.view'), 'home');
     assert.equal(h.run('state.showTrash'), false);
-    assert.equal(h.elements.get('listTitle').textContent, 'Journal一覧');
-    assert.equal(h.elements.get('searchInput').value, '');
-    assert.equal(h.run('state.categoryFilter'), 'all');
-    assert.equal(h.run('state.noteStatusFilter'), 'all');
-    assert.equal(h.run('state.selectedTrash.size'), 0);
+    assert.equal(h.elements.get('homeView').classList.contains('hidden'), false);
+    assert.equal(h.elements.get('listView').classList.contains('hidden'), true);
     assert.equal(h.run('state.purgeTargets.length'), 0);
-    assert.equal(h.elements.get('purgeConfirmation').classList.contains('hidden'), true);
-    assert.match(h.elements.get('draftList').innerHTML, /Synthetic/);
-    assert.equal(h.run('JSON.stringify(state.drafts)'), before);
+    const cards = h.elements.get('bookCards').innerHTML;
+    assert.match(cards, /data-open-book="diary"/);
+    assert.match(cards, /data-open-book="note"/);
+    // 未取得カテゴリの記事は日記に数える。
+    assert.match(cards, /日記を開く（1件）/);
+    assert.match(cards, /noteを開く（0件）/);
   });
 }
 
@@ -691,8 +708,9 @@ test('new articles default to existing diary ID and uncategorized is last', () =
   assert.equal(h.elements.get('categorySelect').value, 'legacy-diary');
   assert.equal(h.elements.get('noteStatusField').hidden, true);
   const html = h.elements.get('categorySelect').innerHTML;
-  assert.ok(html.indexOf('日記') < html.indexOf('note用'));
-  assert.ok(html.indexOf('note用') < html.indexOf('未分類'));
+  assert.ok(html.indexOf('>日記<') < html.indexOf('>note<'));
+  // 未分類の選択肢は、未分類の記事を開いたときだけ出す。
+  assert.ok(!html.includes('未分類'));
 });
 test('selecting note shows unpublished default and stores posted changes', () => {
   const h = harness(); h.run('newDraft();');
@@ -757,17 +775,17 @@ test('category and posting filters intersect search and recognize legacy categor
     core.normalizeDraft({ ...h.draft, id: 'unposted', title: 'Unposted match', category: 'legacy-note', categoryName: 'note用' }),
     core.normalizeDraft({ ...h.draft, id: 'diary', title: 'Diary match', category: 'journal-diary', noteStatus: 'published' }),
   ];
-  h.run("state.categories.push({id:'legacy-note',name:'note用',order:2});state.drafts=filterArticles;setListCategoryFilter('note');setListNoteFilter('published');state.searchQuery='match';renderList();");
+  h.run("state.categories.push({id:'legacy-note',name:'note用',order:2});state.drafts=filterArticles;openJournalList('note');setListNoteFilter('published');state.searchQuery='match';renderList();");
   assert.match(h.elements.get('draftList').innerHTML, /Posted match/);
   assert.ok(!h.elements.get('draftList').innerHTML.includes('Unposted match'));
   assert.ok(!h.elements.get('draftList').innerHTML.includes('Diary match'));
   h.run("state.searchQuery='absent';renderList();");
   assert.match(h.elements.get('draftList').innerHTML, /この条件に一致/);
-  h.run("state.searchQuery='';setListCategoryFilter('diary');");
+  h.run("state.searchQuery='';openJournalList('diary');");
   assert.equal(h.run('state.noteStatusFilter'), 'all');
   assert.equal(h.elements.get('listNoteFilters').classList.contains('hidden'), true);
   assert.match(h.elements.get('draftList').innerHTML, /Diary match/);
-  h.run("setListCategoryFilter('note');setListNoteFilter('unpublished');");
+  h.run("openJournalList('note');setListNoteFilter('unpublished');");
   assert.match(h.elements.get('draftList').innerHTML, /Unposted match/);
   assert.ok(!h.elements.get('draftList').innerHTML.includes('Posted match'));
 });
@@ -778,7 +796,7 @@ test('trash remains accessible regardless of active note filters and titles cann
     core.normalizeDraft({ ...h.draft, id: 'active', title: 'Active note', category: 'journal-note' }),
     core.normalizeDraft({ ...h.draft, id: 'trash', title: 'Trash diary', category: 'journal-diary', deletedAt: '2026-10-09T00:00:00Z' }),
   ];
-  h.run("state.drafts=filterArticles;setListCategoryFilter('note');setListNoteFilter('published');");
+  h.run("state.drafts=filterArticles;openJournalList('note');setListNoteFilter('published');");
   h.events.get('trashButton:click')();
   assert.match(h.elements.get('draftList').innerHTML, /Trash diary/);
   assert.match(h.elements.get('draftList').innerHTML, /data-restore=/);
@@ -972,7 +990,7 @@ test('tag edits immediately update filters, preserve unknown categories on cance
   h.run('closeListTagEditor();');
   assert.equal(h.run('currentDraft().category'), 'unknown-category');
   assert.equal(h.run('currentDraft().pendingSync'), false);
-  h.run("changeListTag('d','category','journal-note');setListCategoryFilter('note');setListNoteFilter('unpublished');changeListTag('d','status','published');");
+  h.run("changeListTag('d','category','journal-note');openJournalList('note');setListNoteFilter('unpublished');changeListTag('d','status','published');");
   assert.match(h.elements.get('draftList').innerHTML, /この条件に一致/);
   assert.equal(h.run('currentDraft().noteStatus'), 'published');
   h.run("state.drafts[0].deletedAt='2026-10-09T00:00:00Z';state.showTrash=true;changeListTag('d','category','journal-diary');openListTagEditor('d','category');renderList();");
@@ -1100,7 +1118,10 @@ const panelClick = (h, dataset, attrs = {}) => h.events.get('templatePanel:click
 
 test('new article asks how to start: blank or a drama template', () => {
   const h = harness();
-  h.run('newDraft();');
+  h.run("newDraft('diary');");
+  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
+  assert.equal(h.elements.get('templateButton').hidden, true);
+  h.run("newDraft('note');");
   const html = h.elements.get('templatePanel').innerHTML;
   assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), false);
   assert.match(html, /書き方を選ぶ/);
@@ -1110,12 +1131,12 @@ test('new article asks how to start: blank or a drama template', () => {
   panelClick(h, {}, { 'data-template-blank': true });
   assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
   assert.equal(h.run('bodyInput.value'), '');
-  assert.equal(h.run('categorySelect.value'), h.run("activeCategories().find(c=>c.name==='日記').id"));
+  assert.equal(h.run('categorySelect.value'), h.run("activeCategories().find(c=>c.name==='note用').id"));
 });
 
 test('choosing a template for a new article fills the body and sets note用', () => {
   const h = harness();
-  h.run('newDraft();');
+  h.run("newDraft('note');");
   panelClick(h, { templateId: 'drama-spoiler' });
   assert.ok(h.run('bodyInput.value').startsWith('【ネタバレあり】'));
   assert.equal(h.run('categorySelect.value'), h.run("activeCategories().find(c=>c.name==='note用').id"));
@@ -1123,9 +1144,10 @@ test('choosing a template for a new article fills the body and sets note用', ()
   assert.equal(h.run("activeCategories().some(c=>c.name==='テンプレート')"), false);
 });
 
-test('template button in the editor is always available and keeps the category', () => {
+test('template button in a note article opens the templates and keeps the category', () => {
   const h = harness();
-  h.run("bodyInput.value='';resetHistory();$('templatePanel').classList.add('hidden');");
+  h.run("categorySelect.value='journal-note';updateNoteStatusControls();bodyInput.value='';resetHistory();$('templatePanel').classList.add('hidden');");
+  assert.equal(h.elements.get('templateButton').hidden, false);
   const before = h.run('categorySelect.value');
   h.events.get('templateButton:click')();
   const html = h.elements.get('templatePanel').innerHTML;
@@ -1185,3 +1207,101 @@ test('a category the user creates named テンプレート is left alone', () =>
   assert.equal(h.run("activeCategories().some(c=>c.id==='mine')"), true);
 });
 
+
+test('subcategories live inside a book: filter, label, new article and editor choices', () => {
+  const h = harness();
+  h.run("addCategory('ドラマ感想','note');addCategory('旅行','diary');");
+  const drama = h.run("state.categories.find(c=>c.name==='ドラマ感想').id"), trip = h.run("state.categories.find(c=>c.name==='旅行').id");
+  h.context.bookArticles = [
+    core.normalizeDraft({ ...h.draft, id: 'n1', title: 'Drama review', category: drama, categoryName: 'ドラマ感想' }),
+    core.normalizeDraft({ ...h.draft, id: 'n2', title: 'Plain note', category: 'journal-note', categoryName: 'note用' }),
+    core.normalizeDraft({ ...h.draft, id: 'd1', title: 'Trip diary', category: trip, categoryName: '旅行' }),
+    core.normalizeDraft({ ...h.draft, id: 'u1', title: 'Loose page', category: null, categoryName: '' }),
+  ];
+  h.run("state.drafts=bookArticles;openJournalList('note');");
+  let list = h.elements.get('draftList').innerHTML;
+  assert.match(list, /Drama review/); assert.match(list, /Plain note/);
+  assert.ok(!list.includes('Trip diary')); assert.ok(!list.includes('Loose page'));
+  assert.equal(h.elements.get('listTitle').textContent, 'note');
+  assert.match(h.elements.get('listSubFilters').innerHTML, /ドラマ感想/);
+  assert.ok(!h.elements.get('listSubFilters').innerHTML.includes('旅行'));
+  // 投稿状況はnoteの小分けカテゴリの記事にも出る。
+  assert.equal(h.run("isNoteDraft(state.drafts[0],state.categories)"), true);
+  h.run(`setListSubFilter(${JSON.stringify(drama)});`);
+  list = h.elements.get('draftList').innerHTML;
+  assert.match(list, /Drama review/); assert.ok(!list.includes('Plain note'));
+  h.run("setListSubFilter('none');");
+  list = h.elements.get('draftList').innerHTML;
+  assert.ok(!list.includes('Drama review')); assert.match(list, /Plain note/);
+  h.run(`setListSubFilter(${JSON.stringify(drama)});newDraft();`);
+  assert.equal(h.run('currentDraft().category'), drama);
+  assert.equal(h.run('currentDraft().categoryName'), 'ドラマ感想');
+  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), false);
+  const options = h.elements.get('categorySelect').innerHTML;
+  assert.match(options, /note \/ ドラマ感想/); assert.match(options, /日記 \/ 旅行/);
+  assert.equal(h.elements.get('noteStatusField').hidden, false);
+  // 未分類の記事は日記に入り、開いても分類は変えない。
+  h.run("openJournalList('diary');");
+  list = h.elements.get('draftList').innerHTML;
+  assert.match(list, /Trip diary/); assert.match(list, /Loose page/); assert.ok(!list.includes('Drama review'));
+  h.run("loadDraft('u1');");
+  assert.match(h.elements.get('categorySelect').innerHTML, /日記（未分類）/);
+  assert.equal(h.run('categorySelect.value'), '');
+  h.run("scheduleSave();");
+  assert.equal(h.run("state.drafts.find(d=>d.id==='u1').category"), null);
+});
+
+test('moving a subcategory to the other book carries its articles without rewriting them', () => {
+  const h = harness();
+  h.run("addCategory('本の感想','diary');");
+  const books = h.run("state.categories.find(c=>c.name==='本の感想').id");
+  h.context.moveArticles = [core.normalizeDraft({ ...h.draft, id: 'b1', title: 'Book notes', category: books, categoryName: '本の感想' }, { remote: true })];
+  h.run("state.drafts=moveArticles;");
+  const before = h.run('JSON.stringify(state.drafts)');
+  assert.equal(h.run("draftBook(state.drafts[0],state.categories)"), 'diary');
+  h.run(`moveCategoryBook(${JSON.stringify(books)});`);
+  assert.equal(h.run("draftBook(state.drafts[0],state.categories)"), 'note');
+  assert.equal(h.run('JSON.stringify(state.drafts)'), before);
+  assert.equal(h.run('state.categoriesDirty'), true);
+  assert.match(h.elements.get('categoryManageList').innerHTML, /noteのカテゴリ.*本の感想/s);
+});
+
+test('deleting a subcategory returns its articles to the book itself, and fixed books cannot be removed', () => {
+  const h = harness();
+  h.run("addCategory('ドラマ感想','note');");
+  const drama = h.run("state.categories.find(c=>c.name==='ドラマ感想').id");
+  h.context.deleteArticles = [core.normalizeDraft({ ...h.draft, id: 'x1', title: 'Drama', category: drama, categoryName: 'ドラマ感想', noteStatus: 'published' })];
+  h.run(`state.drafts=deleteArticles;deleteCategory(${JSON.stringify(drama)});deleteCategory('journal-note');`);
+  assert.equal(h.run("state.drafts[0].category"), 'journal-note');
+  assert.equal(h.run("state.drafts[0].noteStatus"), 'published');
+  assert.equal(h.run("state.categories.find(c=>c.id==='journal-note').deleted"), false);
+  assert.equal(h.run("addCategory('note用','diary')"), false);
+  assert.equal(h.run("addCategory('  ','diary')"), false);
+});
+
+test('reordering subcategories stays within the same book', () => {
+  const h = harness();
+  h.run("addCategory('A','diary');addCategory('X','note');addCategory('B','diary');");
+  const id = (name) => h.run(`state.categories.find(c=>c.name==='${name}').id`);
+  h.run(`moveCategory(${JSON.stringify(id('B'))},-1);`);
+  assert.deepEqual(h.run("JSON.stringify(bookSubcategories(state.categories,'diary').map(c=>c.name))"), JSON.stringify(['B', 'A']));
+  assert.deepEqual(h.run("JSON.stringify(bookSubcategories(state.categories,'note').map(c=>c.name))"), JSON.stringify(['X']));
+  h.run(`moveCategory(${JSON.stringify(id('X'))},-1);`);
+  assert.deepEqual(h.run("JSON.stringify(bookSubcategories(state.categories,'note').map(c=>c.name))"), JSON.stringify(['X']));
+});
+
+test('home cards count each book and the write button creates in that book', () => {
+  const h = harness();
+  h.context.homeArticles = [
+    core.normalizeDraft({ ...h.draft, id: 'h1', category: 'journal-note', noteStatus: 'unpublished' }),
+    core.normalizeDraft({ ...h.draft, id: 'h2', category: 'journal-note', noteStatus: 'published' }),
+    core.normalizeDraft({ ...h.draft, id: 'h3', category: 'journal-diary', deletedAt: '2026-10-09T00:00:00Z' }),
+  ];
+  h.run("state.drafts=homeArticles;showView('home');");
+  const cards = h.elements.get('bookCards').innerHTML;
+  assert.match(cards, /noteを開く（2件）/); assert.match(cards, /日記を開く（0件）/); assert.match(cards, /未投稿 1件/);
+  assert.equal(h.elements.get('homeTrashButton').textContent, 'ごみ箱（1件）');
+  h.events.get('bookCards:click')({ target: { closest: () => ({ dataset: { newBook: 'note' } }) } });
+  assert.equal(h.run('state.view'), 'editor');
+  assert.equal(h.run('currentDraft().category'), 'journal-note');
+});

@@ -28,18 +28,18 @@ const targets = [
 ];
 
 // 撮影する場面。page は Playwright のページ。
+const click = (selector) => async (page) => { await page.click(selector); };
 const scenes = [
   ['editor', '', async () => {}],
-  ['new-article', '', async (page) => { await page.evaluate(() => document.getElementById('newButton').click()); }],
-  ['template-panel', '', async (page) => { await page.click('#templateButton'); }],
-  ['note-category', '', async (page) => {
-    await page.evaluate(() => {
-      const select = document.getElementById('categorySelect');
-      const note = [...select.options].find((option) => option.text === 'note用');
-      if (note) { select.value = note.value; select.dispatchEvent(new Event('change')); }
-    });
-  }],
-  ['list', '?scenario=badges', async () => {}],
+  ['home', '?scenario=books', async () => {}],
+  ['diary-list', '?scenario=books', click('[data-open-book="diary"]')],
+  ['note-list', '?scenario=books', click('[data-open-book="note"]')],
+  ['note-subcategory', '?scenario=books', async (page) => { await page.click('[data-open-book="note"]'); await page.click('[data-sub-filter="c-drama"]'); }],
+  ['new-note', '?scenario=books', click('[data-new-book="note"]')],
+  ['new-diary', '?scenario=books', click('[data-new-book="diary"]')],
+  ['note-editor', '?scenario=books', async (page) => { await page.click('[data-open-book="note"]'); await page.click('[data-edit="n1"]'); await page.evaluate(() => document.activeElement?.blur()); }],
+  ['settings-categories', '?scenario=books', async (page) => { await page.click('#settingsButton'); await page.evaluate(() => document.querySelector('.category-panel').scrollIntoView()); }],
+  ['all-list', '?scenario=badges', async () => {}],
 ];
 
 async function startServer() {
