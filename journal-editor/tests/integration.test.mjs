@@ -809,7 +809,7 @@ test('new diary is available even if its former standard category was deleted', 
   const h = harness();
   h.run('state.categories=defaultCategories().map(c=>({...c,deleted:true}));newDraft();');
   assert.equal(h.run('currentDraft().categoryName'), '日記');
-  assert.equal(h.run('activeCategories().length'), 3);
+  assert.equal(h.run('activeCategories().length'), 2);
   assert.equal(h.run("state.drafts.find(d=>d.id==='d').category"), 'unknown-category');
 });
 test('bulk diary controls count only active uncategorized articles', () => {
@@ -1096,64 +1096,53 @@ test('creation date save safely stops if finishing IME applies a deferred deleti
   assert.ok(h.run('state.drafts[0].deletedAt'));
 });
 
-function templateHarness(body = 'original') {
-  const h = harness();
-  h.run(`ensureStandardCategories();bodyInput.value=${JSON.stringify(body)};resetHistory();`);
-  const templateId = h.run("activeCategories().find(c=>c.name==='テンプレート').id");
-  h.elements.get('categorySelect').value = templateId;
-  h.events.get('categorySelect:change')();
-  return h;
-}
 const panelClick = (h, dataset, attrs = {}) => h.events.get('templatePanel:click')({ target: { closest: () => ({ dataset, hasAttribute: (name) => Boolean(attrs[name]) }) } });
 
-test('template picker is hidden unless the category is テンプレート', () => {
+test('new article asks how to start: blank or a drama template', () => {
   const h = harness();
-  h.run('ensureStandardCategories();');
-  const diaryId = h.run("activeCategories().find(c=>c.name==='日記').id");
-  h.elements.get('categorySelect').value = diaryId;
-  h.events.get('categorySelect:change')();
-  assert.equal(h.elements.get('templateButton').hidden, true);
-  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
-  h.events.get('templateButton:click')();
-  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
-});
-
-test('choosing the template category shows spoiler / no-spoiler choices and creates no articles', () => {
-  const h = templateHarness();
-  assert.equal(h.elements.get('templateButton').hidden, false);
-  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), false);
+  h.run('newDraft();');
   const html = h.elements.get('templatePanel').innerHTML;
-  assert.match(html, /ネタバレなし/);
-  assert.match(html, /ネタバレあり/);
-  assert.equal(h.run('state.drafts.length'), 1);
-  const diaryId = h.run("activeCategories().find(c=>c.name==='日記').id");
-  h.elements.get('categorySelect').value = diaryId;
-  h.events.get('categorySelect:change')();
-  assert.equal(h.elements.get('templateButton').hidden, true);
+  assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), false);
+  assert.match(html, /書き方を選ぶ/);
+  assert.match(html, /data-template-blank/);
+  assert.match(html, /ドラマ感想（ネタバレなし）/);
+  assert.match(html, /ドラマ感想（ネタバレあり）/);
+  panelClick(h, {}, { 'data-template-blank': true });
   assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
+  assert.equal(h.run('bodyInput.value'), '');
+  assert.equal(h.run('categorySelect.value'), h.run("activeCategories().find(c=>c.name==='日記').id"));
 });
 
-test('template choices never list articles written in the template category', () => {
+test('choosing a template for a new article fills the body and sets note用', () => {
   const h = harness();
-  h.run("ensureStandardCategories();const c=activeCategories().find(c=>c.name==='テンプレート');state.drafts.push(editedDraft(normalizeDraft({id:'mine',title:'【ネタバレあり】【ドラマ感想】NCIS',body:'x',category:c.id,categoryName:c.name,createdAt:'2026-10-01T00:00:00Z',updatedAt:'2026-10-01T00:00:00Z'}),{}));");
-  const templateId = h.run("activeCategories().find(c=>c.name==='テンプレート').id");
-  h.elements.get('categorySelect').value = templateId;
-  h.events.get('categorySelect:change')();
-  assert.doesNotMatch(h.elements.get('templatePanel').innerHTML, /NCIS/);
+  h.run('newDraft();');
+  panelClick(h, { templateId: 'drama-spoiler' });
+  assert.ok(h.run('bodyInput.value').startsWith('【ネタバレあり】'));
+  assert.equal(h.run('categorySelect.value'), h.run("activeCategories().find(c=>c.name==='note用').id"));
+  assert.equal(h.elements.get('noteStatusField').hidden, false);
+  assert.equal(h.run("activeCategories().some(c=>c.name==='テンプレート')"), false);
 });
 
-test('choosing a template fills an empty body and can be undone', () => {
-  const h = templateHarness('');
+test('template button in the editor is always available and keeps the category', () => {
+  const h = harness();
+  h.run("bodyInput.value='';resetHistory();$('templatePanel').classList.add('hidden');");
+  const before = h.run('categorySelect.value');
+  h.events.get('templateButton:click')();
+  const html = h.elements.get('templatePanel').innerHTML;
+  assert.match(html, /テンプレートを選ぶ/);
+  assert.doesNotMatch(html, /data-template-blank/);
   panelClick(h, { templateId: 'drama-spoiler' });
   assert.ok(h.run('bodyInput.value').startsWith('【ネタバレあり】'));
   assert.equal(h.elements.get('templatePanel').classList.contains('hidden'), true);
+  assert.equal(h.run('categorySelect.value'), before);
   assert.equal(h.run('currentDraft().title'), 'Synthetic');
   h.run("toolbar('undo');");
   assert.equal(h.run('bodyInput.value'), '');
 });
 
 test('choosing a template with existing text asks first and never overwrites', () => {
-  const h = templateHarness();
+  const h = harness(); h.run("$('templatePanel').classList.add('hidden');");
+  h.events.get('templateButton:click')();
   panelClick(h, { templateId: 'drama-no-spoiler' });
   assert.equal(h.run('bodyInput.value'), 'original');
   assert.match(h.elements.get('templatePanel').innerHTML, /末尾に追加しますか/);
@@ -1166,10 +1155,33 @@ test('choosing a template with existing text asks first and never overwrites', (
   assert.equal(h.run('bodyInput.selectionStart'), 'original\n\n'.length);
 });
 
-test('template filter button lists only template-category articles', () => {
+test('old テンプレート category is retired once data is loaded: articles move to note用, untouched seeds go to trash', () => {
   const h = harness();
-  h.run("setListCategoryFilter('template');");
-  assert.equal(h.run('state.categoryFilter'), 'template');
-  assert.equal(h.run("activeCategories().some(c=>c.name==='テンプレート')"), true);
-  assert.equal(h.run("state.drafts.filter(d=>categoryBadgeKind(d)==='template').length"), 0);
+  h.context.oldSeed = core.templateOptions()[0].body;
+  h.run(`state.categories=[...defaultCategories(),{id:'journal-template',name:'テンプレート',order:2,updatedAt:'2026-11-04T00:00:00.000Z',deleted:false}];
+    const base={category:'journal-template',categoryName:'テンプレート',createdAt:'2026-11-04T00:00:00Z',updatedAt:'2026-11-04T00:00:00Z'};
+    state.drafts.push(normalizeDraft({...base,id:'ncis',title:'【ネタバレあり】【ドラマ感想】NCIS シーズン23',body:'感想'},{remote:true}));
+    state.drafts.push(normalizeDraft({...base,id:'template-seed-no-spoiler',title:'ドラマ感想（ネタバレなし）',body:oldSeed},{remote:true}));
+    state.drafts.push(normalizeDraft({...base,id:'template-seed-spoiler',title:'ドラマ感想（ネタバレあり）',body:'書き換えた'},{remote:true}));`);
+  h.run('retireOldTemplateCategory();');
+  assert.equal(h.run("state.drafts.find(d=>d.id==='ncis').category"), 'journal-template', 'waits until server data is loaded');
+  h.run('state.remoteReady=state.categoriesReady=true;retireOldTemplateCategory();');
+  const note = h.run("activeCategories().find(c=>c.name==='note用').id");
+  const get = (id) => h.run(`(()=>{const d=state.drafts.find(d=>d.id==='${id}');return {category:d.category,categoryName:d.categoryName,deletedAt:d.deletedAt,noteStatus:d.noteStatus}})()`);
+  assert.equal(get('ncis').category, note);
+  assert.equal(get('ncis').categoryName, 'note用');
+  assert.equal(get('ncis').noteStatus, 'unpublished');
+  assert.equal(get('ncis').deletedAt, null);
+  assert.ok(get('template-seed-no-spoiler').deletedAt);
+  assert.equal(get('template-seed-spoiler').deletedAt, null);
+  assert.equal(get('template-seed-spoiler').category, note);
+  assert.equal(h.run("activeCategories().some(c=>c.name==='テンプレート')"), false);
+  assert.equal(h.run("state.categoriesDirty"), true);
 });
+
+test('a category the user creates named テンプレート is left alone', () => {
+  const h = harness();
+  h.run("state.categories=[...defaultCategories(),{id:'mine',name:'テンプレート',order:3,updatedAt:'2026-11-04T00:00:00.000Z',deleted:false}];state.remoteReady=state.categoriesReady=true;retireOldTemplateCategory();");
+  assert.equal(h.run("activeCategories().some(c=>c.id==='mine')"), true);
+});
+

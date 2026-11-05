@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, isTemplateDraft, applyTemplateText, FIXED_CATEGORY_NAMES, TEMPLATE_CATEGORY_NAME, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown } from './editor-core.mjs?v=2026-11-05-1';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-1';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, retireTemplateCategory, RETIRED_TEMPLATE_CATEGORY_ID, applyTemplateText, FIXED_CATEGORY_NAMES, orderedCategories, isNoteDraft, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown, UNTITLED_TITLE, isUntitledTitle, displayTitle } from './editor-core.mjs?v=2026-11-05-3';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-3';
 
-const VERSION = '2026-11-05-1';
+const VERSION = '2026-11-05-3';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const SORT_KEY = 'orangemania-journal-list-sort-v1';
 const COMPACT_EDITOR_QUERY = '(max-width: 700px)';
@@ -42,7 +42,7 @@ function activeCategories() { return orderedCategories(state.categories); }
 function noteStatusLabel(draft) { return draft.noteStatus === 'published' ? '投稿済' : '未投稿'; }
 function categoryBadgeKind(draft) {
   const name = categoryName(draft.category, draft.categoryName);
-  return name === '日記' ? 'diary' : name === 'note用' ? 'note' : name === TEMPLATE_CATEGORY_NAME ? 'template' : 'other';
+  return name === '日記' ? 'diary' : name === 'note用' ? 'note' : 'other';
 }
 function categoryName(id, fallback = '') {
   if (!id) return '未分類';
@@ -212,7 +212,7 @@ function scheduleSave() {
   const category = categorySelect.value || null;
   const categoryLabel = category ? categoryName(category, draft.category === category ? draft.categoryName : '') : '';
   const noteStatus = categoryLabel === 'note用' ? (noteStatusSelect.value === 'published' ? 'published' : 'unpublished') : draft.noteStatus;
-  const changes = { title: titleInput.value.trim() || '無題の記事', body: bodyInput.value, category, categoryName: categoryLabel, noteStatus };
+  const changes = { title: titleInput.value.trim() || (isUntitledTitle(draft.title) ? draft.title : UNTITLED_TITLE), body: bodyInput.value, category, categoryName: categoryLabel, noteStatus };
   if (draft.title === changes.title && draft.body === changes.body && draft.category === changes.category && draft.categoryName === changes.categoryName && draft.noteStatus === changes.noteStatus) return;
   draft = editedDraft(draft, changes);
   state.drafts = state.drafts.map((item) => item.id === draft.id ? draft : item);
@@ -239,7 +239,7 @@ function applyRemoteDrafts(remote, authoritative, onlyId = null, confirmedMissin
   }
   if (visible && previous && next && !next.deletedAt && contentKey(previous) !== contentKey(next) && !previous.pendingSync && !state.composing) {
     const start = bodyInput.selectionStart, end = bodyInput.selectionEnd, scroll = bodyInput.scrollTop;
-    titleInput.value = next.title === '無題の記事' ? '' : next.title; bodyInput.value = next.body;
+    titleInput.value = isUntitledTitle(next.title) ? '' : next.title; bodyInput.value = next.body;
     bodyInput.setSelectionRange(Math.min(start, next.body.length), Math.min(end, next.body.length)); bodyInput.scrollTop = scroll;
     renderCategoryOptions(); updatePreview(); recordHistory(); toast('別端末での変更を反映しました');
   }
@@ -324,7 +324,7 @@ function startRemoteSync() {
     const remote = snapshot.docs.map((item) => normalizeDraft(item.data(), { remote: true, id: item.id }));
     if (authoritative) { state.remoteReady = true; state.syncError = false; state.serverDrafts = remote; state.serverSnapshotCount++; }
     applyRemoteDrafts(remote.filter((draft) => !state.purgedIds.has(draft.id)), authoritative);
-    if (authoritative) { checkDraftPresence(); pumpSync(); }
+    if (authoritative) { checkDraftPresence(); pumpSync(); retireOldTemplateCategory(); }
   }, fail('drafts'));
   state.unsubscribeCategories = state.firebase.onSnapshot(categoriesRef(uid), { includeMetadataChanges: true }, (snapshot) => {
     if (!valid()) return;
@@ -339,7 +339,7 @@ function startRemoteSync() {
       state.categoriesDirty = JSON.stringify(mergeCategories(remote, state.categories)) !== JSON.stringify(remote);
     }
     persistLocal([]); renderCategoryOptions(); renderCategoryManageList(); renderList(); refreshSyncStatus(); updateMigrationPanel();
-    if (authoritative) void syncCategories();
+    if (authoritative) { void syncCategories(); retireOldTemplateCategory(); }
   }, fail('categories'));
 }
 function stopSession() {
@@ -413,9 +413,6 @@ function updateNoteStatusControls() {
   const selected = { category: categorySelect.value || null, categoryName: draft?.category === categorySelect.value ? draft.categoryName : '' };
   $('noteStatusField').hidden = !isNoteDraft(selected, state.categories);
   noteStatusSelect.value = draft?.noteStatus === 'published' ? 'published' : 'unpublished';
-  const template = isTemplateDraft(selected, state.categories);
-  $('templateButton').hidden = !template;
-  if (!template) closeTemplatePanel();
 }
 function renderCategoryManageList() {
   const categories = activeCategories();
@@ -626,7 +623,7 @@ function restoreHistory(index) {
 }
 function findTemplate(id) { return templateOptions().find((template) => template.id === id); }
 function closeTemplatePanel(focus = false) {
-  $('templatePanel').classList.add('hidden'); $('templateButton').setAttribute('aria-expanded', 'false'); state.pendingTemplateId = null;
+  $('templatePanel').classList.add('hidden'); $('templateButton').setAttribute('aria-expanded', 'false'); state.pendingTemplateId = null; state.templateStart = false;
   if (focus) $('templateButton').focus();
 }
 function renderTemplatePanel() {
@@ -635,19 +632,34 @@ function renderTemplatePanel() {
     panel.innerHTML = `<p class="template-message">本文に文字があります。「${escapeHtml(pending.label)}」のテンプレートを本文の末尾に追加しますか？</p><div class="template-actions"><button type="button" class="primary-button" data-template-append="${escapeHtml(pending.id)}">末尾に追加する</button><button type="button" class="secondary-button" data-template-cancel>やめる</button></div>`;
     return;
   }
-  panel.innerHTML = `<div class="template-head"><strong>テンプレートの種類を選ぶ</strong><button type="button" class="small-button" data-template-close>閉じる</button></div>`
-    + `<ul class="template-list">${templateOptions().map((template) => `<li><button type="button" class="template-choice" data-template-id="${escapeHtml(template.id)}">${escapeHtml(template.label)}</button></li>`).join('')}</ul>`;
+  const start = state.templateStart;
+  const choices = templateOptions().map((template) => `<li><button type="button" class="template-choice" data-template-id="${escapeHtml(template.id)}">ドラマ感想（${escapeHtml(template.label)}）</button></li>`).join('');
+  panel.innerHTML = `<div class="template-head"><strong>${start ? '書き方を選ぶ' : 'テンプレートを選ぶ'}</strong><button type="button" class="small-button" data-template-close>閉じる</button></div>`
+    + (start ? '<p class="template-message">テンプレートを選ぶとカテゴリは note用 になります。</p>' : '')
+    + `<ul class="template-list">${start ? '<li><button type="button" class="template-choice" data-template-blank>白紙</button></li>' : ''}${choices}</ul>`;
 }
 function openTemplatePanel() {
-  if (!state.user || state.view !== 'editor' || $('templateButton').hidden) return;
+  if (!state.user || state.view !== 'editor') return;
   const panel = $('templatePanel');
   if (!panel.classList.contains('hidden')) return closeTemplatePanel(true);
-  state.pendingTemplateId = null; renderTemplatePanel();
+  state.pendingTemplateId = null; state.templateStart = false; renderTemplatePanel();
   panel.classList.remove('hidden'); $('templateButton').setAttribute('aria-expanded', 'true');
+}
+function openStartPanel() {
+  const panel = $('templatePanel');
+  if (document.activeElement === bodyInput) bodyInput.blur();
+  updateTypingFocus(false);
+  state.pendingTemplateId = null; state.templateStart = true; renderTemplatePanel();
+  panel.classList.remove('hidden'); $('templateButton').setAttribute('aria-expanded', 'true');
+  panel.querySelector?.('[data-template-blank]')?.focus();
 }
 function insertTemplate(id) {
   const template = findTemplate(id); if (!template) return;
   finishComposition();
+  if (state.templateStart) {
+    const note = activeCategories().find((category) => category.name === 'note用');
+    if (note) { categorySelect.value = note.id; updateNoteStatusControls(); }
+  }
   const result = applyTemplateText(bodyInput.value, template.body);
   bodyInput.value = result.text; bodyInput.setSelectionRange(result.caret, result.caret); bodyInput.scrollTop = 0;
   updatePreview(); recordHistory(); scheduleSave(); closeTemplatePanel();
@@ -703,7 +715,7 @@ function loadDraft(id) {
   closeTemplatePanel();
   finishComposition();
   const draft = state.drafts.find((item) => item.id === id && !item.deletedAt); if (!draft) return;
-  state.currentId = state.editorDraftId = id; titleInput.value = draft.title === '無題の記事' ? '' : draft.title; bodyInput.value = draft.body;
+  state.currentId = state.editorDraftId = id; titleInput.value = isUntitledTitle(draft.title) ? '' : draft.title; bodyInput.value = draft.body;
   renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([]); showView('editor'); bodyInput.focus({ preventScroll: true });
 }
 function ensureStandardCategories(now = new Date().toISOString()) {
@@ -724,13 +736,28 @@ function newDraft() {
   const now = new Date().toISOString();
   ensureStandardCategories(now);
   const diary = activeCategories().find((category) => category.name === '日記');
-  const draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: '無題の記事', body: '', category: diary.id, categoryName: diary.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
+  const draft = editedDraft(normalizeDraft({ id: crypto.randomUUID(), title: UNTITLED_TITLE, body: '', category: diary.id, categoryName: diary.name, noteStatus: 'unpublished', createdAt: now, updatedAt: now }), {});
   state.drafts.unshift(draft); state.currentId = state.editorDraftId = draft.id; titleInput.value = bodyInput.value = '';
-  renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); titleInput.focus();
+  renderCategoryOptions(draft.category); updatePreview(); updateDraftTimestamps(draft); resetHistory(); persistLocal([draft.id]); refreshSyncStatus(); queueSave(draft.id); showView('editor'); openStartPanel();
+}
+/* 以前のカテゴリ「テンプレート」が残っていれば、サーバーの記事とカテゴリを読み終えてから一度だけ片付ける。 */
+function retireOldTemplateCategory() {
+  if (!migrationReady() || state.storageReadFailed || state.bulkAssigning || state.bulkPurging || state.composing) return;
+  if (!state.categories.some((category) => category.id === RETIRED_TEMPLATE_CATEGORY_ID && !category.deleted)) return;
+  ensureStandardCategories();
+  const note = activeCategories().find((category) => category.name === 'note用');
+  const result = retireTemplateCategory(state.drafts, state.categories, note); if (!result) return;
+  state.drafts = result.drafts; state.categories = result.categories;
+  if (state.currentId && result.changedIds.includes(state.currentId)) {
+    const draft = currentDraft();
+    if (draft && !draft.deletedAt) renderCategoryOptions(draft.category);
+    else if (state.view === 'editor') openJournalList();
+  }
+  if (state.categoryFilter !== 'all' && !['diary', 'note'].includes(state.categoryFilter)) state.categoryFilter = 'all';
+  persistLocal(result.changedIds); changedCategories(); for (const id of result.changedIds) queueSave(id);
 }
 function setListCategoryFilter(value) {
-  if (!['all', 'diary', 'note', 'template'].includes(value)) return;
-  if (value === 'template' && state.user && !state.showTrash) ensureStandardCategories();
+  if (!['all', 'diary', 'note'].includes(value)) return;
   state.listTagEditor = null;
   if (state.categoryFilter !== value) state.noteStatusFilter = 'all';
   state.categoryFilter = value; renderList();
@@ -743,7 +770,7 @@ function setListNoteFilter(value) {
 function renderListFilters() {
   $('listFilters').classList.toggle('hidden', state.showTrash);
   $('listNoteFilters').classList.toggle('hidden', state.categoryFilter !== 'note');
-  for (const [id, value] of [['filterAll', 'all'], ['filterDiary', 'diary'], ['filterNote', 'note'], ['filterTemplate', 'template']]) $(id).setAttribute('aria-pressed', String(state.categoryFilter === value));
+  for (const [id, value] of [['filterAll', 'all'], ['filterDiary', 'diary'], ['filterNote', 'note']]) $(id).setAttribute('aria-pressed', String(state.categoryFilter === value));
   for (const [id, value] of [['filterNoteAll', 'all'], ['filterUnpublished', 'unpublished'], ['filterPublished', 'published']]) $(id).setAttribute('aria-pressed', String(state.noteStatusFilter === value));
 }
 function draftTitleMarkup(draft) {
@@ -751,9 +778,9 @@ function draftTitleMarkup(draft) {
   return state.showTrash ? `<span class="draft-title">${title}</span>` : `<button class="draft-title draft-title-button" type="button" data-edit="${escapeHtml(draft.id)}" title="記事を編集">${title}</button>`;
 }
 function draftDisplayTitle(draft) {
-  const suffix = draft.title.match(/(?:（(?:競合コピー|復元)）)+$/u);
-  if (!suffix || suffix.index === 0) return { title: draft.title, labels: [] };
-  return { title: draft.title.slice(0, suffix.index), labels: [...new Set(Array.from(suffix[0].matchAll(/（(競合コピー|復元)）/gu), (match) => match[1]))] };
+  const title = displayTitle(draft.title), suffix = title.match(/(?:（(?:競合コピー|復元)）)+$/u);
+  if (!suffix || suffix.index === 0) return { title, labels: [] };
+  return { title: title.slice(0, suffix.index), labels: [...new Set(Array.from(suffix[0].matchAll(/（(競合コピー|復元)）/gu), (match) => match[1]))] };
 }
 function draftStateMarkup(draft) {
   return draftDisplayTitle(draft).labels.map((label) => `<span class="article-state-badge">${label}</span>`).join('');
@@ -791,7 +818,7 @@ function openListTagEditor(id, kind) {
   state.listTagEditor = { id, kind }; renderList(); $(listTagId(id, kind, 'select'))?.focus({ preventScroll: false });
 }
 function focusListTag(id, kind) {
-  const filter = state.categoryFilter === 'note' ? 'filterNote' : state.categoryFilter === 'diary' ? 'filterDiary' : state.categoryFilter === 'template' ? 'filterTemplate' : 'filterAll';
+  const filter = state.categoryFilter === 'note' ? 'filterNote' : state.categoryFilter === 'diary' ? 'filterDiary' : 'filterAll';
   (document.getElementById(listTagId(id, kind, 'trigger')) || $(filter))?.focus({ preventScroll: true });
 }
 function closeListTagEditor(focus = true) {
@@ -846,7 +873,7 @@ function requestPurge() {
   state.purgeTargets = state.drafts.filter((draft) => draft.deletedAt && state.selectedTrash.has(draft.id))
     .map(({ id, title, deletedAt, baseVersion }) => ({ id, title, deletedAt, baseVersion }));
   if (!state.purgeTargets.length) return;
-  $('purgeTitles').innerHTML = state.purgeTargets.map((draft) => `<li>${escapeHtml(draft.title)}</li>`).join('');
+  $('purgeTitles').innerHTML = state.purgeTargets.map((draft) => `<li>${escapeHtml(displayTitle(draft.title))}</li>`).join('');
   $('purgeConfirmButton').textContent = `${state.purgeTargets.length}件を完全削除する`;
   $('purgeConfirmation').classList.remove('hidden'); updateTrashControls(); $('purgeCancelButton').focus();
 }
@@ -893,7 +920,7 @@ function renderList() {
     .sort((a, b) => pinTime(b) - pinTime(a) || (Date.parse(b[sortField]) || 0) - (Date.parse(a[sortField]) || 0) || a.id.localeCompare(b.id));
   if (!state.showTrash && state.categoryFilter !== 'all') drafts = drafts.filter((draft) => categoryBadgeKind(draft) === state.categoryFilter);
   if (!state.showTrash && state.categoryFilter === 'note' && state.noteStatusFilter !== 'all') drafts = drafts.filter((draft) => draft.noteStatus === state.noteStatusFilter);
-  if (query) drafts = drafts.filter((draft) => [draft.title, draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
+  if (query) drafts = drafts.filter((draft) => [displayTitle(draft.title), draft.body, categoryName(draft.category, draft.categoryName), isNoteDraft(draft, state.categories) ? noteStatusLabel(draft) : ''].some((value) => value.toLowerCase().includes(query)));
   if (state.listTagEditor && !drafts.some((draft) => draft.id === state.listTagEditor.id && !draft.deletedAt && (state.listTagEditor.kind === 'category' || isNoteDraft(draft, state.categories)))) state.listTagEditor = null;
   state.visibleTrashIds = state.showTrash ? drafts.map((draft) => draft.id) : [];
   const trashCount = state.drafts.filter((draft) => draft.deletedAt).length;
@@ -1063,11 +1090,9 @@ $('templatePanel').addEventListener('click', (event) => {
   else if (button.dataset.templateAppend) insertTemplate(button.dataset.templateAppend);
   else if (button.hasAttribute('data-template-cancel')) { state.pendingTemplateId = null; renderTemplatePanel(); }
   else if (button.hasAttribute('data-template-close')) closeTemplatePanel(true);
+  else if (button.hasAttribute('data-template-blank')) { closeTemplatePanel(); titleInput.focus(); }
 });
-categorySelect.addEventListener('change', () => {
-  updateNoteStatusControls(); scheduleSave();
-  if (!$('templateButton').hidden && $('templatePanel').classList.contains('hidden')) openTemplatePanel();
-});
+categorySelect.addEventListener('change', () => { updateNoteStatusControls(); scheduleSave(); });
 noteStatusSelect.addEventListener('change', scheduleSave);
 $('editCreatedAtButton').addEventListener('click', openCreatedAtEditor);
 $('createdAtForm').addEventListener('submit', saveCreatedAt);

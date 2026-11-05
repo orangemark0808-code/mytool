@@ -42,7 +42,7 @@ function matchesRemoteVersion(draft, baseVersion) {
 export function normalizeDraft(raw, { remote = false, id = raw?.id } = {}) {
   const draft = {
     id: String(id || crypto.randomUUID()),
-    title: typeof raw?.title === 'string' ? raw.title : '無題の記事',
+    title: typeof raw?.title === 'string' ? raw.title : UNTITLED_TITLE,
     body: typeof raw?.body === 'string' ? raw.body : '',
     category: typeof raw?.category === 'string' && raw.category ? raw.category : null,
     categoryName: typeof raw?.categoryName === 'string' ? raw.categoryName : '',
@@ -102,9 +102,15 @@ export function recoveryCopy(draft, suffix = '競合コピー', id = crypto.rand
   }, now);
 }
 function recoveryTitle(title, suffix) {
-  const base = (title || '無題の記事').replace(/(?:（(?:競合コピー|復元)）)+$/u, '');
-  return `${base || '無題の記事'}（${suffix}）`;
+  const base = (title || UNTITLED_TITLE).replace(/(?:（(?:競合コピー|復元)）)+$/u, '');
+  return `${base || UNTITLED_TITLE}（${suffix}）`;
 }
+
+/* 題名なしの記事。以前の「無題の記事」も題名なしとして扱い、表示は Non Title にそろえる。 */
+export const UNTITLED_TITLE = 'Non Title';
+const LEGACY_UNTITLED_TITLE = '無題の記事';
+export function isUntitledTitle(title) { return title === UNTITLED_TITLE || title === LEGACY_UNTITLED_TITLE; }
+export function displayTitle(title) { return title === LEGACY_UNTITLED_TITLE || title.startsWith(`${LEGACY_UNTITLED_TITLE}（`) ? UNTITLED_TITLE + title.slice(LEGACY_UNTITLED_TITLE.length) : title; }
 
 // All reads precede writes, and retries reuse the same copy ID. A stale client
 // must never overwrite a newer server revision or resurrect a deleted article.
@@ -199,18 +205,13 @@ export function defaultCategories() {
   ];
 }
 
-export const TEMPLATE_CATEGORY_NAME = 'テンプレート';
-export const FIXED_CATEGORY_NAMES = ['日記', 'note用', TEMPLATE_CATEGORY_NAME];
-
-export function templateCategory() {
-  return { id: 'journal-template', name: TEMPLATE_CATEGORY_NAME, order: 2, updatedAt: '2026-01-01T00:00:00.000Z', deleted: false };
-}
+export const FIXED_CATEGORY_NAMES = ['日記', 'note用'];
 
 export function standardCategories() {
-  return [...defaultCategories(), templateCategory()];
+  return defaultCategories();
 }
 
-/* カテゴリ「テンプレート」で選べるテンプレートの種類。 */
+/* 書き始めに選べるテンプレート。 */
 export function templateOptions() {
   return [
     { id: 'drama-no-spoiler', label: 'ネタバレなし', body: "【ドラマ感想】作品名｜共感を呼ぶ一言キャッチコピー\n\n作品名／配信先／全◯話／ジャンル\nおすすめ度：★★★★☆\n\n### 観る前の私\n**観ようと思ったきっかけ**\n（なんとなく、話題だったから、疲れていたから、など）\n\n### あらすじ（ネタバレなし）\n（導入部分まで。3〜4行）\n\n### 私の感想\n**いちばん心が動いたところ**\n（どの場面で、どう感じたか）\n\n**自分の経験と重なったところ**\n（「私もこういうことあった」を一言でも入れる）\n\n**ここがちょっと気になった**\n（正直な気持ち。軽めでOK）\n\n### 一言ツッコミ\n- 「◯◯、そこは気づけよ！」\n- 「◯◯、絶対あとで伏線になるやつ」\n- 「◯◯、さすがに強すぎん？」\n\n### こんな人に刺さると思う\n- ◯◯な気持ちになったことがある人\n- ◯◯な夜に観たい人\n\n### 最後に\n（余韻の一言＋読者への問いかけ）\n「みなさんはどう感じましたか？ よかったらコメントで教えてください」" },
@@ -218,9 +219,23 @@ export function templateOptions() {
   ];
 }
 
-export function isTemplateDraft(draft, categories) {
-  if (!draft?.category) return false;
-  return (categories.find((category) => category.id === draft.category)?.name || draft.categoryName) === TEMPLATE_CATEGORY_NAME;
+/* 以前あったカテゴリ「テンプレート」を片付ける。
+   記事は note用 へ移し、自動で作られたまま手つかずのテンプレート記事はごみ箱へ入れる（復元できる）。 */
+export const RETIRED_TEMPLATE_CATEGORY_ID = 'journal-template';
+const RETIRED_SEED_TEMPLATES = { 'template-seed-no-spoiler': 'drama-no-spoiler', 'template-seed-spoiler': 'drama-spoiler' };
+export function retireTemplateCategory(drafts, categories, noteCategory, now = new Date().toISOString()) {
+  const retired = categories.find((category) => category.id === RETIRED_TEMPLATE_CATEGORY_ID && !category.deleted);
+  if (!retired || !noteCategory) return null;
+  const changedIds = [];
+  const nextDrafts = drafts.map((draft) => {
+    if (draft.category !== retired.id) return draft;
+    changedIds.push(draft.id);
+    const seed = templateOptions().find((template) => template.id === RETIRED_SEED_TEMPLATES[draft.id]);
+    const untouched = seed && draft.body === seed.body;
+    return editedDraft(draft, { category: noteCategory.id, categoryName: noteCategory.name, noteStatus: draft.noteStatus === 'published' ? 'published' : 'unpublished', ...(untouched && !draft.deletedAt ? { deletedAt: now } : {}) }, now);
+  });
+  const nextCategories = categories.map((category) => category === retired ? { ...category, deleted: true, updatedAt: now } : category);
+  return { drafts: nextDrafts, categories: nextCategories, changedIds };
 }
 
 /* テンプレートを本文へ入れる。本文が空なら置き換え、あれば末尾に追加する。 */
@@ -232,7 +247,7 @@ export function applyTemplateText(body, template) {
 }
 
 export function orderedCategories(records) {
-  const priority = (category) => category.name === '日記' ? 0 : category.name === 'note用' ? 1 : category.name === TEMPLATE_CATEGORY_NAME ? 2 : 3;
+  const priority = (category) => category.name === '日記' ? 0 : category.name === 'note用' ? 1 : 2;
   return records.filter((category) => !category.deleted).sort((a, b) => priority(a) - priority(b) || a.order - b.order || a.id.localeCompare(b.id));
 }
 
