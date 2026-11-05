@@ -366,18 +366,18 @@ test('older offline baselines save without creating a false conflict after upgra
   assert.equal(fs.data.get(original.id).body, local.body);
 });
 
-test('template category is standard, ordered after note, and offers spoiler / no-spoiler templates', () => {
-  const names = core.standardCategories().map((category) => category.name);
-  assert.deepEqual(names, ['日記', 'note用', 'テンプレート']);
-  assert.deepEqual(core.defaultCategories().map((category) => category.name), ['日記', 'note用']);
-  const ordered = core.orderedCategories([{ id: 'x', name: '自作', order: 0 }, core.templateCategory(), ...core.defaultCategories()]);
-  assert.deepEqual(ordered.map((category) => category.name), ['日記', 'note用', 'テンプレート', '自作']);
+test('standard categories are 日記 and note用, and two drama templates are offered', () => {
+  assert.deepEqual(core.standardCategories().map((category) => category.name), ['日記', 'note用']);
+  assert.deepEqual(core.FIXED_CATEGORY_NAMES, ['日記', 'note用']);
   const seeds = core.templateOptions();
   assert.deepEqual(seeds.map((seed) => seed.label), ['ネタバレなし', 'ネタバレあり']);
-  assert.equal(new Set(seeds.map((seed) => seed.id)).size, 2);
   assert.ok(seeds[0].body.includes('観る前の私') && !seeds[0].body.includes('ネタバレを含みます'));
   assert.ok(seeds[1].body.startsWith('【ネタバレあり】') && seeds[1].body.includes('ネタバレを含みます'));
   assert.ok(seeds.every((seed) => seed.body.includes('作品名／配信先／全◯話／ジャンル') && seed.body.includes('おすすめ度')));
+});
+
+test('retiring the old template category returns null when there is nothing to do', () => {
+  assert.equal(core.retireTemplateCategory([], core.defaultCategories(), core.defaultCategories()[1]), null);
 });
 
 test('applying a template replaces an empty body and appends to an existing one', () => {
@@ -386,8 +386,6 @@ test('applying a template replaces an empty body and appends to an existing one'
   assert.deepEqual(core.applyTemplateText('abc', 'T'), { text: 'abc\n\nT', caret: 5, appended: true });
   assert.deepEqual(core.applyTemplateText('abc\n', 'T'), { text: 'abc\n\nT', caret: 5, appended: true });
   assert.deepEqual(core.applyTemplateText('abc\n\n', 'T'), { text: 'abc\n\nT', caret: 5, appended: true });
-  assert.equal(core.isTemplateDraft({ category: 'journal-template' }, [core.templateCategory()]), true);
-  assert.equal(core.isTemplateDraft({ category: 'journal-diary' }, core.standardCategories()), false);
 });
 
 test('untitled articles are shown as Non Title, including older 無題の記事 data', () => {
