@@ -835,3 +835,10 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); o
 .journal-image.failed figcaption { justify-content: flex-start; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; }
 .journal-image.failed [data-save-image] { display: none; }
 .journal-image [data-save-image] { min-height: 36px; }
+
+/* v2026-11-06-1：タイプライター表示。本文の後ろに余白（--typewriter-tail）を足し、最後の行も枠の上の方まで上げられるようにする。 */
+.editor-stack textarea { padding-bottom: calc(var(--editor-padding) + var(--typewriter-tail, 0px)); }
+@media (max-width: 700px) {
+  .compact-editor .editor-stack textarea { padding-bottom: calc(var(--mobile-bar-height, 80px) + 24px + var(--typewriter-tail, 0px)); }
+  .compact-editor.editor-typing .editor-stack textarea { padding-bottom: calc(16px + var(--typewriter-tail, 0px)); }
+}
