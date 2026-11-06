@@ -1,7 +1,7 @@
-import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, retireTemplateCategory, RETIRED_TEMPLATE_CATEGORY_ID, applyTemplateText, IMAGE_DOC_PREFIX, IMAGE_MAX_SIDE, IMAGE_MAX_DATA_LENGTH, imageMarkdown, imageInsertion, replaceImageLines, FIXED_CATEGORY_NAMES, orderedCategories, isNoteDraft, BOOKS, BOOK_LABELS, BOOK_CATEGORY_NAMES, categoryBook, isBookCategory, draftBook, draftSubcategory, bookSubcategories, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown, UNTITLED_TITLE, isUntitledTitle, displayTitle } from './editor-core.mjs?v=2026-11-05-6';
-import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-05-6';
+import { SCHEMA_VERSION, LEGACY_KEYS, storageKey, normalizeDraft, remoteVersion, contentKey, editedDraft, reconcileDrafts, applyWriteResult, writeDraftTransaction, assignUncategorizedToDiary, permanentlyDeleteDraft, defaultCategories, standardCategories, templateOptions, retireTemplateCategory, RETIRED_TEMPLATE_CATEGORY_ID, applyTemplateText, IMAGE_DOC_PREFIX, IMAGE_MAX_SIDE, IMAGE_MAX_DATA_LENGTH, imageMarkdown, imageInsertion, replaceImageLines, FIXED_CATEGORY_NAMES, orderedCategories, isNoteDraft, BOOKS, BOOK_LABELS, BOOK_CATEGORY_NAMES, categoryBook, isBookCategory, draftBook, draftSubcategory, bookSubcategories, normalizeCategories, mergeCategories, planLegacyImport, blockEdit, enterEdit, exportMarkdown, UNTITLED_TITLE, isUntitledTitle, displayTitle } from './editor-core.mjs?v=2026-11-06-1';
+import { escapeHtml, markdownToHtml } from './markdown.mjs?v=2026-11-06-1';
 
-const VERSION = '2026-11-05-6';
+const VERSION = '2026-11-06-1';
 const VIEW_KEY = 'orangemania-blog-editor-view-v1';
 const SORT_KEY = 'orangemania-journal-list-sort-v1';
 const COMPACT_EDITOR_QUERY = '(max-width: 700px)';
@@ -319,7 +319,9 @@ async function verifyDraftPresence(id) {
 function finishComposition() {
   if (!state.composing) return;
   // Capture the final value before releasing remote results or changing IDs.
+  const composedBody = state.composingInput === bodyInput;
   scheduleSave(); state.composing = false; state.composingInput = null;
+  if (composedBody) scheduleTypewriter();
   updatePreview(); recordHistory();
   const deferred = state.deferredDrafts; state.deferredDrafts = null;
   if (deferred) applyRemoteDrafts(deferred.drafts, true, deferred.id);
@@ -798,7 +800,7 @@ function chooseTemplate(id) {
   if (bodyInput.value.trim()) { state.pendingTemplateId = id; renderTemplatePanel(); $('templatePanel').querySelector?.('[data-template-append]')?.focus(); return; }
   insertTemplate(id);
 }
-function applyEdit(text, start = bodyInput.selectionStart, end = bodyInput.selectionEnd) { bodyInput.setRangeText(text, start, end, 'end'); bodyInput.focus({ preventScroll: true }); updatePreview(); recordHistory(); scheduleSave(); }
+function applyEdit(text, start = bodyInput.selectionStart, end = bodyInput.selectionEnd) { bodyInput.setRangeText(text, start, end, 'end'); bodyInput.focus({ preventScroll: true }); updatePreview(); recordHistory(); scheduleSave(); scheduleTypewriter(); }
 function toolbar(action) {
   if (action === 'image') { $('imageFileInput').click(); return; }
   if (state.composing) return;
@@ -1188,6 +1190,47 @@ function updateTypingFocus(typing) {
   document.body.classList.toggle('editor-typing', Boolean(typing && state.user && state.view === 'editor' && state.mode !== 'preview' && compact));
   updateToolbarViewport();
 }
+// タイプライター表示：入力中の行が見えている枠の下の方に来たら、上から約4割の高さまで本文を送る。
+const TYPEWRITER_LINE = 0.4;
+let typewriterFrame = 0, caretMeasure = null;
+function updateTypewriterTail() {
+  const tail = Math.round(bodyInput.clientHeight * (1 - TYPEWRITER_LINE) - 40);
+  bodyInput.style.setProperty('--typewriter-tail', `${Math.max(0, tail)}px`);
+}
+function caretTop() {
+  // textareaと同じ文字組みの見えない要素にカーソル前までの本文を入れ、カーソルの高さを測る。
+  if (!caretMeasure) { caretMeasure = document.createElement('div'); caretMeasure.setAttribute('aria-hidden', 'true'); document.body.append(caretMeasure); }
+  const style = getComputedStyle(bodyInput);
+  caretMeasure.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;height:auto;overflow:hidden;box-sizing:border-box;border:0;';
+  for (const name of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'whiteSpace', 'overflowWrap', 'wordBreak', 'tabSize', 'paddingTop', 'paddingLeft', 'paddingRight']) caretMeasure.style[name] = style[name];
+  caretMeasure.style.width = `${bodyInput.clientWidth}px`;
+  caretMeasure.textContent = bodyInput.value.slice(0, bodyInput.selectionEnd);
+  const marker = document.createElement('span'); marker.textContent = '\u200b'; caretMeasure.append(marker);
+  return marker.offsetTop;
+}
+function keepCaretInView() {
+  typewriterFrame = 0;
+  if (document.activeElement !== bodyInput || state.composing || bodyInput.selectionStart !== bodyInput.selectionEnd) return;
+  updateTypewriterTail();
+  // キーボードやツールバーで隠れている部分を除いた、実際に見えている範囲で位置を決める。
+  const rect = bodyInput.getBoundingClientRect(), viewport = window.visualViewport;
+  let viewTop = Math.max(rect.top, viewport ? viewport.offsetTop : 0);
+  let viewBottom = Math.min(rect.bottom, viewport ? viewport.offsetTop + viewport.height : window.innerHeight);
+  const bar = document.querySelector('.editor-pane > .toolbar-wrap');
+  // 上に貼り付くツールバー（PC・iPad）と下に固定されたツールバー（スマホ）が重なる分を除く。
+  if (bar && ['fixed', 'sticky'].includes(getComputedStyle(bar).position)) {
+    const barRect = bar.getBoundingClientRect();
+    if (barRect.bottom > viewTop && barRect.top < viewBottom) {
+      if (barRect.top + barRect.bottom < viewTop + viewBottom) viewTop = Math.max(viewTop, barRect.bottom);
+      else viewBottom = Math.min(viewBottom, barRect.top);
+    }
+  }
+  if (viewBottom - viewTop < 60) return;
+  const caretOnScreen = rect.top + caretTop() - bodyInput.scrollTop;
+  const target = viewTop + (viewBottom - viewTop) * TYPEWRITER_LINE;
+  if (caretOnScreen > target) bodyInput.scrollTop += Math.round(caretOnScreen - target);
+}
+function scheduleTypewriter() { if (!typewriterFrame && typeof requestAnimationFrame === 'function') typewriterFrame = requestAnimationFrame(keepCaretInView); }
 function updateToolbarViewport() {
   const viewport = window.visualViewport, gap = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
   document.documentElement.style.setProperty('--keyboard-gap', `${gap}px`);
@@ -1206,10 +1249,11 @@ function onBodyKeydown(event) {
 function init() {
   document.body.dataset.appVersion = VERSION; $('appVersion').textContent = `v${VERSION}`;
   try { state.mode = localStorage.getItem(VIEW_KEY) || 'edit'; } catch {}
-  setEditorMode(state.mode, false); resetHistory(); updateToolbarVisibility(); refreshSyncStatus(); void setupFirebase();
+  setEditorMode(state.mode, false); resetHistory(); updateToolbarVisibility(); updateTypewriterTail(); refreshSyncStatus(); void setupFirebase();
 }
 titleInput.addEventListener('input', scheduleSave);
-bodyInput.addEventListener('input', () => { updatePreview(); if (!state.composing) recordHistory(); scheduleSave(); });
+bodyInput.addEventListener('input', () => { updatePreview(); if (!state.composing) recordHistory(); scheduleSave(); scheduleTypewriter(); });
+window.addEventListener('resize', updateTypewriterTail);
 for (const input of [titleInput, bodyInput]) {
   input.addEventListener('compositionstart', () => { state.composing = true; state.composingInput = input; });
   input.addEventListener('compositionend', finishComposition);
@@ -1222,7 +1266,7 @@ bodyInput.addEventListener('dragover', (event) => { if (Array.from(event.dataTra
 bodyInput.addEventListener('drop', (event) => { if (hasImageFiles(event.dataTransfer)) { event.preventDefault(); void addImages(event.dataTransfer.files); } });
 $('imageFileInput').addEventListener('change', (event) => { const files = Array.from(event.target.files || []); event.target.value = ''; void addImages(files); });
 $('preview').addEventListener('click', (event) => { const button = event.target.closest?.('[data-save-image]'); if (button) void saveImage(button.dataset.saveImage); });
-bodyInput.addEventListener('focus', () => updateTypingFocus(true));
+bodyInput.addEventListener('focus', () => { updateTypingFocus(true); updateTypewriterTail(); });
 $('finishInputButton').addEventListener('click', () => { finishComposition(); bodyInput.blur(); updateTypingFocus(false); });
 $('listSortSelect').addEventListener('change', (event) => changeListSort(event.target.value));
 const toolbarWrap = document.querySelector('.toolbar-wrap');
