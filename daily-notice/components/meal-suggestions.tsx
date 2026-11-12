@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useMemo,useState} from 'react';
-import {CookingPot,RefreshCw,Shuffle} from 'lucide-react';
+import {RefreshCw,Shuffle} from 'lucide-react';
 import {useFoodRefresh} from '@/hooks/use-food-refresh';
 import {makeMeals,foodKind,BASIC_SEASONINGS} from '@/lib/meal-plan.mjs';
 import {COOKING_TOOLS,normalizeMealTool,REDE_MANUAL} from '@/lib/meal-tools.mjs';
@@ -22,7 +22,7 @@ export function MealSuggestions({today,externalFood}:{today:string;externalFood?
   const excluded=food.stock?.items.filter(item=>item.expiryDate&&item.expiryDate<today).length||0;
   const fetched=food.stock?new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(food.stock.fetchedAt)):'';
   return <section className="panel meal-panel" id="meals" aria-labelledby="meals-title">
-    <div className="panel-title"><h2 className="section-label" id="meals-title"><CookingPot className="card-icon" size={18} color="currentColor" strokeWidth={2} aria-hidden="true"/><span>今日のメニュー<small>MENU</small></span></h2><div className="task-source-actions"><a className="source-label" href={SOURCE} target="_blank" rel="noopener noreferrer">食材リスト ↗</a><button className="task-refresh-button" type="button" disabled={food.busy} aria-label="イロイロキロクから食材と調味料を更新" aria-busy={food.busy} onClick={()=>void food.refresh()}><RefreshCw size={13} aria-hidden="true"/>{food.busy?'更新中…':'更新'}</button></div></div>
+    <div className="panel-title"><h2 className="section-label" id="meals-title"><span>今日のメニュー</span></h2><div className="task-source-actions"><a className="source-label" href={SOURCE} target="_blank" rel="noopener noreferrer">食材リスト ↗</a><button className="task-refresh-button" type="button" disabled={food.busy} aria-label="イロイロキロクから食材と調味料を更新" aria-busy={food.busy} onClick={()=>void food.refresh()}><RefreshCw size={13} aria-hidden="true"/>{food.busy?'更新中…':'更新'}</button></div></div>
     <div className="meal-intro"><h3>家にある食材で、今日のメニュー</h3><p className="muted">肉・魚は1項目を1回分として使用。野菜は必要な分だけ使います。</p></div>
     <fieldset className="meal-tool-picker" aria-describedby="meal-tool-help"><legend>今日は、どの器具で作りますか？</legend><div className="meal-tool-options">{COOKING_TOOLS.map(value=><label key={value.id} className={tool===value.id?'selected':''}><input type="radio" name="meal-tool" value={value.id} checked={tool===value.id} disabled={ai.busy} onChange={()=>selectTool(value.id)}/><span>{value.label}</span></label>)}</div><p id="meal-tool-help">{selected.description}</p></fieldset>
     {tool==='rede'&&<p className="meal-help">肉・魚はgで登録された500g以下の1回分が対象です。卵は、せいろかフライパンで提案します。<a href={REDE_MANUAL} target="_blank" rel="noopener noreferrer">PCH-20Lの公式説明書 ↗</a></p>}
