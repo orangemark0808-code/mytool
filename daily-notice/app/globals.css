@@ -341,3 +341,30 @@ button,.save-button{border-radius:var(--radius)}
 .meal-time{background:#e9f1e5;color:#4c6047}
 .meal-reason,.meal-recipe summary{color:#a35216}
 .meal-help a{color:#3c6834}
+
+/* Match the iroiro look: flat white cards with a soft shadow, no top rules, one orange accent, pastel dots for the sections. */
+:root{--orange-dark:#c95e10;--orange-soft:#fff1e7}
+#schedule{--dot:#8fb8e8}#tasks{--dot:#f5a35c}#memo{--dot:#c4a3e0}#meals{--dot:#9ccc8a}
+.panel{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 8px #4a2c1707}
+.panel-title,.memo-panel .panel-title{border-bottom:1px solid var(--line)}
+.panel .section-label,.panel.memo-panel h2{color:var(--ink)}
+.panel .section-label::before,.panel.memo-panel h2::before{content:"";flex:0 0 10px;width:10px;height:10px;border-radius:50%;background:var(--dot);border:1px solid #0000001a}
+.site-header nav a,.site-header nav a[href]{background:none;color:var(--muted);border-radius:9px}
+.site-header nav a:hover{background:#f4f1ee;color:var(--ink)}
+.site-header nav a[aria-current]{background:var(--orange-soft);color:var(--orange-dark);font-weight:700}
+.site-header nav a[aria-current]::after{display:none}
+.upcoming-list time::before{background:transparent}
+.upcoming-list article{grid-template-columns:48px minmax(0,1fr)}
+.upcoming-list time{padding-left:0;color:var(--orange-dark)}
+.source-label a>span{color:var(--orange-dark)}
+.task summary::before{border-color:var(--orange-dark)}
+.task-check{border-color:var(--orange-dark);color:var(--orange-dark)}
+.sky-item+.sky-item::before{background:var(--line)}
+.meal-card,.meal-tool-picker,.server-link-settings{background:#fff;border-color:var(--line);box-shadow:none}
+.meal-tool-options label.selected,.ai-meal-views button[aria-pressed=true]{background:var(--orange-soft);border-color:#f2ae7b;color:var(--orange-dark)}
+.meal-tool-options input{accent-color:var(--orange)}
+.meal-tool-options label:focus-within{outline-color:var(--orange)}
+.ai-meal-generate{background:var(--orange);border-color:var(--orange);color:#382000}
+.ai-meal-generate:hover:enabled{background:#ff943e;border-color:#ff943e;color:#382000}
+.meal-time{background:#f4f1ee;color:var(--muted)}
+.meal-reason,.meal-recipe summary,.meal-help a{color:var(--orange-dark)}
