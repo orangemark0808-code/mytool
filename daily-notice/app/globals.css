@@ -313,3 +313,31 @@ button,.save-button{border-radius:var(--radius)}
 .meal-tool-picker p,.meal-time,.meal-water{color:var(--muted)}
 .meal-reason,.meal-recipe summary,.meal-more,.meal-connect{color:var(--ink)}
 .meal-more,.meal-connect{border-color:var(--line)}
+
+/* Soft color: each section keeps its own hue as a light tint, a colored top rule and colored heading text. No bands, side bars, icons or English labels. */
+#schedule,.site-header nav a[href="#schedule"]{--section-tint:#f6f9fd;--section-band:#e3eefb;--section-accent:#2f5f90;--section-border:#c9dbee}
+#tasks,.site-header nav a[href="#tasks"]{--section-tint:#fffaf2;--section-band:#ffecd5;--section-accent:#a85a10;--section-border:#f0d9bb}
+#meals,.site-header nav a[href="#meals"]{--section-tint:#f6faf4;--section-band:#e2efdc;--section-accent:#3c6834;--section-border:#cfe0c9}
+#memo,.site-header nav a[href="#memo"]{--section-tint:#faf6fd;--section-band:#ece1f6;--section-accent:#70508b;--section-border:#ddd0e8}
+.panel{background:var(--section-tint);border-color:var(--section-border);border-top:3px solid var(--section-accent)}
+.panel-title,.memo-panel .panel-title{border-bottom:1px solid var(--section-border)}
+.panel .section-label,.panel.memo-panel h2{color:var(--section-accent)}
+.site-header nav a{color:var(--section-accent);background:var(--section-tint);border-radius:var(--radius)}
+.site-header nav a:hover,.site-header nav a[aria-current]{color:var(--section-accent);background:var(--section-band);border-radius:var(--radius)}
+.site-header nav a[aria-current]::after{background:var(--section-accent);left:8px;right:8px}
+.day>.date-pill{background:var(--orange);color:#fff}
+.counts .has-tasks strong{color:var(--orange)}
+.sky-item+.sky-item::before{background:#e6c9a6}
+.upcoming-list time::before{background:var(--section-accent)}
+.task summary::before{border-color:var(--section-accent)}
+.task-check{border-color:var(--section-accent);color:var(--section-accent)}
+.upcoming-list time,.source-label a>span{color:var(--section-accent)}
+.meal-card,.meal-tool-picker,.server-link-settings{background:#fff;border-color:var(--section-border)}
+.meal-tool-options label.selected,.ai-meal-views button[aria-pressed=true]{background:#e2efdc;border-color:#3c6834;color:#305528}
+.meal-tool-options input{accent-color:#3c6834}
+.meal-tool-options label:focus-within{outline-color:#3c6834}
+.ai-meal-generate{background:#3c6834;border-color:#3c6834;color:#fff}
+.ai-meal-generate:hover:enabled{background:#31582a;border-color:#31582a;color:#fff}
+.meal-time{background:#e9f1e5;color:#4c6047}
+.meal-reason,.meal-recipe summary{color:#a35216}
+.meal-help a{color:#3c6834}
