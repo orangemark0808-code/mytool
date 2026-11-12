@@ -180,7 +180,7 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
 
   return <div className="board">
     <header className="site-header">
-      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-11-12-03">2026-11-12-03</span></div>
+      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-11-12-04">2026-11-12-04</span></div>
       <MoonWidget sky={sky} />
       <div className="header-tools"><nav aria-label="表示する項目">{[["schedule", "予定"], ["tasks", "タスク"], ["memo", "メモ"], ["meals", "メニュー"]].map(([id, label]) => <a key={id} href={`#${id}`} aria-current={activeNav === id ? "location" : undefined} onClick={() => setActiveNav(id)}>{label}</a>)}</nav>
         <div className="fetch-meta" aria-label="最終更新日時（日本時間）" title="最終更新日時（日本時間）">
