@@ -88,9 +88,9 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
     let frame = 0;
     const update = () => {
       frame = 0;
-      const sections = ["schedule", "tasks", "meals", "memo"].map(id => ({ id, top: document.getElementById(id)?.getBoundingClientRect().top ?? Infinity }));
+      const sections = ["schedule", "tasks", "memo", "meals"].map(id => ({ id, top: document.getElementById(id)?.getBoundingClientRect().top ?? Infinity }));
       if (window.scrollY > 0 && window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) {
-        setActiveNav("memo");
+        setActiveNav("meals");
         return;
       }
       const passed = sections.filter(section => section.top <= window.innerHeight * .3);
@@ -180,9 +180,9 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
 
   return <div className="board">
     <header className="site-header">
-      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-11-12-01">2026-11-12-01</span></div>
+      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-11-12-03">2026-11-12-03</span></div>
       <MoonWidget sky={sky} />
-      <div className="header-tools"><nav aria-label="表示する項目">{[["schedule", "予定"], ["tasks", "タスク"], ["meals", "メニュー"], ["memo", "メモ"]].map(([id, label]) => <a key={id} href={`#${id}`} aria-current={activeNav === id ? "location" : undefined} onClick={() => setActiveNav(id)}>{label}</a>)}</nav>
+      <div className="header-tools"><nav aria-label="表示する項目">{[["schedule", "予定"], ["tasks", "タスク"], ["memo", "メモ"], ["meals", "メニュー"]].map(([id, label]) => <a key={id} href={`#${id}`} aria-current={activeNav === id ? "location" : undefined} onClick={() => setActiveNav(id)}>{label}</a>)}</nav>
         <div className="fetch-meta" aria-label="最終更新日時（日本時間）" title="最終更新日時（日本時間）">
           <span className="fetch-meta-heading">最終更新</span>
           <dl>{([["予定", snapshot.calendar.lastSuccessAt], ["タスク", snapshot.tasks.lastSuccessAt]] as const).map(([label, value]) =>
@@ -234,7 +234,6 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
             }) : <p className="empty">{snapshot.tasks.lastSuccessAt ? "未完了のタスクはありません。" : "タスクは未取得です。"}</p>}
           </div>
         </section>
-        <MealSuggestions today={today} externalFood={serverLinkMode.enabled?{stock:serverLink.stock,busy:serverLink.busy,error:serverLink.error||(serverLink.needsConnection?"サーバー接続を確認してください。":""),authNeeded:serverLink.needsConnection,manualMode:false,refresh:serverLink.refresh,connect:async()=>{setShowServerSetup(true);return false;}}:undefined}/>
         <section className="panel memo-panel" id="memo" aria-labelledby="memo-title">
           <div className="panel-title"><div className="memo-heading"><h2 id="memo-title"><span>メモ</span></h2><span className="memo-state" role="status" aria-live="polite">{saving ? "保存中…" : dirty ? "未保存の変更があります" : memo ? "保存済み" : "読込中…"}</span></div><div className="memo-actions">{(dirty || saving) && <button className="save-button" type="button" disabled={!memo || !dirty || saving || loadingMemo} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button>}</div></div>
           <label className="sr-only" htmlFor="memo-input">Memoの内容</label>
@@ -245,6 +244,7 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
           <p className="memo-help" id="memo-help">直接入力して編集できます</p>
           <div className="memo-bottom"><span>{memo ? `保存 ${stamp(memo.updatedAt)} · ${text.length.toLocaleString()} / 20,000文字` : ""}</span><button className="text-button" type="button" disabled={saving || loadingMemo} onClick={() => void checkSaved()}>{loadingMemo ? "確認中…" : memo ? "最新の保存内容を確認" : "読み込みを再試行"}</button></div>
         </section>
+        <MealSuggestions today={today} externalFood={serverLinkMode.enabled?{stock:serverLink.stock,busy:serverLink.busy,error:serverLink.error||(serverLink.needsConnection?"サーバー接続を確認してください。":""),authNeeded:serverLink.needsConnection,manualMode:false,refresh:serverLink.refresh,connect:async()=>{setShowServerSetup(true);return false;}}:undefined}/>
 
       </div>
       <footer className="site-footer"><span>予定・タスクは最終取得時点の情報です。</span></footer>
