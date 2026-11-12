@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { clientRequest } from "@/lib/client-api";
-import { Calendar, SquareCheck, PenLine, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import type { TaskAddition } from "@/hooks/use-task-refresh";
 import { useTaskRefresh } from "@/hooks/use-task-refresh";
 import { useServerLink, type ServerLinkMode } from "@/hooks/use-server-link";
@@ -180,7 +180,7 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
 
   return <div className="board">
     <header className="site-header">
-      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-11-01-02">2026-11-01-02</span></div>
+      <div className="title-lockup"><a className="wordmark" href={import.meta.env.BASE_URL} onClick={event => { if (dirty && !window.confirm("未保存のメモがあります。ページを読み込み直しますか？")) event.preventDefault(); }}><h1>今日のお知らせ</h1></a><span className="badge" aria-label="バージョン 2026-11-12-01">2026-11-12-01</span></div>
       <MoonWidget sky={sky} />
       <div className="header-tools"><nav aria-label="表示する項目">{[["schedule", "予定"], ["tasks", "タスク"], ["meals", "メニュー"], ["memo", "メモ"]].map(([id, label]) => <a key={id} href={`#${id}`} aria-current={activeNav === id ? "location" : undefined} onClick={() => setActiveNav(id)}>{label}</a>)}</nav>
         <div className="fetch-meta" aria-label="最終更新日時（日本時間）" title="最終更新日時（日本時間）">
@@ -201,7 +201,7 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
       {snapshotError && <p className="notice" role="status">{snapshotError} 前回の取得内容を表示しています。</p>}
       <div className="daily-grid">
         <section className="panel" id="schedule" aria-labelledby="schedule-title">
-          <div className="panel-title"><h2 className="section-label" id="schedule-title"><Calendar className="card-icon" size={18} color="currentColor" strokeWidth={2} fill="none" aria-hidden="true" focusable="false" /><span>今日の予定<small>TODAY</small></span></h2><span className="source-label"><ExternalLink href={CALENDAR}>Google Calendar</ExternalLink></span></div>
+          <div className="panel-title"><h2 className="section-label" id="schedule-title"><span>今日の予定</span></h2><span className="source-label"><ExternalLink href={CALENDAR}>Google Calendar</ExternalLink></span></div>
           {(calendarOld || snapshot.calendar.error) && <p className="notice">{calendarDay}取得分です。最新の予定はカレンダーで確認してください。</p>}
           <div className="schedule-list">
             {events.length ? events.map((event, index) => <article className="event-row" key={`${event.id}-${index}`}><time>{event.allDay ? "終日" : eventDay(event) < calendarDay ? "継続" : clock(event.start)}</time><div><h3><ExternalLink href={event.url}>{event.title}</ExternalLink></h3><p className="muted">{eventTime(event, calendarDay)}</p></div></article>) : <p className="empty">{snapshot.calendar.lastSuccessAt ? "今日は予定がありません" : "予定は未取得です。"}</p>}
@@ -209,7 +209,7 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
           </div>
         </section>
         <section className="panel" id="tasks" aria-labelledby="tasks-title">
-          <div className="panel-title"><h2 className="section-label" id="tasks-title"><SquareCheck className="card-icon" size={18} color="currentColor" strokeWidth={2} fill="none" aria-hidden="true" focusable="false" /><span>やること<small>TASKS</small></span></h2><div className="task-source-actions"><span className="source-label"><ExternalLink href={TASKS}>イロイロキロク</ExternalLink></span><button className="task-refresh-button" type="button" disabled={readingTasks||taskRefresh.refreshing} aria-label="イロイロキロクからタスクを更新" aria-busy={readingTasks} onClick={refreshTasks}><RefreshCw size={13} strokeWidth={2} aria-hidden="true" />{readingTasks ? "更新中…" : "更新"}</button></div></div>
+          <div className="panel-title"><h2 className="section-label" id="tasks-title"><span>やること</span></h2><div className="task-source-actions"><span className="source-label"><ExternalLink href={TASKS}>イロイロキロク</ExternalLink></span><button className="task-refresh-button" type="button" disabled={readingTasks||taskRefresh.refreshing} aria-label="イロイロキロクからタスクを更新" aria-busy={readingTasks} onClick={refreshTasks}><RefreshCw size={13} strokeWidth={2} aria-hidden="true" />{readingTasks ? "更新中…" : "更新"}</button></div></div>
           {(tasksOld || snapshot.tasks.error) && <p className="notice">{snapshot.tasks.date}取得分です。最新の状態はイロイロキロクで確認してください。</p>}
           <form className="task-add-form" onSubmit={event => void addTask(event)}>
             <div className="task-add-fields">
@@ -236,7 +236,7 @@ export default function Dashboard({ initialMemo = null, serverLinkMode = NO_SERV
         </section>
         <MealSuggestions today={today} externalFood={serverLinkMode.enabled?{stock:serverLink.stock,busy:serverLink.busy,error:serverLink.error||(serverLink.needsConnection?"サーバー接続を確認してください。":""),authNeeded:serverLink.needsConnection,manualMode:false,refresh:serverLink.refresh,connect:async()=>{setShowServerSetup(true);return false;}}:undefined}/>
         <section className="panel memo-panel" id="memo" aria-labelledby="memo-title">
-          <div className="panel-title"><div className="memo-heading"><h2 id="memo-title"><PenLine className="card-icon" size={18} color="currentColor" strokeWidth={2} fill="none" aria-hidden="true" focusable="false" /><span>メモ<small>MEMO</small></span></h2><span className="memo-state" role="status" aria-live="polite">{saving ? "保存中…" : dirty ? "未保存の変更があります" : memo ? "保存済み" : "読込中…"}</span></div><div className="memo-actions">{(dirty || saving) && <button className="save-button" type="button" disabled={!memo || !dirty || saving || loadingMemo} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button>}</div></div>
+          <div className="panel-title"><div className="memo-heading"><h2 id="memo-title"><span>メモ</span></h2><span className="memo-state" role="status" aria-live="polite">{saving ? "保存中…" : dirty ? "未保存の変更があります" : memo ? "保存済み" : "読込中…"}</span></div><div className="memo-actions">{(dirty || saving) && <button className="save-button" type="button" disabled={!memo || !dirty || saving || loadingMemo} onClick={() => void save()}>{saving ? "保存中…" : "保存"}</button>}</div></div>
           <label className="sr-only" htmlFor="memo-input">Memoの内容</label>
           <textarea aria-describedby="memo-help" id="memo-input" className="memo-input" rows={2} value={text} disabled={!memo || loadingMemo} maxLength={20000} onChange={event => { setText(event.target.value); setMemoMessage(""); }} placeholder={memo ? "覚えておきたいことを書いてください…" : "メモを読み込んでいます…"} />
           {memoError && <p className="notice error" role="alert">{memoError}</p>}

@@ -276,3 +276,40 @@ h3{font-size:12px;font-weight:500}
 .ai-meal-views{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .ai-meal-views button{min-height:44px;padding:8px 12px;border-radius:8px;font-size:12px}
 .ai-meal-views button[aria-pressed=true]{border-color:#3c6834;background:#e2efdc;color:#305528;font-weight:600}
+
+/* Calm theme: one neutral palette, two corner radii (8px boxes, 999px pills), orange only for actions and overdue. */
+:root{--radius:8px;--pill:999px}
+#schedule,#tasks,#meals,#memo,.site-header nav a[href="#schedule"],.site-header nav a[href="#tasks"],.site-header nav a[href="#meals"],.site-header nav a[href="#memo"]{--section-tint:#fff;--section-band:transparent;--section-accent:var(--ink);--section-border:var(--line)}
+.panel{border-radius:var(--radius);background:var(--paper);border-color:var(--line)}
+.panel-title,.memo-panel .panel-title{margin:0 0 9px;padding:0 0 11px;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0}
+.panel .section-label,.panel.memo-panel h2{font-weight:600;color:var(--ink)}
+.site-header nav a,.site-header nav a:hover,.site-header nav a[aria-current]{background:none;color:var(--muted);border-radius:0}
+.site-header nav a:hover,.site-header nav a[aria-current]{color:var(--ink)}
+.site-header nav a[aria-current]::after{background:var(--ink);left:0;right:0}
+.day>.date-pill{background:#f1eee8;color:var(--ink);border-radius:var(--pill)}
+.sky-item+.sky-item::before{background:var(--line)}
+.counts .has-tasks strong{color:var(--ink)}
+.upcoming-list time::before{background:var(--line)}
+.upcoming-list time,.event-row h3 a>span,.upcoming-list a>span,#schedule .panel-footer a>span,#tasks .panel-footer a>span,.source-label a>span{color:var(--muted)}
+.task summary::before{border-color:var(--muted)}
+.task-check{border-color:var(--muted);color:var(--muted)}
+.task-refresh-button,.task-add-fields button,.task-toast .toast-action{border-radius:var(--pill)}
+.task-add-fields input{border-radius:var(--radius)}
+.task-toast{border-color:var(--line);border-radius:var(--radius)}
+.task-toast>svg{color:var(--muted)}
+button,.save-button{border-radius:var(--radius)}
+.meal-card,.server-link-settings,.server-link-consent,.meal-tool-picker,.meal-tool-options label,.meal-more,.meal-connect,.ai-meal-generate,.ai-meal-views button,.server-link-actions button,.compare,.notice{border-radius:var(--radius)}
+.server-link-dialog,.login-card,.account-panel,.account-message{border-radius:var(--radius)}
+.link-state,.meal-time{border-radius:var(--pill)}
+.meal-card,.server-link-settings,.meal-tool-picker{background:#fff;border-color:var(--line)}
+.meal-tool-options label{border-color:var(--line)}
+.meal-tool-options label.selected,.ai-meal-views button[aria-pressed=true]{background:#fff5e9;border-color:var(--orange);color:var(--ink)}
+.meal-tool-options input,.server-link-check input{accent-color:var(--orange)}
+.meal-tool-options label:focus-within{outline-color:var(--orange)}
+.ai-meal-generate{background:var(--orange);border-color:var(--orange);color:#382000}
+.ai-meal-generate:hover:enabled{background:#ff943e;border-color:#ff943e;color:#382000}
+.meal-time{background:#f1eee8}
+.meal-help a{color:var(--ink)}
+.meal-tool-picker p,.meal-time,.meal-water{color:var(--muted)}
+.meal-reason,.meal-recipe summary,.meal-more,.meal-connect{color:var(--ink)}
+.meal-more,.meal-connect{border-color:var(--line)}
