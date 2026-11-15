@@ -2113,6 +2113,14 @@ document.getElementById("detailPanel").addEventListener("click", event => {
   applyDetailToSelect(button.dataset.applyDetail, button.dataset.value);
 });
 
+// The sticky header is not a reliable scroll target. Return to the document's actual top.
+document.querySelector(".brand-home").addEventListener("click", event => {
+  event.preventDefault();
+  closeDetail({ updateHash:false });
+  history.replaceState(null, "", location.pathname + location.search);
+  window.scrollTo({ top:0, left:0, behavior:"instant" });
+  document.documentElement.scrollTop = 0;
+});
 document.getElementById("readerBack").addEventListener("click", () => closeDetail());
 document.getElementById("readerRailList").addEventListener("click", event => {
   const button = event.target.closest("[data-reader-item]");
