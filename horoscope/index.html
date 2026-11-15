@@ -681,7 +681,7 @@ h2 {
   <a class="brand brand-home" href="#content" aria-label="ページ先頭へ戻る">星読み辞典</a>
   <nav class="nav" aria-label="ページ内メニュー">
     <a href="#selector">組み合わせ</a>
-    <a href="#planets">天体</a>
+    <a href="#planets">天体・感受点</a>
     <a href="#signs">星座</a>
     <a href="#houses">ハウス</a>
     <a href="#hint">読むヒント</a>
@@ -694,16 +694,16 @@ h2 {
     <h1>自分を読むための占星術ミニ辞典</h1>
     <p class="lead">
       ホロスコープは、たくさんの要素が組み合わさって「あなたらしさ」を描き出します。<br>
-      ここでは、天体・星座・ハウスの役割と深い意味を読み解き、3つの違いを比較しながら学んでいきましょう。
+      ここでは、天体・感受点・星座・ハウスの役割と深い意味を読み解き、3つの違いを比較しながら学んでいきましょう。
     </p>
 
     <section id="selector">
       <h2><span class="heading-icon">✦</span>01｜組み合わせて理解する</h2>
-      <p class="desc">天体は「何が働くか」、星座は「どのように」、ハウスは「どこで」。3つを選んで読み、ひとつだけ変えて違いを比べましょう。</p>
+      <p class="desc">天体・感受点は「どんな働き・テーマか」、星座は「どのように」、ハウスは「どこで」。3つを選んで読み、ひとつだけ変えて違いを比べましょう。</p>
       <div class="selector-panel">
         <div class="selector-grid">
           <div class="field">
-            <label for="planetSelect">天体</label>
+            <label for="planetSelect">天体・感受点</label>
             <select id="planetSelect"></select>
           </div>
           <div class="field">
@@ -731,13 +731,13 @@ h2 {
           </div>
           <div id="comparisonDescription" class="comparison-output" aria-live="polite">上の3つを選ぶと、比較結果が表示されます。</div>
         </div>
-        <p class="combination-note">現代占星術の象徴を学ぶための組み合わせ例です。天体・星座・ハウスの基本的な意味を組み立てており、アスペクトなどの条件は含みません。</p>
+        <p class="combination-note">現代占星術の象徴を学ぶための組み合わせ例です。天体・感受点・星座・ハウスの基本的な意味を組み立てており、アスペクトなどの条件は含みません。リリスはブラックムーン・リリスを扱い、天体位置の算出や平均・真位置の選択は行いません。</p>
       </div>
     </section>
 
     <section id="planets">
-      <h2><span class="heading-icon">☉</span>天体は「登場人物の役割」</h2>
-      <p class="desc">天体は、物語の中であなたがどんな役割を持っているかを表します。<br>それぞれの天体が、あなたの中の違うテーマを担当しています。</p>
+      <h2><span class="heading-icon">☉</span>天体・感受点は「役割や人生のテーマ」</h2>
+      <p class="desc">10天体は心や行動の働きを、ドラゴンヘッド・テイルとリリスは成長の方向や内面のテーマを象徴します。<br>後者3つは実際の天体ではなく、月の軌道に関係する感受点です。</p>
       <div class="grid planets">
         <article class="card mini-card planet-card" style="--item-color:#FFB300;--item-ink:#875500">
   <div class="planet-icon">☉</div>
@@ -818,6 +818,27 @@ h2 {
   <p><span class="pale">裏テーマ</span>真実を知りたい</p>
 
   <p class="planet-question"><span>本質的な問い</span>私は何を失うことを恐れ、何を手放す必要があるのか</p>
+</article>
+<article class="card mini-card planet-card" style="--item-color:#268A61;--item-ink:#176642">
+  <div class="planet-icon">☊</div>
+  <h3>ドラゴンヘッド（未来への方向）</h3>
+  <p><span>表テーマ</span>発展・未知への挑戦</p>
+  <p><span class="pale">裏テーマ</span>慣れた世界から出るのが怖い</p>
+  <p class="planet-question"><span>本質的な問い</span>慣れた自分を越えて、どんな経験へ踏み出したいのか</p>
+</article>
+<article class="card mini-card planet-card" style="--item-color:#A57639;--item-ink:#80531B">
+  <div class="planet-icon">☋</div>
+  <h3>ドラゴンテイル（慣れ親しんだ資質）</h3>
+  <p><span>表テーマ</span>慣れ・蓄積・手放し</p>
+  <p><span class="pale">裏テーマ</span>いつものやり方に戻りたい</p>
+  <p class="planet-question"><span>本質的な問い</span>すでに身につけた力を、これからどう活かしていくのか</p>
+</article>
+<article class="card mini-card planet-card" style="--item-color:#7544A6;--item-ink:#61318D">
+  <div class="planet-icon">⚸</div>
+  <h3>リリス（抑圧された本音）</h3>
+  <p><span>表テーマ</span>自立・本能・影</p>
+  <p><span class="pale">裏テーマ</span>本音を見せたら拒絶されるかもしれない</p>
+  <p class="planet-question"><span>本質的な問い</span>誰にも認められなくても、私が否定したくない本音は何か</p>
 </article>
       </div>
     </section>
@@ -1035,7 +1056,7 @@ h2 {
 
     <section id="hint">
       <h2><span class="heading-icon">♧</span>読むヒント</h2>
-      <p class="desc">天体は「誰が」、星座は「どんな個性で」、ハウスは「どの舞台で」を表します。<br>表テーマだけでなく裏テーマを見ると、その配置がなぜ大切なのかが見えてきます。</p>
+      <p class="desc">天体・感受点は「どんな働きや人生のテーマか」、星座は「どんな個性で」、ハウスは「どの舞台で」を表します。<br>表テーマだけでなく裏テーマを見ると、その配置がなぜ大切なのかが見えてきます。</p>
     </section>
 
     <section id="summary">
@@ -1057,7 +1078,10 @@ const planets = [
   { value:"saturn", symbol:"♄", name:"土星（先生）", theme:"責任・熟成", shadow:"失敗したくない", role:"課題、責任、時間をかけて育てる力" },
   { value:"uranus", symbol:"♅", name:"天王星（改革者）", theme:"革新・自由", shadow:"自由でいたい", role:"変化、独自性、古い形を壊す力" },
   { value:"neptune", symbol:"♆", name:"海王星（夢見る人）", theme:"夢・共感", shadow:"境界を超えたい", role:"想像力、共感、目に見えないものへの感受性" },
-  { value:"pluto", symbol:"♇", name:"冥王星（変容させる人）", theme:"変容・真実", shadow:"真実を知りたい", role:"深い変化、再生、本質を見抜く力" }
+  { value:"pluto", symbol:"♇", name:"冥王星（変容させる人）", theme:"変容・真実", shadow:"真実を知りたい", role:"深い変化、再生、本質を見抜く力" },
+  { value:"northnode", symbol:"☊", name:"ドラゴンヘッド（未来への方向）", theme:"発展・未知への挑戦", shadow:"慣れた世界から出るのが怖い", role:"今までの習慣を越えて育てたい方向性", kind:"point" },
+  { value:"southnode", symbol:"☋", name:"ドラゴンテイル（慣れ親しんだ資質）", theme:"慣れ・蓄積・手放し", shadow:"いつものやり方に戻りたい", role:"自然に使える資質と、慣れゆえの偏り", kind:"point" },
+  { value:"lilith", symbol:"⚸", name:"リリス（抑圧された本音）", theme:"自立・本能・影", shadow:"本音を見せたら拒絶されるかもしれない", role:"抑えられた欲求、境界、自由でありたい本音", kind:"point" }
 ];
 
 const signs = [
@@ -1090,8 +1114,8 @@ const houses = [
   { value:"12", name:"12ハウス　見えない世界（潜在意識）", theme:"潜在意識・癒し・精神性の場", shadow:"私は何者なのか", stage:"潜在意識、癒し、見えない世界" }
 ];
 
-const planetColorMap = {"sun":"#FFB300","moon":"#7895E8","mercury":"#00B8D4","venus":"#EC4899","mars":"#F44336","jupiter":"#9C55E8","saturn":"#455A64","uranus":"#00A8A8","neptune":"#3366FF","pluto":"#8E244D"};
-const planetInkMap = {"sun":"#875500","moon":"#3F5FA9","mercury":"#006C80","venus":"#A31565","mars":"#B3261E","jupiter":"#65319D","saturn":"#455A64","uranus":"#006B6B","neptune":"#2345AB","pluto":"#8E244D"};
+const planetColorMap = {"sun":"#FFB300","moon":"#7895E8","mercury":"#00B8D4","venus":"#EC4899","mars":"#F44336","jupiter":"#9C55E8","saturn":"#455A64","uranus":"#00A8A8","neptune":"#3366FF","pluto":"#8E244D","northnode":"#268A61","southnode":"#A57639","lilith":"#7544A6"};
+const planetInkMap = {"sun":"#875500","moon":"#3F5FA9","mercury":"#006C80","venus":"#A31565","mars":"#B3261E","jupiter":"#65319D","saturn":"#455A64","uranus":"#006B6B","neptune":"#2345AB","pluto":"#8E244D","northnode":"#176642","southnode":"#80531B","lilith":"#61318D"};
 const planetDeepReadings = {
   "sun": {
     "question": "私は本当はどんな人生を生きたいのか",
@@ -1182,6 +1206,33 @@ const planetDeepReadings = {
     "meaning": "冥王星の本質は破壊そのものではありません。もはや自分を支えなくなった形を終わらせ、より深い本質へと生まれ変わる力です。",
     "growth": "失わないために握りしめる段階から、必要な終わりを引き受け、自分を根本から作り直す段階へ。力が支配から再生へ変わります。",
     "soul": "古い自己像を脱ぎ捨てる魂の変容。手放しを通して、内側に眠っていた生命力を取り戻します。"
+  },
+  "northnode": {
+    "question": "慣れた自分を越えて、どんな経験へ踏み出したいのか",
+    "growthLine": "安心できる慣習にとどまる段階から、未知の経験を通して新しい力を育てる段階へ",
+    "surface": "ドラゴンヘッド（ノースノード）は、月の軌道と黄道が交差する昇交点です。占星術では、慣れないけれど成長へつながる経験や、人生で意識的に伸ばしたい方向を象徴します。",
+    "inner": "新しい経験への期待と同時に、慣れないことへの不安も感じやすいテーマです。今まで身につけたやり方を手放すことへの抵抗が、成長の入口になることがあります。",
+    "meaning": "ドラゴンヘッドの本質は、無条件に過去を否定することではなく、すでに持っている力を土台として新しい経験の領域へ向かうことです。対向するドラゴンテイルと一組の軸として読みます。",
+    "growth": "安心できる方法だけを繰り返す段階から、不慣れな課題にも自分の意志で関わり、経験によって可能性を広げる段階へ。ドラゴンテイル側の才能も活かしながら育てます。",
+    "soul": "魂がこの人生で新たに探求しようとする方向。『まだ十分に知らない自分に出会う』という象徴です。"
+  },
+  "southnode": {
+    "question": "すでに身につけた力を、これからどう活かしていくのか",
+    "growthLine": "慣れた方法への依存から、得意な資質を新しい方向へ生かす段階へ",
+    "surface": "ドラゴンテイル（サウスノード）は、月の軌道と黄道が交差する降交点です。占星術では、なじみ深い感覚や使い慣れた資質、無意識に繰り返しやすい行動パターンを象徴します。",
+    "inner": "自分にとって当たり前の方法には安心感がありますが、そこだけに留まると、違う可能性を試す機会を逃すことがあります。手放したい思いと、慣れから離れたくない気持ちが交差します。",
+    "meaning": "ドラゴンテイルは捨てるべき欠点ではありません。すでにある力や経験を表し、それをどのように使い直すかを考える地点です。対向するドラゴンヘッドへの歩みを支える資源にもなります。",
+    "growth": "使い慣れた方法だけに頼る段階から、得意なことを認めつつ新しい経験のために使う段階へ。手放すのは資質そのものではなく、そこに閉じこもることです。",
+    "soul": "魂が持ち歩いてきたように感じられる親しみ深い領域。そこから何を受け取り、何を次の旅へ持っていくかを問います。"
+  },
+  "lilith": {
+    "question": "誰にも認められなくても、私が否定したくない本音は何か",
+    "growthLine": "拒まれることへの恐れや反発から、本音と境界を自分のものとして受け止める段階へ",
+    "surface": "ここではリリスをブラックムーン・リリス（月の遠地点に関わる感受点）として扱います。占星術では、社会に合わせて抑えた欲求、自立心、受け入れにくい本音や野性的な生命力を象徴します。",
+    "inner": "拒まれたくない気持ちから自分の欲求を隠したり、逆に抑え込まれたことへの怒りが強く表れたりすることがあります。恥ずかしさと解放への願いが重なる場所です。",
+    "meaning": "リリスの本質は『悪い部分』ではありません。認めたくなかった感情や欲求に気づき、自分の境界や尊厳を取り戻すための象徴です。他者との関わりの中で何を譲れないかも問いかけます。",
+    "growth": "欲求を否定するか反発するかの二択から離れ、自分の本音を正面から認め、他者との境界を意識しながら表現する段階へ。",
+    "soul": "『私の中の、まだ許されていない私』に出会う魂の探求。隠してきた生命力を、恥ではなく自分の一部として引き受けます。"
   }
 };
 
@@ -1195,7 +1246,10 @@ const planetReadings = {
   saturn:{ surface:"時間をかけて責任を引き受け、形にしていく力", shadow:"失敗を避けたい気持ちが強まると、挑戦する前から自分に厳しい制限をかけやすくなります" },
   uranus:{ surface:"古い前提をほどき、自由な発想で流れを変える力", shadow:"自由でいたい気持ちが強まると、縛られる前に距離を取りすぎて孤立しやすくなります" },
   neptune:{ surface:"見えない気配を感じ取り、夢や共感で世界を広げる力", shadow:"境界を超えたい気持ちが強まると、自分と相手の感情が混ざりすぎて疲れやすくなります" },
-  pluto:{ surface:"本質に触れ、古い自分を終わらせて再生する力", shadow:"真実を知りたい気持ちが強まると、白黒をつけすぎたり、深みに入り込みすぎたりしやすくなります" }
+  pluto:{ surface:"本質に触れ、古い自分を終わらせて再生する力", shadow:"真実を知りたい気持ちが強まると、白黒をつけすぎたり、深みに入り込みすぎたりしやすくなります" },
+  northnode:{ surface:"今までの習慣を越えて育てたい方向性", shadow:"慣れた世界から出るのが怖い" },
+  southnode:{ surface:"自然に使える資質と、慣れゆえの偏り", shadow:"いつものやり方に戻りたい" },
+  lilith:{ surface:"抑えられた欲求、境界、自由でありたい本音", shadow:"本音を見せたら拒絶されるかもしれない" }
 };
 
 const signDeepReadings = {
@@ -1369,7 +1423,10 @@ const combinationPlanetActions = {
   "saturn": "責任を引き受け、時間をかけて確かな形を築く力が働きます",
   "uranus": "既存の前提を問い直し、新しい自由を切り開く力が働きます",
   "neptune": "直感や理想を受け取り、目に見えないつながりを感じる力が働きます",
-  "pluto": "隠れた本質に向き合い、古い形を終えて変容する力が働きます"
+  "pluto": "隠れた本質に向き合い、古い形を終えて変容する力が働きます",
+  "northnode": "慣れ親しんだ姿勢を土台に、これから経験し育てたい方向が示されます",
+  "southnode": "なじみ深い資質やパターンが示され、それをどう活かし直すかが問われます",
+  "lilith": "押し込めてきた本音や自立への欲求が照らされ、どのように受け止めるかが問われます"
 };
 const combinationSignStyles = {
   "aries": "率直に始め、自分から一歩踏み出す形で",
@@ -1487,7 +1544,7 @@ function signTags(sign) {
 }
 
 const detailTypes = {
-  planet: { label:"天体", selectId:"planetSelect", items:planets, hashPrefix:"planet", cardSelector:".planets .mini-card" },
+  planet: { label:"天体・感受点", selectId:"planetSelect", items:planets, hashPrefix:"planet", cardSelector:".planets .mini-card" },
   sign: { label:"星座", selectId:"signSelect", items:signs, hashPrefix:"sign", cardSelector:".signs .sign-card" },
   house: { label:"ハウス", selectId:"houseSelect", items:houses, hashPrefix:"house", cardSelector:".houses .house-card" }
 };
@@ -1599,7 +1656,7 @@ function signDetailMarkup(item) {
 function planetDetailMarkup(item) {
   const deep = planetDeepReadings[item.value];
   return `<div class="planet-deep-grid">
-    <div class="planet-deep-block"><h3>表テーマ｜外側に現れる働き</h3><p>${deep.surface}</p></div>
+    <div class="planet-deep-block"><h3>表テーマ｜外側に現れる働き・テーマ</h3><p>${deep.surface}</p></div>
     <div class="planet-deep-block"><h3>裏テーマ｜無意識の欲求・葛藤</h3><p>${deep.inner}</p></div>
     <div class="planet-deep-block wide"><h3>本質的な問い</h3><p class="planet-key-question">「${deep.question}」</p></div>
     <div class="planet-deep-block wide"><h3>本質的な意味</h3><p>${deep.meaning}</p></div>
@@ -1681,8 +1738,9 @@ function selectedCombination() {
 
 function combinationReading({ planet, sign, house }) {
   const context = combinationHouseContexts[house.value];
+  const isPoint = planet.kind === "point";
   return {
-    summary: `${context.scene}では、${combinationPlanetActions[planet.value]}。その働きは${combinationSignStyles[sign.value]}表れ、「${context.focus}」が大切な経験のテーマになります。`,
+    summary: `${context.scene}では、${combinationPlanetActions[planet.value]}。その${isPoint ? "テーマ" : "働き"}は${combinationSignStyles[sign.value]}表れ、「${context.focus}」が大切な経験のテーマになります。`,
     planet: `${shortName(planet.name)}：${planetDeepReadings[planet.value].surface}`,
     sign: `${sign.name}：${signDeepReadings[sign.value].surface}`,
     house: `${shortName(house.name)}：${houseDeepReadings[house.value].meaning}`,
@@ -1695,7 +1753,7 @@ function displayCombination({ planet, sign, house }) {
   const reading = combinationReading({ planet, sign, house });
   return `<div class="combination-summary" style="--planet-color:${planetColorMap[planet.value]};--sign-color:${elementColorMap[sign.element]};--house-color:${houseColorMap[house.value]}">
     <div class="combination-parts">
-      <div class="combination-part"><span class="combination-emblem" style="background:${planetColorMap[planet.value]}">${planet.symbol}</span><strong>${shortName(planet.name)}</strong><small>何の力が働く？</small></div>
+      <div class="combination-part"><span class="combination-emblem" style="background:${planetColorMap[planet.value]}">${planet.symbol}</span><strong>${shortName(planet.name)}</strong><small>${planet.kind === "point" ? "どんなテーマ？" : "何の力が働く？"}</small></div>
       <span class="combination-plus" aria-hidden="true">＋</span>
       <div class="combination-part"><span class="combination-emblem" style="background:${elementColorMap[sign.element]}">☆</span><strong>${sign.name}</strong><small>どのように？</small></div>
       <span class="combination-plus" aria-hidden="true">＋</span>
@@ -1718,7 +1776,7 @@ function updateResult() {
     ${displayCombination(chosen)}
     <div class="combination-breakdown">
       <h3>この解釈の内訳</h3>
-      <div class="combination-breakdown-row"><strong style="color:${planetInkMap[chosen.planet.value]}">天体｜何の力？</strong><p>${reading.planet}</p></div>
+      <div class="combination-breakdown-row"><strong style="color:${planetInkMap[chosen.planet.value]}">${chosen.planet.kind === "point" ? "感受点｜どんなテーマ？" : "天体｜何の力？"}</strong><p>${reading.planet}</p></div>
       <div class="combination-breakdown-row"><strong style="color:${elementColorMap[chosen.sign.element]}">星座｜どのように？</strong><p>${reading.sign}</p></div>
       <div class="combination-breakdown-row"><strong style="color:${houseInkMap[chosen.house.value]}">ハウス｜どこで？</strong><p>${reading.house}</p></div>
     </div>
@@ -1750,8 +1808,8 @@ function updateComparison(chosen) {
   const replacement = config.items.find(item => item.value === comparisonSelect.value);
   if (!replacement) return;
   const alternate = { ...chosen, [mode]:replacement };
-  const names = {planet:"天体",sign:"星座",house:"ハウス"};
-  const roles = {planet:"働く力",sign:"表現の仕方",house:"人生の領域"};
+  const names = {planet:"天体・感受点",sign:"星座",house:"ハウス"};
+  const roles = {planet:"働き・人生のテーマ",sign:"表現の仕方",house:"人生の領域"};
   const descriptions = {
     planet: item => planetDeepReadings[item.value].surface,
     sign: item => signDeepReadings[item.value].surface,
