@@ -716,14 +716,20 @@ section { padding:38px 0 44px; }
 .grid { gap:18px; }
 .planets { grid-template-columns:repeat(4,minmax(0,1fr)); }
 .signs { grid-template-columns:repeat(3,minmax(0,1fr)); }
-.houses { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.houses { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .card { border-radius:15px; box-shadow:0 5px 20px rgba(58,42,26,.04); transition:transform .2s ease, box-shadow .2s ease,border-color .2s ease; overflow:hidden; }
 .card.is-clickable:hover { transform:translateY(-4px); box-shadow:0 15px 32px rgba(58,42,26,.11); }
 .card.is-clickable::after { content:"詳しく読む  ↗"; display:block; width:max-content; margin:13px 0 0 auto; color:var(--item-ink,var(--orange)); font-size:11px; font-weight:900; letter-spacing:.05em; }
 .mini-card,.sign-card { padding:22px 18px; }
 .planet-card,.sign-card { min-height:280px; }
 .planet-icon { margin-bottom:14px; }
-.house-card { padding:22px; min-height:205px; }
+.house-card { padding:24px; min-height:240px; }
+.house-card .house-head { margin-bottom:18px; }
+.house-card > p { font-size:14px; font-weight:700; line-height:1.75; gap:12px; margin:10px 0; }
+.house-card > p > span { font-size:12px; padding:5px 10px; border-radius:6px; font-weight:900; }
+.house-card .house-question { display:block; margin-top:20px; padding-top:16px; border-top:1px solid color-mix(in srgb, var(--item-color) 30%, white); line-height:1.8; font-size:14px; }
+.house-card .house-question > span { display:inline-block; margin-right:10px; vertical-align:baseline; }
+.house-card.is-clickable::after { margin-top:18px; }
 .card h3 { font-size:15px; }
 .card p { font-weight:600; line-height:1.65; }
 .card .planet-question,.card .sign-question,.card .house-question { margin-top:17px; }
@@ -803,6 +809,8 @@ body.reader-open { overflow:hidden; }
  .nav a { font-size:12px; }
  .planets,.signs,.houses { grid-template-columns:1fr; }
  .mini-card,.sign-card,.house-card { min-height:0; }
+ .house-card { padding:20px; }
+ .house-card > p { font-size:13px; }
  .reader-content { padding:24px 18px 54px; }
  .reader-topbar { padding:10px 15px; }
  .reader-back { font-size:12px; padding:8px 12px; }
