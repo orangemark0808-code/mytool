@@ -60,3 +60,10 @@
   .topbar .nav a{font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){.topbar .nav a{transition:none}}
+
+/* Desktop and tablet consistency: explicitly define every shared layout value. */
+.topbar{box-sizing:border-box;width:100%;margin:0}
+.topbar .brand-home{display:inline-block;flex:0 0 auto;line-height:1.68;letter-spacing:.02em}
+.topbar .nav{align-items:center;align-content:center;line-height:1.68;letter-spacing:.02em}
+.topbar .nav a{display:inline-block;font-size:15px;line-height:1.68;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+@media(max-width:560px){.topbar .nav a{font-size:12px}}
