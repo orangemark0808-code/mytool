@@ -42,6 +42,14 @@ h1{font-size:28px;line-height:1.4;margin:0 0 12px}h2{margin:0;font-size:24px;lin
 @media(min-width:981px){.topbar{padding-left:max(32px,calc((100% - 1160px)/2));padding-right:max(32px,calc((100% - 1160px)/2))}}
 @media(max-width:560px){.topbar{align-items:flex-start;flex-direction:column;padding:13px 18px;gap:6px}.brand-home{font-size:18px}.nav{justify-content:flex-start;gap:4px 14px;font-size:13px}.nav a{font-size:12px}}
 @media(prefers-reduced-motion:reduce){.nav a{transition:none}}
+
+/* Shared foundation matched to horoscope/index.html (header uses inherited typography). */
+body{line-height:1.68;letter-spacing:.02em}
+@media (min-width:561px) and (max-width:680px){
+ .topbar{align-items:center;flex-direction:row;gap:18px;padding:14px 20px}
+ .nav{justify-content:flex-end;gap:10px 22px;font-size:15px}
+ .nav a{font-size:15px}
+}
 </style>
 </head>
 <body>
