@@ -6,6 +6,8 @@
 <meta name="description" content="ホロスコープの天体・星座・ハウスを、表テーマと裏テーマからやさしく理解するためのガイドです。">
 <title>ホロスコープ｜自分を読むための占星術ミニ辞典</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1">
+<meta name="apple-mobile-web-app-title" content="Horoscope">
 <style>
 :root {
   --orange:#FF7F00;
@@ -611,6 +613,26 @@ h2 {
 #detailPanel[data-detail-type="sign"] .sign-deep-block { border:1px solid var(--item-color); }
 #detailPanel[data-detail-type="sign"] .sign-deep-block h3 { color:var(--item-ink); }
 @media(max-width:980px){ .sign-deep-grid { grid-template-columns:1fr; } }
+
+/* Distinct celestial colors and in-depth planetary readings. */
+.planet-card { min-height:245px; border-color:var(--item-color); }
+.planet-card .planet-icon { color:var(--item-ink); }
+.planet-card p>span:not(.pale) { background:var(--item-color); color:#fff; }
+.planet-card .planet-question { margin-top:10px; padding-top:9px; border-top:1px solid var(--line-soft); font-size:13px; line-height:1.6; text-align:left; }
+.planet-card .planet-question span { background:var(--item-color); color:#fff; }
+.planet-deep-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:0 0 16px; }
+.planet-deep-block { background:#fff; border:1px solid var(--item-color); border-radius:6px; padding:15px 16px; }
+.planet-deep-block.wide { grid-column:1/-1; }
+.planet-deep-block h3 { margin:0 0 8px; color:var(--item-ink); font-size:13px; font-weight:900; }
+.planet-deep-block p { margin:0; font-size:14px; font-weight:700; line-height:1.85; }
+.planet-deep-block .planet-key-question { font-size:20px; line-height:1.55; font-weight:900; color:var(--item-ink); }
+.planet-deep-block .planet-key-line { font-size:16px; line-height:1.6; font-weight:900; margin-bottom:8px; color:var(--item-ink); }
+#detailPanel[data-detail-type="planet"] .detail-kicker,
+#detailPanel[data-detail-type="planet"] .detail-title,
+#detailPanel[data-detail-type="planet"] .detail-symbol { color:var(--item-ink); }
+#detailPanel[data-detail-type="planet"] .detail-button { background:var(--item-color); border-color:var(--item-color); color:#fff; }
+#detailPanel[data-detail-type="planet"] .detail-button.secondary { background:#fff; color:var(--item-ink); }
+@media(max-width:980px){ .planet-deep-grid { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -661,65 +683,85 @@ h2 {
       <h2><span class="heading-icon">☉</span>天体は「登場人物の役割」</h2>
       <p class="desc">天体は、物語の中であなたがどんな役割を持っているかを表します。<br>それぞれの天体が、あなたの中の違うテーマを担当しています。</p>
       <div class="grid planets">
-        <article class="card mini-card">
+        <article class="card mini-card planet-card" style="--item-color:#FFB300;--item-ink:#875500">
   <div class="planet-icon">☉</div>
   <h3>太陽（主役）</h3>
   <p><span>表テーマ</span>成長・自分らしさ</p>
   <p><span class="pale">裏テーマ</span>本当に自分らしく生きたい</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は本当はどんな人生を生きたいのか</p>
 </article>
-<article class="card mini-card">
+<article class="card mini-card planet-card" style="--item-color:#7895E8;--item-ink:#3F5FA9">
   <div class="planet-icon">☽</div>
   <h3>月（心の安心）</h3>
   <p><span>表テーマ</span>安心・感情</p>
   <p><span class="pale">裏テーマ</span>傷つきたくない</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は何によって心から安心できるのか</p>
 </article>
-<article class="card mini-card">
+<article class="card mini-card planet-card" style="--item-color:#00B8D4;--item-ink:#006C80">
   <div class="planet-icon">☿</div>
   <h3>水星（伝える人）</h3>
   <p><span>表テーマ</span>思考・言葉</p>
   <p><span class="pale">裏テーマ</span>理解したい</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は世界をどのように理解し、伝えたいのか</p>
 </article>
-<article class="card mini-card">
+<article class="card mini-card planet-card" style="--item-color:#EC4899;--item-ink:#A31565">
   <div class="planet-icon">♀</div>
   <h3>金星（愛する人）</h3>
   <p><span>表テーマ</span>愛・喜び</p>
   <p><span class="pale">裏テーマ</span>愛されたい</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は何を美しいと感じ、何を愛するのか</p>
 </article>
-<article class="card mini-card">
+<article class="card mini-card planet-card" style="--item-color:#F44336;--item-ink:#B3261E">
   <div class="planet-icon">♂</div>
   <h3>火星（行動する人）</h3>
   <p><span>表テーマ</span>行動・闘志</p>
   <p><span class="pale">裏テーマ</span>負けたくない</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は何のために自分の力を使うのか</p>
 </article>
-<article class="card mini-card">
+<article class="card mini-card planet-card" style="--item-color:#9C55E8;--item-ink:#65319D">
   <div class="planet-icon">♃</div>
   <h3>木星（広げる人）</h3>
   <p><span>表テーマ</span>発展・幸運</p>
   <p><span class="pale">裏テーマ</span>可能性を信じたい</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は何を信じ、どんな可能性を広げたいのか</p>
 </article>
-<article class="card mini-card">
+<article class="card mini-card planet-card" style="--item-color:#455A64;--item-ink:#455A64">
   <div class="planet-icon">♄</div>
   <h3>土星（先生）</h3>
   <p><span>表テーマ</span>責任・熟成</p>
   <p><span class="pale">裏テーマ</span>失敗したくない</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は何を恐れ、何に責任を持つのか</p>
 </article>
-<article class="card mini-card">
+<article class="card mini-card planet-card" style="--item-color:#00A8A8;--item-ink:#006B6B">
   <div class="planet-icon">♅</div>
   <h3>天王星（改革者）</h3>
   <p><span>表テーマ</span>革新・自由</p>
   <p><span class="pale">裏テーマ</span>自由でいたい</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は何から自由になりたいのか</p>
 </article>
-<article class="card mini-card">
+<article class="card mini-card planet-card" style="--item-color:#3366FF;--item-ink:#2345AB">
   <div class="planet-icon">♆</div>
   <h3>海王星（夢見る人）</h3>
   <p><span>表テーマ</span>夢・共感</p>
   <p><span class="pale">裏テーマ</span>境界を超えたい</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は何とつながり、何を信じたいのか</p>
 </article>
-<article class="card mini-card">
+<article class="card mini-card planet-card" style="--item-color:#8E244D;--item-ink:#8E244D">
   <div class="planet-icon">♇</div>
   <h3>冥王星（変容させる人）</h3>
   <p><span>表テーマ</span>変容・真実</p>
   <p><span class="pale">裏テーマ</span>真実を知りたい</p>
+
+  <p class="planet-question"><span>本質的な問い</span>私は何を失うことを恐れ、何を手放す必要があるのか</p>
 </article>
       </div>
     </section>
@@ -991,6 +1033,101 @@ const houses = [
   { value:"11", name:"11ハウス　仲間（理想・未来）", theme:"仲間・理想・未来を作る場", shadow:"同じ理想を持つ人はいるのか", stage:"仲間、コミュニティ、未来の理想" },
   { value:"12", name:"12ハウス　見えない世界（潜在意識）", theme:"潜在意識・癒し・精神性の場", shadow:"私は何者なのか", stage:"潜在意識、癒し、見えない世界" }
 ];
+
+const planetColorMap = {"sun":"#FFB300","moon":"#7895E8","mercury":"#00B8D4","venus":"#EC4899","mars":"#F44336","jupiter":"#9C55E8","saturn":"#455A64","uranus":"#00A8A8","neptune":"#3366FF","pluto":"#8E244D"};
+const planetInkMap = {"sun":"#875500","moon":"#3F5FA9","mercury":"#006C80","venus":"#A31565","mars":"#B3261E","jupiter":"#65319D","saturn":"#455A64","uranus":"#006B6B","neptune":"#2345AB","pluto":"#8E244D"};
+const planetDeepReadings = {
+  "sun": {
+    "question": "私は本当はどんな人生を生きたいのか",
+    "growthLine": "他者の期待に応える生き方から、自分の本質を表現する生き方へ",
+    "surface": "太陽は生命力、主体性、自己実現、人生の中心に据える意志を象徴します。自分の意思で選び、創造し、存在感を発揮しようとする働きです。",
+    "inner": "期待される役割を果たそうとするほど、本来の願いを見失うことがあります。認められることと、自分自身を生きることが混ざってしまう葛藤です。",
+    "meaning": "太陽は表面的な性格を決める記号ではなく、自分が人生の主人公となって何を生き抜くかという中心軸です。まだ十分に発揮できていない可能性へ向かう意志も表します。",
+    "growth": "他者からの評価を軸にする段階から、自分が本当に大切にしたいことを選び、内側から生まれる創造性を形にする段階へ。",
+    "soul": "魂がこの人生で光を当てたい中心テーマ。『私はどんな存在として生きたいのか』を問い続ける旅です。"
+  },
+  "moon": {
+    "question": "私は何によって心から安心できるのか",
+    "growthLine": "無意識の反応や防衛から、自分の感情を受け止める内面的な安定へ",
+    "surface": "月は感情、安心感、習慣、本能的な反応、日常のリズムを象徴します。頭で考えるより先に何を感じるか、どこで自然体になれるかに関わります。",
+    "inner": "『安心していたい』『傷つきたくない』『ありのままを受け止めてほしい』という欲求があります。身につけた防衛反応が、新しい経験や本音の対話を遠ざけることもあります。",
+    "meaning": "月は単なる気分ではなく、自分の内側にある安心の土台と無意識に繰り返す感情のパターンを象徴します。その反応の理由を知り、否定せず理解するための鍵になります。",
+    "growth": "外側の環境や他者の反応だけで安心を得ようとする段階から、自分の感情を受け止め、内側にも安心を育てる段階へ。感情を抑え込まず共に生きる力です。",
+    "soul": "魂がこの世界で安心して存在するための内なる居場所。過去の経験や感情の記憶を通して、自分の中の愛と安らぎを見いだします。"
+  },
+  "mercury": {
+    "question": "私は世界をどのように理解し、伝えたいのか",
+    "growthLine": "正しい答えを求める思考から、自分自身の知性と言葉を育てる",
+    "surface": "水星は観察、思考、学習、言語、情報交換を担います。経験を言葉にし、違いを見分け、他者と意味を共有する働きです。",
+    "inner": "わからないことへの不安から、答えを急いだり考えすぎたりすることがあります。理解されたい願いと、うまく伝えられないもどかしさが交差します。",
+    "meaning": "水星は単に頭の回転の速さではありません。世界をどんな視点で切り取り、どんな言葉で自分と他者を結びつけるかという知性の使い方を表します。",
+    "growth": "知識や正解を集めるだけの段階から、問いを持ち、対話し、自分の実感に根差した言葉を育てる段階へ。",
+    "soul": "世界に名前を与え、経験を理解へ変えていく魂の探求。言葉は自分自身を発見する道具にもなります。"
+  },
+  "venus": {
+    "question": "私は何を美しいと感じ、何を愛するのか",
+    "growthLine": "愛されることや評価への依存から、自分の喜びと価値観を信頼する",
+    "surface": "金星は愛情、魅力、美意識、喜び、心地よさ、価値観を象徴します。何に惹かれ、何を大切にしたいと感じるかを教える働きです。",
+    "inner": "愛されたい、受け入れられたいという気持ちが強まると、自分の『好き』を相手の評価に委ねることがあります。喜びを受け取ることへの遠慮も現れます。",
+    "meaning": "金星の本質は他者を惹きつけることだけではありません。自分の感性を信頼し、何が心を満たすかを知り、世界と喜びを交換する力です。",
+    "growth": "好かれるために価値を決める段階から、自分の感性に従って選び、他者の美しさも尊重できる段階へ。",
+    "soul": "愛と美を通して『私にとって価値があるもの』を発見する魂の旅。受け取る喜びと分かち合う喜びが循環します。"
+  },
+  "mars": {
+    "question": "私は何のために自分の力を使うのか",
+    "growthLine": "怒りや競争による自己証明から、自分の意志に沿った主体的な行動へ",
+    "surface": "火星は意志、行動力、欲求、主張、怒り、境界線を守る力を象徴します。望むものに向かって現実を動かす推進力です。",
+    "inner": "『負けたくない』『邪魔されたくない』という思いから、競争や焦りに突き動かされることがあります。怒りを抑え込みすぎる場合にも力の行き場を失います。",
+    "meaning": "火星の本質は争いではありません。自分の望みを認め、必要なときに断り、自分の人生を自ら動かすための健全な力です。",
+    "growth": "相手に勝つことで存在を示す段階から、自分の目的に向けて力を使い、相手の意志も尊重できる段階へ。",
+    "soul": "魂の意志を現実に押し出す炎。何を守り、何を実現したいのかを行動を通して知っていきます。"
+  },
+  "jupiter": {
+    "question": "私は何を信じ、どんな可能性を広げたいのか",
+    "growthLine": "外側の成功や幸運を追うことから、経験を通して人生への信頼を育てる",
+    "surface": "木星は拡大、探求、希望、信念、寛容、学びと成長の可能性を象徴します。視野を広げ、経験の中に意味を見いだす働きです。",
+    "inner": "可能性を信じたい一方で、広げすぎたり都合のよい答えだけを選んだりすることがあります。『もっと先へ』という欲求が今あるものへの感謝を曇らせる場合もあります。",
+    "meaning": "木星の本質は単に幸運を与えることではありません。経験を通して世界観を広げ、自分の人生を信頼して可能性に心を開く力です。",
+    "growth": "大きな成果や正解を追い求める段階から、自分の経験に意味を見いだし、他者と学びや豊かさを分かち合う段階へ。",
+    "soul": "成長することそのものを喜びに変える魂の旅。自分が信じる世界を広げながら、寛容さを育てます。"
+  },
+  "saturn": {
+    "question": "私は何を恐れ、何に責任を持つのか",
+    "growthLine": "失敗や不足への恐れから、自分の限界を受け入れ、確かな力を築く",
+    "surface": "土星は責任、努力、規律、忍耐、制限、時間、社会的な役割を象徴します。簡単には手に入らないものを経験と積み重ねによって形にする働きです。",
+    "inner": "『失敗したくない』『認められたい』『十分な力を持ちたい』という願いが、過剰な努力や自己批判につながることがあります。弱さを見せることへの恐れも関わります。",
+    "meaning": "土星は単に試練を与える天体ではありません。自分の限界を知り、その中で何を実現するかを学び、他者の基準ではなく内側の確かな基準を築く力です。",
+    "growth": "努力で価値を証明しようとする段階から、能力と限界を理解し、自分の意志で責任を引き受ける段階へ。内なる権威が育ちます。",
+    "soul": "時間と現実の中で経験を知恵へ変える魂の学び。制限を通して本当に大切なものを見極めます。"
+  },
+  "uranus": {
+    "question": "私は何から自由になりたいのか",
+    "growthLine": "反抗や突然の変化による解放から、自分らしく生きるための真の自由へ",
+    "surface": "天王星は革新、独立、独自性、突然の変化、目覚めを象徴します。当たり前と思っていた枠組みを問い直し、新しい可能性を開く働きです。",
+    "inner": "縛られたくないという思いから、関係や仕組みを急に断ち切りたくなることがあります。人と違うこと自体が目的になる葛藤もあります。",
+    "meaning": "天王星の本質は反抗そのものではありません。自分を制限している古い前提に気づき、本質に沿った新しい生き方を見つける意識です。",
+    "growth": "外側の規則を壊すことによって自由を確かめる段階から、自分の個性を自覚し、周囲との新しい関係を築く段階へ。",
+    "soul": "魂を目覚めさせる変化の閃光。既知の自分を越えて、まだ表現されていない可能性を解き放ちます。"
+  },
+  "neptune": {
+    "question": "私は何とつながり、何を信じたいのか",
+    "growthLine": "理想への逃避や境界の曖昧さから、現実の中で直感と共感を活かす",
+    "surface": "海王星は夢、直感、想像力、慈悲、共感、境界を越えたつながりを象徴します。言葉にならない感覚や理想を受け取る働きです。",
+    "inner": "理想と現実の隔たりが苦しくなると、幻想に逃げたり他者の感情を抱え込みすぎたりすることがあります。信じたい思いが物事を曖昧にする葛藤です。",
+    "meaning": "海王星の本質は現実を見失うことではありません。目に見えるものだけでは測れない意味やつながりを感じ、それを共感や創造へと変える意識です。",
+    "growth": "理想の中に溶け込む段階から、自分の境界を保ちながら直感や慈悲を現実の表現に活かす段階へ。",
+    "soul": "個を超えた大きな世界との一体感を探る魂の旅。夢と現実を結び、目に見えない豊かさを形にします。"
+  },
+  "pluto": {
+    "question": "私は何を失うことを恐れ、何を手放す必要があるのか",
+    "growthLine": "支配や執着による自己防衛から、根源的な変容と再生へ",
+    "surface": "冥王星は深層心理、強い意志、喪失、再生、根本的な変容を象徴します。表面に見えない力や避けてきた真実に向き合う働きです。",
+    "inner": "失うことへの恐れが、物事を支配したい気持ちや強い執着につながることがあります。弱さに触れることを避けるほど、内側の緊張が高まります。",
+    "meaning": "冥王星の本質は破壊そのものではありません。もはや自分を支えなくなった形を終わらせ、より深い本質へと生まれ変わる力です。",
+    "growth": "失わないために握りしめる段階から、必要な終わりを引き受け、自分を根本から作り直す段階へ。力が支配から再生へ変わります。",
+    "soul": "古い自己像を脱ぎ捨てる魂の変容。手放しを通して、内側に眠っていた生命力を取り戻します。"
+  }
+};
 
 const planetReadings = {
   sun:{ surface:"人生の軸を育て、自分の意志で選び取る力", shadow:"本音を押し込めるほど、誰かの期待に合わせすぎて自分の輪郭がぼやけやすくなります" },
@@ -1325,6 +1462,18 @@ function signDetailMarkup(item) {
   </div>`;
 }
 
+function planetDetailMarkup(item) {
+  const deep = planetDeepReadings[item.value];
+  return `<div class="planet-deep-grid">
+    <div class="planet-deep-block"><h3>表テーマ｜外側に現れる働き</h3><p>${deep.surface}</p></div>
+    <div class="planet-deep-block"><h3>裏テーマ｜無意識の欲求・葛藤</h3><p>${deep.inner}</p></div>
+    <div class="planet-deep-block wide"><h3>本質的な問い</h3><p class="planet-key-question">「${deep.question}」</p></div>
+    <div class="planet-deep-block wide"><h3>本質的な意味</h3><p>${deep.meaning}</p></div>
+    <div class="planet-deep-block wide"><h3>成長・成熟のテーマ</h3><p class="planet-key-line">${deep.growthLine}</p><p>${deep.growth}</p></div>
+    <div class="planet-deep-block wide"><h3>魂の探求</h3><p>${deep.soul}</p></div>
+  </div>`;
+}
+
 function showDetail(type, item, options = {}) {
   const { sourceCard = null, scroll = false, updateHash = true } = options;
   const detailSection = document.getElementById("detail");
@@ -1337,13 +1486,13 @@ function showDetail(type, item, options = {}) {
   }
   detailSection.hidden = false;
   detailPanel.dataset.detailType = type;
-  detailPanel.style.setProperty("--item-color", type === "sign" ? elementColorMap[item.element] : type === "house" ? houseColorMap[item.value] : "#FF7F00");
-  detailPanel.style.setProperty("--item-ink", type === "sign" ? elementColorMap[item.element] : type === "house" ? houseInkMap[item.value] : "#FF7F00");
+  detailPanel.style.setProperty("--item-color", type === "sign" ? elementColorMap[item.element] : type === "house" ? houseColorMap[item.value] : type === "planet" ? planetColorMap[item.value] : "#FF7F00");
+  detailPanel.style.setProperty("--item-ink", type === "sign" ? elementColorMap[item.element] : type === "house" ? houseInkMap[item.value] : type === "planet" ? planetInkMap[item.value] : "#FF7F00");
   detailPanel.innerHTML = `
     <div class="detail-kicker">${detailTypes[type].label}の詳細</div>
     <div class="detail-title"><span class="detail-symbol">${detailIcon(type, item)}</span>${detailTitle(type, item)}</div>
     ${detailMeta(type, item)}
-    ${type === "house" ? houseDetailMarkup(item) : type === "sign" ? signDetailMarkup(item) : `    <div class="detail-grid"
+    ${type === "house" ? houseDetailMarkup(item) : type === "sign" ? signDetailMarkup(item) : type === "planet" ? planetDetailMarkup(item) : `    <div class="detail-grid"
       <div class="detail-block"><h3>表テーマ</h3><p>${detailSurface(type, item)}</p></div>
       <div class="detail-block"><h3>裏テーマ</h3><p>${detailShadow(type, item)}</p></div>
       <div class="detail-block"><h3>深い解釈</h3><p>${detailDeep(type, item)}</p></div>
