@@ -688,6 +688,117 @@ h2 {
 .comparison-difference p { margin:8px 0 0; }
 #selector { scroll-margin-top:100px; }
 @media(max-width:680px) { .comparison-columns {grid-template-columns:1fr;} .comparison-panel {padding:14px;} .comparison-choice .combination-parts {gap:3px;} }
+
+/* Editorial atlas redesign – unified layouts for desktop, tablet and mobile */
+:root { --atlas-shadow:0 12px 36px rgba(58,42,26,.055); }
+body { background:#FAF8F4; }
+.topbar { backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+.brand-home { font-size:22px; font-weight:900; }
+main { width:min(1160px,calc(100% - 64px)); padding-top:52px; }
+h1 { color:var(--text); font-size:clamp(29px,3.5vw,44px); letter-spacing:.015em; }
+h2 { color:var(--text); font-size:clamp(23px,2.7vw,31px); letter-spacing:.005em; }
+.heading-icon { color:var(--orange); }
+.lead { max-width:780px; line-height:1.95; color:var(--muted); font-weight:500; font-size:15px; }
+.desc { max-width:880px; line-height:1.9; font-weight:500; color:var(--muted); }
+section { padding:38px 0 44px; }
+#selector { padding-top:34px; }
+.selector-panel, .comparison-panel, .result-card { border:1px solid var(--line); border-radius:18px; box-shadow:var(--atlas-shadow); }
+.selector-panel { padding:clamp(18px,2.5vw,32px); }
+.comparison-panel { background:#FAF8F4; }
+.result-card { background:#FFF8F0; box-shadow:none; }
+.grid { gap:18px; }
+.planets { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.signs { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.houses { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.card { border-radius:15px; box-shadow:0 5px 20px rgba(58,42,26,.04); transition:transform .2s ease, box-shadow .2s ease,border-color .2s ease; overflow:hidden; }
+.card.is-clickable:hover { transform:translateY(-4px); box-shadow:0 15px 32px rgba(58,42,26,.11); }
+.card.is-clickable::after { content:"詳しく読む  ↗"; display:block; width:max-content; margin:13px 0 0 auto; color:var(--item-ink,var(--orange)); font-size:11px; font-weight:900; letter-spacing:.05em; }
+.mini-card,.sign-card { padding:22px 18px; }
+.planet-card,.sign-card { min-height:280px; }
+.planet-icon { margin-bottom:14px; }
+.house-card { padding:22px; min-height:205px; }
+.card h3 { font-size:16px; }
+.card p { font-weight:600; line-height:1.65; }
+.card .planet-question,.card .sign-question,.card .house-question { margin-top:17px; }
+.note { border-radius:15px; background:#FFF6EA; padding:22px 28px; }
+body.reader-open { overflow:hidden; }
+.reader-view[hidden] { display:none !important; }
+.reader-view { position:fixed; inset:0; z-index:100; background:#FAF8F4; display:flex; flex-direction:column; }
+.reader-topbar { min-height:74px; padding:12px clamp(18px,4vw,56px); display:flex; align-items:center; justify-content:space-between; gap:14px; border-bottom:1px solid var(--line); background:rgba(250,248,244,.98); }
+.reader-back { appearance:none; border:1px solid var(--line); color:var(--text); background:#fff; border-radius:999px; cursor:pointer; font:inherit; font-size:14px; font-weight:800; padding:9px 18px; min-height:44px; }
+.reader-back:hover,.reader-back:focus-visible { border-color:var(--orange); color:#A64E00; }
+.reader-brand { color:var(--orange); font-weight:900; letter-spacing:.06em; font-size:19px; }
+.reader-top-label { color:var(--muted); font-size:11px; letter-spacing:.14em; font-weight:800; }
+.reader-layout { min-height:0; flex:1; display:grid; grid-template-columns:minmax(230px,290px) minmax(0,1fr); width:min(1440px,100%); margin:0 auto; }
+.reader-rail { min-height:0; overflow-y:auto; border-right:1px solid var(--line); padding:32px 18px 38px clamp(16px,3vw,36px); background:#F7F2EA; }
+.reader-rail-heading { display:flex; flex-direction:column; gap:7px; margin:0 0 20px; padding:0 8px; }
+.reader-rail-heading span { font-size:10px; font-weight:900; letter-spacing:.16em; color:var(--orange); }
+.reader-rail-heading strong { font-size:20px; }
+.reader-rail-list { display:flex; flex-direction:column; gap:5px; }
+.reader-rail-item { border:1px solid transparent; background:transparent; color:var(--text); border-radius:11px; min-height:52px; width:100%; padding:9px 13px; display:flex; align-items:center; gap:13px; text-align:left; font:inherit; font-weight:700; cursor:pointer; }
+.reader-rail-item:hover { background:#fff8ef; }
+.reader-rail-item.is-current { background:#fff; border-color:#F5D3B2; box-shadow:0 4px 14px rgba(58,42,26,.045); }
+.reader-rail-icon { width:27px; font-family:"Times New Roman",serif; font-size:24px; text-align:center; flex:0 0 auto; }
+.reader-rail-arrow { color:var(--orange); margin-left:auto; opacity:0; }
+.reader-rail-item.is-current .reader-rail-arrow,.reader-rail-item:hover .reader-rail-arrow { opacity:1; }
+#detail.detail-section { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0; border:0; scroll-margin-top:0; }
+.reader-content { width:min(860px,100%); margin:0 auto; padding:clamp(24px,4vw,56px) clamp(18px,5vw,60px) 70px; }
+.reader-breadcrumb { color:#9D7C64; font-size:12px; font-weight:800; letter-spacing:.06em; }
+.reader-heading { font-size:clamp(32px,3vw,45px); line-height:1.2; margin:10px 0 28px; color:var(--text); }
+.detail-panel { background:transparent; border:0; padding:0; }
+.detail-kicker { text-transform:uppercase; font-size:12px; letter-spacing:.1em; }
+.detail-title { font-size:25px; padding:22px 26px; border-radius:16px; background:#fff; border:1px solid var(--line); box-shadow:var(--atlas-shadow); }
+.planet-deep-grid,.sign-deep-grid,.house-deep-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:0 0 20px; }
+.planet-deep-block,.sign-deep-block,.house-deep-block { border:1px solid var(--line) !important; border-left:3px solid var(--item-color) !important; border-radius:13px; padding:22px 23px; box-shadow:0 5px 15px rgba(58,42,26,.035); }
+.planet-deep-block h3,.sign-deep-block h3,.house-deep-block h3 { font-size:13px; letter-spacing:.03em; }
+.planet-deep-block p,.sign-deep-block p,.house-deep-block p { line-height:1.95; font-weight:500; font-size:14px; }
+.planet-deep-block.wide,.sign-deep-block.wide,.house-deep-block.wide { grid-column:1/-1; }
+.planet-deep-block .planet-key-question,.sign-deep-block .sign-key-question,.house-deep-block .house-key-question { font-size:clamp(19px,2vw,24px); }
+.detail-tags { margin:24px 0; }
+.detail-actions { margin:25px 0 30px; }
+.detail-button { border-radius:999px; padding:10px 20px; cursor:pointer; }
+.reader-pagination { display:grid; grid-template-columns:1fr 1fr; gap:12px; border-top:1px solid var(--line); padding-top:24px; }
+.reader-page-button { min-height:73px; border-radius:13px; border:1px solid var(--line); background:#fff; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; padding:14px 20px; color:var(--text); cursor:pointer; font:inherit; }
+.reader-page-button:last-child { align-items:flex-end; text-align:right; }
+.reader-page-button small { font-size:12px; font-weight:700; color:var(--orange); }
+.reader-page-button strong { font-size:15px; }
+.reader-page-button:disabled { opacity:.35; cursor:default; }
+.reader-page-button:not(:disabled):hover { border-color:var(--orange); background:#FFF8F0; }
+@media(max-width:980px) {
+ main { width:min(100% - 40px,1000px); }
+ .planets { grid-template-columns:repeat(3,minmax(0,1fr)); }
+ .signs,.houses { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .reader-layout { grid-template-columns:230px minmax(0,1fr); }
+ .planet-deep-grid,.sign-deep-grid,.house-deep-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:740px) {
+ .reader-top-label,.reader-rail { display:none; }
+ .reader-layout { display:block; min-height:0; overflow:hidden; }
+ #detail.detail-section { height:100%; }
+ .reader-topbar { min-height:64px; }
+ .reader-brand { font-size:17px; }
+ .reader-heading { margin-bottom:20px; }
+ .planet-deep-grid,.sign-deep-grid,.house-deep-grid { grid-template-columns:1fr; }
+ .planets,.signs,.houses { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .planet-card,.sign-card { min-height:250px; }
+}
+@media(max-width:560px) {
+ main { width:calc(100% - 30px); padding-top:28px; }
+ section { padding:28px 0 34px; }
+ .topbar { padding:13px 18px; gap:6px; }
+ .nav { gap:4px 14px; }
+ .nav a { font-size:12px; }
+ .planets,.signs,.houses { grid-template-columns:1fr; }
+ .mini-card,.sign-card,.house-card { min-height:0; }
+ .reader-content { padding:24px 18px 54px; }
+ .reader-topbar { padding:10px 15px; }
+ .reader-back { font-size:12px; padding:8px 12px; }
+ .detail-title { padding:18px; }
+ .planet-deep-block,.sign-deep-block,.house-deep-block { padding:18px; }
+ .reader-page-button { padding:12px; }
+}
+@media(prefers-reduced-motion:reduce) { .card,.nav a { transition:none; } }
+
 </style>
 </head>
 <body>
@@ -1064,11 +1175,6 @@ h2 {
       </div>
     </section>
 
-    <section id="detail" class="detail-section" hidden>
-      <h2><span class="heading-icon">✧</span>カードの詳細</h2>
-      <div id="detailPanel" class="detail-panel" aria-live="polite"></div>
-    </section>
-
     <section id="hint">
       <h2><span class="heading-icon">♧</span>読むヒント</h2>
       <p class="desc">天体・感受点は「どんな働きや人生のテーマか」、星座は「どんな個性で」、ハウスは「どの舞台で」を表します。<br>表テーマだけでなく裏テーマを見ると、その配置がなぜ大切なのかが見えてきます。</p>
@@ -1081,6 +1187,30 @@ h2 {
       </div>
     </section>
   </main>
+</div>
+<div id="readerView" class="reader-view" hidden aria-label="星読み辞典の詳細画面">
+  <header class="reader-topbar">
+    <button id="readerBack" type="button" class="reader-back" aria-label="カード一覧へ戻る"><span aria-hidden="true">←</span> 一覧へ戻る</button>
+    <span class="reader-brand">星読み辞典</span>
+    <span class="reader-top-label">CELESTIAL ATLAS</span>
+  </header>
+  <div class="reader-layout">
+    <aside class="reader-rail" aria-label="項目の一覧">
+      <div class="reader-rail-heading"><span>EXPLORE</span><strong id="readerRailTitle">天体・感受点</strong></div>
+      <div id="readerRailList" class="reader-rail-list"></div>
+    </aside>
+    <section id="detail" class="detail-section" aria-labelledby="readerHeading">
+      <div class="reader-content">
+        <div class="reader-breadcrumb" id="readerBreadcrumb">星読み辞典 / 詳細</div>
+        <h1 id="readerHeading" class="reader-heading">象徴を読み解く</h1>
+        <div id="detailPanel" class="detail-panel" aria-live="polite"></div>
+        <nav class="reader-pagination" aria-label="前後の項目">
+          <button id="readerPrev" type="button" class="reader-page-button"></button>
+          <button id="readerNext" type="button" class="reader-page-button"></button>
+        </nav>
+      </div>
+    </section>
+  </div>
 </div>
 <script>
 const planets = [
@@ -1565,6 +1695,42 @@ const detailTypes = {
 };
 
 let activeDetailCard = null;
+let activeReaderType = null;
+let activeReaderValue = null;
+
+function readerSelect(type, item) {
+  const sourceCard = findDetailCard(type, item);
+  showDetail(type, item, { sourceCard });
+}
+
+function renderReaderRail(type, item) {
+  const config = detailTypes[type];
+  document.getElementById("readerRailTitle").textContent = config.label;
+  document.getElementById("readerRailList").innerHTML = config.items.map(entry => {
+    const current = entry.value === item.value;
+    const icon = detailIcon(type, entry);
+    const ink = type === "planet" ? planetInkMap[entry.value] : type === "sign" ? elementColorMap[entry.element] : houseInkMap[entry.value];
+    return `<button type="button" class="reader-rail-item${current ? " is-current" : ""}" data-reader-item="${type}" data-value="${entry.value}" ${current ? 'aria-current="true"' : ""}>
+      <span class="reader-rail-icon" style="color:${ink}">${icon}</span>
+      <span>${shortName(entry.name)}</span>
+      <span class="reader-rail-arrow" aria-hidden="true">↗</span>
+    </button>`;
+  }).join("");
+  document.getElementById("readerRailList").querySelector(".is-current")?.scrollIntoView({block:"nearest"});
+}
+
+function renderReaderPagination(type, item) {
+  const list = detailTypes[type].items;
+  const index = list.findIndex(entry => entry.value === item.value);
+  for (const [id, nextIndex, prefix] of [["readerPrev", index - 1, "← 前へ"], ["readerNext", index + 1, "次へ →"]]) {
+    const button = document.getElementById(id);
+    const next = list[nextIndex];
+    button.disabled = !next;
+    button.dataset.readerType = type;
+    button.dataset.readerValue = next ? next.value : "";
+    button.innerHTML = next ? `<small>${prefix}</small><strong>${shortName(next.name)}</strong>` : `<small>${prefix}</small><strong>ここまで</strong>`;
+  }
+}
 
 function detailHash(type, value) {
   return `${detailTypes[type].hashPrefix}-${value}`;
@@ -1639,9 +1805,15 @@ function findDetailCard(type, item) {
   return document.querySelectorAll(config.cardSelector)[index] || null;
 }
 
-function closeDetail() {
-  document.getElementById("detail").hidden = true;
-  if (activeDetailCard) activeDetailCard.focus();
+function closeDetail({ updateHash = true } = {}) {
+  const reader = document.getElementById("readerView");
+  if (reader.hidden) return;
+  reader.hidden = true;
+  document.body.classList.remove("reader-open");
+  if (updateHash && findDetailFromHash(location.hash)) {
+    history.replaceState(null, "", location.pathname + location.search + "#" + (activeReaderType === "planet" ? "planets" : activeReaderType === "sign" ? "signs" : "houses"));
+  }
+  if (activeDetailCard) activeDetailCard.focus({preventScroll:true});
 }
 
 function houseDetailMarkup(item) {
@@ -1681,16 +1853,20 @@ function planetDetailMarkup(item) {
 }
 
 function showDetail(type, item, options = {}) {
-  const { sourceCard = null, scroll = false, updateHash = true } = options;
-  const detailSection = document.getElementById("detail");
+  const { sourceCard = null, updateHash = true } = options;
   const detailPanel = document.getElementById("detailPanel");
   const detailCard = sourceCard || findDetailCard(type, item);
   const keywords = detailKeywords(type, item).map(keyword => `<span class="tag">${keyword}</span>`).join("");
-  if (detailCard) {
-    detailCard.insertAdjacentElement("afterend", detailSection);
-    activeDetailCard = detailCard;
-  }
-  detailSection.hidden = false;
+  if (detailCard) activeDetailCard = detailCard;
+  activeReaderType = type;
+  activeReaderValue = item.value;
+  document.getElementById("readerView").hidden = false;
+  document.body.classList.add("reader-open");
+  document.getElementById("readerHeading").textContent = shortName(item.name);
+  document.getElementById("readerBreadcrumb").textContent = "星読み辞典 / " + detailTypes[type].label;
+  renderReaderRail(type, item);
+  renderReaderPagination(type, item);
+  document.getElementById("detail").scrollTop = 0;
   detailPanel.dataset.detailType = type;
   detailPanel.style.setProperty("--item-color", type === "sign" ? elementColorMap[item.element] : type === "house" ? houseColorMap[item.value] : type === "planet" ? planetColorMap[item.value] : "#FF7F00");
   detailPanel.style.setProperty("--item-ink", type === "sign" ? elementColorMap[item.element] : type === "house" ? houseInkMap[item.value] : type === "planet" ? planetInkMap[item.value] : "#FF7F00");
@@ -1706,18 +1882,20 @@ function showDetail(type, item, options = {}) {
     </div>`}
     <div class="detail-tags" aria-label="関連キーワード">${keywords}</div>
     <div class="detail-actions">
-      <button class="detail-button" type="button" data-apply-detail="${type}" data-value="${item.value}">結果選択に反映</button>
-      <button class="detail-button secondary" type="button" data-close-detail>詳細を閉じる</button>
+      <button class="detail-button" type="button" data-apply-detail="${type}" data-value="${item.value}">この項目を組み合わせに使う</button>
+      <button class="detail-button secondary" type="button" data-close-detail>一覧に戻る</button>
     </div>
   `;
   if (updateHash) history.pushState(null, "", `#${detailHash(type, item.value)}`);
-  if (scroll) detailSection.scrollIntoView({ behavior:"auto", block:"nearest" });
+  document.getElementById("detail").scrollTop = 0;
 }
 
 function applyDetailToSelect(type, value) {
   const select = document.getElementById(detailTypes[type].selectId);
   select.value = value;
   updateResult();
+  closeDetail({updateHash:false});
+  history.replaceState(null, "", location.pathname + location.search + "#selector");
   document.getElementById("selector").scrollIntoView({ behavior:"auto", block:"start" });
 }
 
@@ -1738,10 +1916,13 @@ function bindCards(selector, type, items) {
   });
 }
 
-function showDetailFromHash(scroll = false) {
+function showDetailFromHash() {
   const detail = findDetailFromHash(location.hash);
-  if (!detail) return;
-  showDetail(detail.type, detail.item, { scroll, updateHash:false });
+  if (!detail) {
+    closeDetail({updateHash:false});
+    return;
+  }
+  showDetail(detail.type, detail.item, { updateHash:false });
 }
 
 function selectedCombination() {
@@ -1875,8 +2056,28 @@ document.getElementById("detailPanel").addEventListener("click", event => {
   applyDetailToSelect(button.dataset.applyDetail, button.dataset.value);
 });
 
-window.addEventListener("hashchange", () => showDetailFromHash(true));
-showDetailFromHash(false);
+document.getElementById("readerBack").addEventListener("click", () => closeDetail());
+document.getElementById("readerRailList").addEventListener("click", event => {
+  const button = event.target.closest("[data-reader-item]");
+  if (!button) return;
+  const config = detailTypes[button.dataset.readerItem];
+  const item = config.items.find(entry => entry.value === button.dataset.value);
+  if (item) readerSelect(button.dataset.readerItem, item);
+});
+for (const id of ["readerPrev", "readerNext"]) {
+  document.getElementById(id).addEventListener("click", event => {
+    const button = event.currentTarget;
+    const config = detailTypes[button.dataset.readerType];
+    const item = config?.items.find(entry => entry.value === button.dataset.readerValue);
+    if (item) readerSelect(button.dataset.readerType, item);
+  });
+}
+window.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !document.getElementById("readerView").hidden) closeDetail();
+});
+window.addEventListener("hashchange", showDetailFromHash);
+window.addEventListener("popstate", showDetailFromHash);
+showDetailFromHash();
 </script>
 </body>
 </html>
