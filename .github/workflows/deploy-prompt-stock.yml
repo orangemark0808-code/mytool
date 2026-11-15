@@ -100,6 +100,7 @@ jobs:
           cp "Scene_Prompt/favicon.svg" "dist/Scene_Prompt/favicon.svg"
           cp "horoscope/index.html" "dist/horoscope/index.html"
           cp "horoscope/favicon.svg" "dist/horoscope/favicon.svg"
+          cp "horoscope/apple-touch-icon.png" "dist/horoscope/apple-touch-icon.png"
           cp "netakiroku/index.html" "dist/netakiroku/index.html"
           cp "netakiroku/app.js" "dist/netakiroku/app.js"
           cp "netakiroku/styles.css" "dist/netakiroku/styles.css"
