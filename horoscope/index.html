@@ -66,6 +66,9 @@ a:focus-visible {
   z-index:10;
 }
 .brand { font-weight:800; font-size:20px; }
+.brand-home { color:inherit; text-decoration:none; }
+.brand-home:hover { text-decoration:underline; }
+.brand-home:focus-visible { outline:3px solid #fff; outline-offset:4px; }
 .nav {
   display:flex;
   flex-wrap:wrap;
@@ -584,14 +587,10 @@ h2 {
 #detailPanel[data-detail-type="house"] .detail-symbol { color:var(--item-ink); }
 #detailPanel[data-detail-type="sign"] .detail-block { border-top:3px solid var(--item-color); }
 #detailPanel[data-detail-type="house"] .house-deep-block {
-  border:2px solid var(--item-color);
-  border-top-width:2px;
-  border-right-width:2px;
-  border-bottom-width:2px;
-  border-left-width:2px;
+  border:1px solid var(--item-color);
   box-shadow:none;
 }
-.house-card { border:2px solid var(--item-color); }
+.house-card { border:1.5px solid var(--item-color); }
 .house-card.is-clickable:hover { border-color:var(--item-ink); }
 #result .result-line[data-kind="sign"] { border-top:3px solid var(--sign-color); }
 #result .result-line[data-kind="sign"] > span { color:var(--sign-color); }
@@ -602,7 +601,7 @@ h2 {
 <body>
 <a class="skip-link" href="#content">本文へ移動</a>
 <header class="topbar">
-  <div class="brand">Horoscope</div>
+  <a class="brand brand-home" href="#content" aria-label="ページ先頭へ戻る">Horoscope</a>
   <nav class="nav" aria-label="ページ内メニュー">
     <a href="#selector">選ぶ</a>
     <a href="#planets">天体</a>
