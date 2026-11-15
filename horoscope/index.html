@@ -633,6 +633,46 @@ h2 {
 #detailPanel[data-detail-type="planet"] .detail-button { background:var(--item-color); border-color:var(--item-color); color:#fff; }
 #detailPanel[data-detail-type="planet"] .detail-button.secondary { background:#fff; color:var(--item-ink); }
 @media(max-width:980px){ .planet-deep-grid { grid-template-columns:1fr; } }
+
+/* Combined reading and one-variable comparison learning interface */
+.combination-note { font-size:12px; color:var(--muted); line-height:1.6; margin:14px 0 0; }
+.combination-summary { background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; }
+.combination-parts { display:grid; grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr) 16px minmax(0,1fr); align-items:center; gap:6px; }
+.combination-part { display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0; text-align:center; font-size:14px; }
+.combination-emblem { display:flex; align-items:center; justify-content:center; height:49px; width:49px; border-radius:50%; color:#fff; font-size:28px; font-family:"Times New Roman",serif; }
+.combination-part strong { font-size:13px; }
+.combination-part small { font-size:11px; color:var(--muted); }
+.combination-plus { font-size:19px; color:var(--muted); text-align:center; }
+.combination-main-reading { font-size:15px; font-weight:800; line-height:1.9; margin:16px 0 0; padding-top:13px; border-top:1px solid var(--line); }
+.combination-breakdown { margin-top:17px; }
+.combination-breakdown h3, .comparison-panel h3 { margin:0 0 10px; font-size:17px; }
+.combination-breakdown-row { background:#fff; border:1px solid var(--line); border-radius:6px; padding:12px 14px; margin:9px 0; }
+.combination-breakdown-row strong { font-size:13px; }
+.combination-breakdown-row p { margin:5px 0 0; font-size:13px; line-height:1.85; }
+.combination-deeper { margin-top:14px; border:1px solid var(--line); border-radius:6px; background:#fff; padding:12px 14px; font-size:14px; }
+.combination-deeper summary { font-weight:900; color:#A95000; cursor:pointer; }
+.comparison-panel { background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:20px; margin-top:18px; }
+.comparison-help { margin:0 0 14px; font-size:13px; }
+.comparison-modes { display:flex; flex-wrap:wrap; gap:10px 18px; border:0; padding:0; margin:0 0 16px; }
+.comparison-modes legend { font-size:13px; font-weight:900; margin-bottom:8px; }
+.comparison-modes label { cursor:pointer; font-weight:800; font-size:14px; }
+.comparison-modes input { accent-color:var(--orange); }
+.comparison-field { max-width:400px; }
+.comparison-output { font-size:13px; line-height:1.85; margin-top:14px; }
+.comparison-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.comparison-choice { min-width:0; }
+.comparison-choice h4 { font-size:14px; margin:0 0 8px; }
+.comparison-choice .combination-summary { background:#fffaf4; height:100%; }
+.comparison-choice .combination-emblem { width:35px; height:35px; font-size:21px; }
+.comparison-choice .combination-part { font-size:12px; }
+.comparison-choice .combination-part strong { font-size:12px; }
+.comparison-choice .combination-part small { font-size:10px; }
+.comparison-choice .combination-main-reading { font-size:13px; }
+.comparison-difference { margin-top:14px; background:#fff0e0; border-radius:6px; padding:13px 15px; }
+.comparison-difference strong { color:#8C4500; }
+.comparison-difference p { margin:8px 0 0; }
+#selector { scroll-margin-top:100px; }
+@media(max-width:680px) { .comparison-columns {grid-template-columns:1fr;} .comparison-panel {padding:14px;} .comparison-choice .combination-parts {gap:3px;} }
 </style>
 </head>
 <body>
@@ -640,7 +680,7 @@ h2 {
 <header class="topbar">
   <a class="brand brand-home" href="#content" aria-label="ページ先頭へ戻る">Horoscope</a>
   <nav class="nav" aria-label="ページ内メニュー">
-    <a href="#selector">選ぶ</a>
+    <a href="#selector">組み合わせ</a>
     <a href="#planets">天体</a>
     <a href="#signs">星座</a>
     <a href="#houses">ハウス</a>
@@ -654,12 +694,12 @@ h2 {
     <h1>自分を読むための占星術ミニ辞典</h1>
     <p class="lead">
       ホロスコープは、たくさんの要素が組み合わさって「あなたらしさ」を描き出します。<br>
-      ここでは、3つの要素の表テーマと裏テーマをやさしく理解していきましょう。
+      ここでは、天体・星座・ハウスの役割と深い意味を読み解き、3つの違いを比較しながら学んでいきましょう。
     </p>
 
     <section id="selector">
-      <h2><span class="heading-icon">✦</span>3つを選んで読む</h2>
-      <p class="desc">天体・星座・ハウスを選ぶと、組み合わせた結果が下に表示されます。</p>
+      <h2><span class="heading-icon">✦</span>01｜組み合わせて理解する</h2>
+      <p class="desc">天体は「何が働くか」、星座は「どのように」、ハウスは「どこで」。3つを選んで読み、ひとつだけ変えて違いを比べましょう。</p>
       <div class="selector-panel">
         <div class="selector-grid">
           <div class="field">
@@ -676,6 +716,22 @@ h2 {
           </div>
         </div>
         <div id="result" class="result-card" aria-live="polite"></div>
+        <div class="comparison-panel">
+          <h3>ひとつ変えて比べる</h3>
+          <p class="comparison-help">固定する2要素はそのままに、選んだ1要素だけを切り替えます。</p>
+          <fieldset class="comparison-modes">
+            <legend>比較する要素</legend>
+            <label><input type="radio" name="compareMode" value="planet" checked> 天体</label>
+            <label><input type="radio" name="compareMode" value="sign"> 星座</label>
+            <label><input type="radio" name="compareMode" value="house"> ハウス</label>
+          </fieldset>
+          <div class="field comparison-field">
+            <label for="compareSelect">比較する相手</label>
+            <select id="compareSelect" aria-describedby="comparisonDescription"></select>
+          </div>
+          <div id="comparisonDescription" class="comparison-output" aria-live="polite">上の3つを選ぶと、比較結果が表示されます。</div>
+        </div>
+        <p class="combination-note">現代占星術の象徴を学ぶための組み合わせ例です。天体・星座・ハウスの基本的な意味を組み立てており、アスペクトなどの条件は含みません。</p>
       </div>
     </section>
 
@@ -1302,6 +1358,84 @@ const houseReadings = {
   "12":{ surface:"潜在意識、癒し、見えない世界、内面の静けさにあらわれます", shadow:"深く感じるほど、自分は何者なのか、どこまでが自分なのかという問いが浮かびやすいです" }
 };
 
+// 各要素の役割を分けて組み立てる、学習用の解釈フレーズ
+const combinationPlanetActions = {
+  "sun": "自分の人生の中心を選び取り、本質を表現しようとする力が働きます",
+  "moon": "心の安心を確かめ、感情や習慣を通して反応する力が働きます",
+  "mercury": "情報を理解し、自分の言葉で伝えようとする力が働きます",
+  "venus": "喜びや美しさを感じ取り、大切なものを愛する力が働きます",
+  "mars": "自分の望みを明確にし、意志を行動に移す力が働きます",
+  "jupiter": "経験の意味を探り、可能性や信頼を広げる力が働きます",
+  "saturn": "責任を引き受け、時間をかけて確かな形を築く力が働きます",
+  "uranus": "既存の前提を問い直し、新しい自由を切り開く力が働きます",
+  "neptune": "直感や理想を受け取り、目に見えないつながりを感じる力が働きます",
+  "pluto": "隠れた本質に向き合い、古い形を終えて変容する力が働きます"
+};
+const combinationSignStyles = {
+  "aries": "率直に始め、自分から一歩踏み出す形で",
+  "taurus": "五感の確かさを重視し、時間をかけて積み重ねる形で",
+  "gemini": "好奇心を持って言葉や情報を行き来する形で",
+  "cancer": "感情的なつながりを大切にし、守り育てる形で",
+  "leo": "自分の喜びを創造的に表現する形で",
+  "virgo": "細部を見つめ、必要な調整を重ねる形で",
+  "libra": "相手の立場も考え、調和を探る形で",
+  "scorpio": "表面で終わらせず、深く関わり続ける形で",
+  "sagittarius": "広い世界に目を向け、意味を探求する形で",
+  "capricorn": "現実的な目標を定め、着実に築く形で",
+  "aquarius": "常識を問い直し、独自の視点を活かす形で",
+  "pisces": "境界をやわらげ、共感と直感を受け取る形で"
+};
+const combinationHouseContexts = {
+  "1": {
+    "scene": "自分自身のあり方や人生への向き合い方",
+    "focus": "自分をどう表現し、人生へ踏み出すか"
+  },
+  "2": {
+    "scene": "お金・才能・所有・自分の価値",
+    "focus": "何を大切な資源として育てるか"
+  },
+  "3": {
+    "scene": "言葉・学び・身近な交流",
+    "focus": "世界をどう理解し、伝えるか"
+  },
+  "4": {
+    "scene": "家庭・ルーツ・心の土台",
+    "focus": "どこに安心できる居場所を築くか"
+  },
+  "5": {
+    "scene": "創造・恋愛・遊び・自己表現",
+    "focus": "自分の喜びをどう外に表すか"
+  },
+  "6": {
+    "scene": "日々の仕事・習慣・心身のケア",
+    "focus": "持てる力を日常でどう役立てるか"
+  },
+  "7": {
+    "scene": "パートナーシップや一対一の関係",
+    "focus": "自分と他者の違いをどう尊重し合うか"
+  },
+  "8": {
+    "scene": "深い絆・共有・心理的な変容",
+    "focus": "何を分かち合い、何を手放すか"
+  },
+  "9": {
+    "scene": "旅・学問・哲学・人生観",
+    "focus": "どんな真実を自分の経験から見いだすか"
+  },
+  "10": {
+    "scene": "仕事・社会的な役割・達成",
+    "focus": "社会にどんな形で自分の力を表すか"
+  },
+  "11": {
+    "scene": "仲間・コミュニティ・未来の理想",
+    "focus": "どんな未来を誰と分かち合うか"
+  },
+  "12": {
+    "scene": "潜在意識・癒し・精神世界",
+    "focus": "内面の静けさや全体とのつながりにどう向き合うか"
+  }
+};
+
 const selectConfig = [
   { id:"planetSelect", items:planets, type:"planet" },
   { id:"signSelect", items:signs, type:"sign" },
@@ -1538,52 +1672,101 @@ function showDetailFromHash(scroll = false) {
   showDetail(detail.type, detail.item, { scroll, updateHash:false });
 }
 
-function createReading(planet, sign, house) {
-  const planetText = planetReadings[planet.value];
-  const signText = signReadings[sign.value];
-  const houseText = houseReadings[house.value];
-  const planetName = shortName(planet.name);
-  const signName = signDisplayName(sign);
-  const houseName = shortName(house.name);
-  return {
-    surface:`${planetName}は、${planetText.surface}です。${signName}の質が加わることで、${signText.surface}。それは${houseName}の領域、つまり${houseText.surface}。この配置は、自分の中にある力をどこで、どんな表情で使うと自然に流れやすいかを示しています。`,
-    shadow:`裏テーマでは、${planetText.shadow}。さらに${signName}の影として、${signText.shadow}。${houseName}では、${houseText.shadow}。この不安は欠点ではなく、意識して扱うことで表テーマの力をより成熟させる入口になります。`
-  };
-}
-
-function updateResult() {
+function selectedCombination() {
   const planet = findSelected(planets, document.getElementById("planetSelect"));
   const sign = findSelected(signs, document.getElementById("signSelect"));
   const house = findSelected(houses, document.getElementById("houseSelect"));
-  if (!planet || !sign || !house) {
-    document.getElementById("result").innerHTML = `
-      <div class="result-title">選んだ内容がここに表示されます</div>
-      <p class="result-reading">天体・星座・ハウスをそれぞれ選んでください。</p>
-    `;
+  return planet && sign && house ? { planet, sign, house } : null;
+}
+
+function combinationReading({ planet, sign, house }) {
+  const context = combinationHouseContexts[house.value];
+  return {
+    summary: `${context.scene}では、${combinationPlanetActions[planet.value]}。その働きは${combinationSignStyles[sign.value]}表れ、「${context.focus}」が大切な経験のテーマになります。`,
+    planet: `${shortName(planet.name)}：${planetDeepReadings[planet.value].surface}`,
+    sign: `${sign.name}：${signDeepReadings[sign.value].surface}`,
+    house: `${shortName(house.name)}：${houseDeepReadings[house.value].meaning}`,
+    inner: `${shortName(planet.name)}には「${planetDeepReadings[planet.value].question}」、${sign.name}には「${signDeepReadings[sign.value].question}」、第${house.value}ハウスには「${houseDeepReadings[house.value].question}」という問いがあります。それぞれの問いを重ねることで、この組み合わせの内面的なテーマを探れます。`,
+    growth: `${planetDeepReadings[planet.value].growthLine}。その力を${signDeepReadings[sign.value].growthLine}という方向で育て、${houseDeepReadings[house.value].growthLine}という人生のテーマに向き合います。`
+  };
+}
+
+function displayCombination({ planet, sign, house }) {
+  const reading = combinationReading({ planet, sign, house });
+  return `<div class="combination-summary" style="--planet-color:${planetColorMap[planet.value]};--sign-color:${elementColorMap[sign.element]};--house-color:${houseColorMap[house.value]}">
+    <div class="combination-parts">
+      <div class="combination-part"><span class="combination-emblem" style="background:${planetColorMap[planet.value]}">${planet.symbol}</span><strong>${shortName(planet.name)}</strong><small>何の力が働く？</small></div>
+      <span class="combination-plus" aria-hidden="true">＋</span>
+      <div class="combination-part"><span class="combination-emblem" style="background:${elementColorMap[sign.element]}">☆</span><strong>${sign.name}</strong><small>どのように？</small></div>
+      <span class="combination-plus" aria-hidden="true">＋</span>
+      <div class="combination-part"><span class="combination-emblem" style="background:${houseColorMap[house.value]}">${house.value}</span><strong>第${house.value}ハウス</strong><small>どこで？</small></div>
+    </div>
+    <p class="combination-main-reading">${reading.summary}</p>
+  </div>`;
+}
+
+function updateResult() {
+  const result = document.getElementById("result");
+  const chosen = selectedCombination();
+  if (!chosen) {
+    result.innerHTML = `<div class="result-title">選んだ内容がここに表示されます</div><p class="result-reading">天体・星座・ハウスをそれぞれ選んでください。</p>`;
+    updateComparison(null);
     return;
   }
-  const reading = createReading(planet, sign, house);
-  document.getElementById("result").style.setProperty("--sign-color",elementColorMap[sign.element]);
-  document.getElementById("result").style.setProperty("--house-color",houseColorMap[house.value]);
-  document.getElementById("result").style.setProperty("--house-ink",houseInkMap[house.value]);
-  document.getElementById("result").innerHTML = `
-    <div class="result-title"><span class="result-symbol">${planet.symbol}</span>${planet.name} × ${signDisplayName(sign)} × ${house.name}</div>
-    <div class="result-lines">
-      <div class="result-line"><span>天体</span>${planet.theme}<br>${planet.shadow}</div>
-      <div class="result-line" data-kind="sign"><span>星座</span>${signTags(sign)}${sign.theme}<br>${sign.shadow}</div>
-      <div class="result-line" data-kind="house"><span>ハウス</span>${house.theme}<br>${house.shadow}</div>
+  const reading = combinationReading(chosen);
+  result.innerHTML = `
+    ${displayCombination(chosen)}
+    <div class="combination-breakdown">
+      <h3>この解釈の内訳</h3>
+      <div class="combination-breakdown-row"><strong style="color:${planetInkMap[chosen.planet.value]}">天体｜何の力？</strong><p>${reading.planet}</p></div>
+      <div class="combination-breakdown-row"><strong style="color:${elementColorMap[chosen.sign.element]}">星座｜どのように？</strong><p>${reading.sign}</p></div>
+      <div class="combination-breakdown-row"><strong style="color:${houseInkMap[chosen.house.value]}">ハウス｜どこで？</strong><p>${reading.house}</p></div>
     </div>
-    <div class="result-reading">
-      <div class="reading-block">
-        <span class="reading-label">表テーマの解釈</span>
-        <p>${reading.surface}</p>
-      </div>
-      <div class="reading-block">
-        <span class="reading-label">裏テーマの解釈</span>
-        <p>${reading.shadow}</p>
-      </div>
+    <details class="combination-deeper">
+      <summary>内面的なテーマ・成長の方向を読む</summary>
+      <div class="reading-block"><span class="reading-label">根源的な問い</span><p>${reading.inner}</p></div>
+      <div class="reading-block"><span class="reading-label">成長・成熟の視点</span><p>${reading.growth}</p></div>
+    </details>`;
+  updateComparison(chosen);
+}
+
+function currentComparisonMode() {
+  return document.querySelector('input[name="compareMode"]:checked').value;
+}
+
+function updateComparison(chosen) {
+  const mode = currentComparisonMode();
+  const comparisonSelect = document.getElementById("compareSelect");
+  const output = document.getElementById("comparisonDescription");
+  const config = detailTypes[mode];
+  const earlier = comparisonSelect.value;
+  const primaryValue = chosen ? chosen[mode].value : "";
+  const options = config.items.filter(item => item.value !== primaryValue);
+  comparisonSelect.innerHTML = '<option value="">比較する相手を選んでください</option>' +
+    options.map(item => `<option value="${item.value}">${selectDisplayName(item,mode)}</option>`).join("");
+  comparisonSelect.value = options.some(item => item.value === earlier) ? earlier : "";
+  if (!chosen) { output.textContent = "天体・星座・ハウスを選ぶと比較できます。"; return; }
+  if (!comparisonSelect.value) { output.textContent = "比較する相手を選ぶと、変化する部分と共通する部分が表示されます。"; return; }
+  const replacement = config.items.find(item => item.value === comparisonSelect.value);
+  if (!replacement) return;
+  const alternate = { ...chosen, [mode]:replacement };
+  const names = {planet:"天体",sign:"星座",house:"ハウス"};
+  const roles = {planet:"働く力",sign:"表現の仕方",house:"人生の領域"};
+  const descriptions = {
+    planet: item => planetDeepReadings[item.value].surface,
+    sign: item => signDeepReadings[item.value].surface,
+    house: item => houseDeepReadings[item.value].meaning
+  };
+  output.innerHTML = `<div class="comparison-columns">
+    <div class="comparison-choice"><h4>もとの組み合わせ</h4>${displayCombination(chosen)}</div>
+    <div class="comparison-choice"><h4>ひとつ変更した場合</h4>${displayCombination(alternate)}</div>
     </div>
-  `;
+    <div class="comparison-difference">
+      <strong>変わるのは「${names[mode]}」＝${roles[mode]}</strong>
+      <p><b>${selectDisplayName(chosen[mode],mode)}</b>：${descriptions[mode](chosen[mode])}</p>
+      <p><b>${selectDisplayName(replacement,mode)}</b>：${descriptions[mode](replacement)}</p>
+      <p>残りの2要素は同じです。解釈の主題・表現方法・経験領域のうち、どこが変わるのかに注目してください。</p>
+    </div>`;
 }
 
 selectConfig.forEach(({ id, items, type }) => {
@@ -1596,6 +1779,14 @@ selectConfig.forEach(({ id, items, type }) => {
   });
 });
 updateResult();
+
+document.querySelectorAll('input[name="compareMode"]').forEach(radio => {
+  radio.addEventListener("change", () => {
+    document.getElementById("compareSelect").value = "";
+    updateComparison(selectedCombination());
+  });
+});
+document.getElementById("compareSelect").addEventListener("change", () => updateComparison(selectedCombination()));
 
 bindCards(".planets .mini-card", "planet", planets);
 bindCards(".signs .sign-card", "sign", signs);
