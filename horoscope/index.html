@@ -911,7 +911,7 @@ body.reader-open { overflow:hidden; }
 
     <section id="planets">
       <h2><span class="heading-icon">☉</span>天体・感受点は「役割や人生のテーマ」</h2>
-      <p class="desc">10天体は心や行動の働きを、ドラゴンヘッド・テイルとリリスは成長の方向や内面のテーマを象徴します。<br>後者3つは実際の天体ではなく、月の軌道に関係する感受点です。</p>
+      <p class="desc">10天体は心や行動の働きを、ドラゴンヘッド・テイルは成長の方向や慣れ親しんだ資質を象徴します。キロンは傷と癒しをめぐるテーマ、リリスは抑えられた本音を読み解く手がかりです。<br>キロンは小天体（ケンタウルス族）、ドラゴンヘッド・テイルは月の交点、ここで扱うリリスはブラックムーン・リリス（月の遠地点に関わる感受点）です。</p>
       <div class="grid planets">
         <article class="card mini-card planet-card" style="--item-color:#FFB300;--item-ink:#875500">
   <div class="planet-icon">☉</div>
@@ -1006,6 +1006,13 @@ body.reader-open { overflow:hidden; }
   <p><span>表テーマ</span>慣れ・蓄積・手放し</p>
   <p><span class="pale">裏テーマ</span>いつものやり方に戻りたい</p>
   <p class="planet-question"><span>本質的な問い</span>すでに身につけた力を、これからどう活かしていくのか</p>
+</article>
+<article class="card mini-card planet-card" style="--item-color:#B46A49;--item-ink:#87432B">
+  <div class="planet-icon">⚷</div>
+  <h3>キロン（傷と癒しの探求）</h3>
+  <p><span>表テーマ</span>癒し・理解・知恵</p>
+  <p><span class="pale">裏テーマ</span>この痛みを抱えた自分でもよいのか</p>
+  <p class="planet-question"><span>本質的な問い</span>自分の傷つきやすさから、どんな理解や優しさを育てられるのか</p>
 </article>
 <article class="card mini-card planet-card" style="--item-color:#7544A6;--item-ink:#61318D">
   <div class="planet-icon">⚸</div>
@@ -1274,6 +1281,7 @@ const planets = [
   { value:"pluto", symbol:"♇", name:"冥王星（変容させる人）", theme:"変容・真実", shadow:"真実を知りたい", role:"深い変化、再生、本質を見抜く力" },
   { value:"northnode", symbol:"☊", name:"ドラゴンヘッド（未来への方向）", theme:"発展・未知への挑戦", shadow:"慣れた世界から出るのが怖い", role:"今までの習慣を越えて育てたい方向性", kind:"point" },
   { value:"southnode", symbol:"☋", name:"ドラゴンテイル（慣れ親しんだ資質）", theme:"慣れ・蓄積・手放し", shadow:"いつものやり方に戻りたい", role:"自然に使える資質と、慣れゆえの偏り", kind:"point" },
+  { value:"chiron", symbol:"⚷", name:"キロン（傷と癒しの探求）", theme:"癒し・理解・知恵", shadow:"この痛みを抱えた自分でもよいのか", role:"傷つきやすさ、癒し、体験から生まれる理解", kind:"minor" },
   { value:"lilith", symbol:"⚸", name:"リリス（抑圧された本音）", theme:"自立・本能・影", shadow:"本音を見せたら拒絶されるかもしれない", role:"抑えられた欲求、境界、自由でありたい本音", kind:"point" }
 ];
 
@@ -1307,8 +1315,8 @@ const houses = [
   { value:"12", name:"12ハウス　見えない世界（潜在意識）", theme:"潜在意識・癒し・精神性の場", shadow:"私は何者なのか", stage:"潜在意識、癒し、見えない世界" }
 ];
 
-const planetColorMap = {"sun":"#FFB300","moon":"#7895E8","mercury":"#00B8D4","venus":"#EC4899","mars":"#F44336","jupiter":"#9C55E8","saturn":"#455A64","uranus":"#00A8A8","neptune":"#3366FF","pluto":"#8E244D","northnode":"#268A61","southnode":"#A57639","lilith":"#7544A6"};
-const planetInkMap = {"sun":"#875500","moon":"#3F5FA9","mercury":"#006C80","venus":"#A31565","mars":"#B3261E","jupiter":"#65319D","saturn":"#455A64","uranus":"#006B6B","neptune":"#2345AB","pluto":"#8E244D","northnode":"#176642","southnode":"#80531B","lilith":"#61318D"};
+const planetColorMap = {"sun":"#FFB300","moon":"#7895E8","mercury":"#00B8D4","venus":"#EC4899","mars":"#F44336","jupiter":"#9C55E8","saturn":"#455A64","uranus":"#00A8A8","neptune":"#3366FF","pluto":"#8E244D","northnode":"#268A61","southnode":"#A57639","chiron":"#B46A49","lilith":"#7544A6"};
+const planetInkMap = {"sun":"#875500","moon":"#3F5FA9","mercury":"#006C80","venus":"#A31565","mars":"#B3261E","jupiter":"#65319D","saturn":"#455A64","uranus":"#006B6B","neptune":"#2345AB","pluto":"#8E244D","northnode":"#176642","southnode":"#80531B","chiron":"#87432B","lilith":"#61318D"};
 const planetDeepReadings = {
   "sun": {
     "question": "私は本当はどんな人生を生きたいのか",
@@ -1418,6 +1426,15 @@ const planetDeepReadings = {
     "growth": "使い慣れた方法だけに頼る段階から、得意なことを認めつつ新しい経験のために使う段階へ。手放すのは資質そのものではなく、そこに閉じこもることです。",
     "soul": "魂が持ち歩いてきたように感じられる親しみ深い領域。そこから何を受け取り、何を次の旅へ持っていくかを問います。"
   },
+  "chiron": {
+    "question": "自分の傷つきやすさから、どんな理解や優しさを育てられるのか",
+    "growthLine": "傷を隠したり克服だけを急いだりする段階から、その体験を知恵と共感へ育てる段階へ",
+    "surface": "キロンは土星と天王星の軌道付近を巡る小天体で、占星術では『傷ついた癒し手』の象徴として扱われます。弱さを感じるところや、そこから生まれる気づきと学びを示します。",
+    "inner": "自分だけが欠けているように感じたり、傷を見られたくないために強がったりすることがあります。苦しみを早く消したい気持ちと、理解されたい願いが同居する領域です。",
+    "meaning": "キロンが象徴する癒しは、傷が完全に消えることだけではありません。痛みを経験したからこそ生まれる理解や、同じ痛みを持つ人への共感を育てることにも意味があります。",
+    "growth": "痛みを欠点として隠す姿勢から、傷ついた経験を自分の一部として見つめる姿勢へ。無理に誰かを癒す役を引き受けず、自分にも他者にも丁寧に向き合う力を育てます。",
+    "soul": "傷つきやすさを通して、人間の不完全さと尊厳を知る魂の探求。自分を否定していた場所から、より深い理解と優しさへ進みます。"
+  },
   "lilith": {
     "question": "誰にも認められなくても、私が否定したくない本音は何か",
     "growthLine": "拒まれることへの恐れや反発から、本音と境界を自分のものとして受け止める段階へ",
@@ -1442,6 +1459,7 @@ const planetReadings = {
   pluto:{ surface:"本質に触れ、古い自分を終わらせて再生する力", shadow:"真実を知りたい気持ちが強まると、白黒をつけすぎたり、深みに入り込みすぎたりしやすくなります" },
   northnode:{ surface:"今までの習慣を越えて育てたい方向性", shadow:"慣れた世界から出るのが怖い" },
   southnode:{ surface:"自然に使える資質と、慣れゆえの偏り", shadow:"いつものやり方に戻りたい" },
+  chiron:{ surface:"傷つきやすさを理解し、経験を知恵や共感へ変えていく力", shadow:"この痛みを抱えた自分でもよいのか" },
   lilith:{ surface:"抑えられた欲求、境界、自由でありたい本音", shadow:"本音を見せたら拒絶されるかもしれない" }
 };
 
@@ -1619,6 +1637,7 @@ const combinationPlanetActions = {
   "pluto": "隠れた本質に向き合い、古い形を終えて変容する力が働きます",
   "northnode": "慣れ親しんだ姿勢を土台に、これから経験し育てたい方向が示されます",
   "southnode": "なじみ深い資質やパターンが示され、それをどう活かし直すかが問われます",
+  "chiron": "傷つきやすさに向き合い、その体験から理解や共感を育てるテーマが表れます",
   "lilith": "押し込めてきた本音や自立への欲求が照らされ、どのように受け止めるかが問われます"
 };
 const combinationSignStyles = {
