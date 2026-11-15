@@ -582,8 +582,10 @@ h2 {
 #detailPanel[data-detail-type="house"] .house-key-line { color:var(--item-ink); }
 #detailPanel[data-detail-type="sign"] .detail-symbol { color:var(--item-ink); }
 #detailPanel[data-detail-type="house"] .detail-symbol { color:var(--item-ink); }
-#detailPanel[data-detail-type="sign"] .detail-block,
-#detailPanel[data-detail-type="house"] .house-deep-block { border-top:3px solid var(--item-color); }
+#detailPanel[data-detail-type="sign"] .detail-block { border-top:3px solid var(--item-color); }
+#detailPanel[data-detail-type="house"] .house-deep-block { border:2px solid var(--item-color); }
+.house-card { border:2px solid var(--item-color); }
+.house-card.is-clickable:hover { border-color:var(--item-ink); }
 #result .result-line[data-kind="sign"] { border-top:3px solid var(--sign-color); }
 #result .result-line[data-kind="sign"] > span { color:var(--sign-color); }
 #result .result-line[data-kind="house"] { border-top:3px solid var(--house-color); }
