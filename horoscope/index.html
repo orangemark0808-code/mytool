@@ -547,6 +547,16 @@ h2 {
     padding:16px;
   }
 }
+.house-card .house-question { border-top:1px solid var(--line-soft); padding-top:9px; margin-top:10px; font-size:13px; line-height:1.55; }
+.house-card .house-question span { background:#fff0e0; color:var(--orange); }
+.house-deep-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:0 0 16px; }
+.house-deep-block { background:#fff; border:1px solid var(--line-soft); border-radius:6px; padding:15px 16px; }
+.house-deep-block h3 { margin:0 0 8px; color:var(--orange); font-size:13px; font-weight:900; }
+.house-deep-block p { margin:0; font-size:14px; font-weight:700; line-height:1.85; white-space:pre-wrap; }
+.house-deep-block.wide { grid-column:1/-1; }
+.house-deep-block .house-key-line { font-weight:900; font-size:16px; line-height:1.6; margin-bottom:8px; }
+.house-deep-block .house-key-question { font-size:20px; font-weight:900; line-height:1.55; }
+@media(max-width:980px) { .house-deep-grid { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -783,61 +793,73 @@ h2 {
   <div class="house-head"><strong>1</strong><h3>ハウス　自分（自己表現）<em class="house-en">I AM</em></h3></div>
   <p><span>表テーマ</span>個性・外見・生き方を表す場</p>
   <p><span class="pale">裏テーマ</span>私は存在していいのか</p>
+  <p class="house-question"><span>本質的な問い</span>私は何者なのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>2</strong><h3>ハウス　価値（お金・才能）<em class="house-en">I HAVE</em></h3></div>
   <p><span>表テーマ</span>才能・お金・所有を育てる場</p>
   <p><span class="pale">裏テーマ</span>私には価値があるのか</p>
+  <p class="house-question"><span>本質的な問い</span>私の価値はどこにあるのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>3</strong><h3>ハウス　学び（コミュニケーション）<em class="house-en">I THINK</em></h3></div>
   <p><span>表テーマ</span>言葉・学び・情報交換の場</p>
   <p><span class="pale">裏テーマ</span>理解されるのか</p>
+  <p class="house-question"><span>本質的な問い</span>私は世界をどう理解するのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>4</strong><h3>ハウス　安心（家庭・基盤）<em class="house-en">I FEEL</em></h3></div>
   <p><span>表テーマ</span>家庭・ルーツ・心の土台の場</p>
   <p><span class="pale">裏テーマ</span>居場所はあるのか</p>
+  <p class="house-question"><span>本質的な問い</span>私の本当の居場所はどこか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>5</strong><h3>ハウス　表現（創造・恋愛）<em class="house-en">I CREATE</em></h3></div>
   <p><span>表テーマ</span>遊び・創造・喜びを表す場</p>
   <p><span class="pale">裏テーマ</span>本当の私を見せていいのか</p>
+  <p class="house-question"><span>本質的な問い</span>私は何を生み出したいのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>6</strong><h3>ハウス　仕事（日常・健康）<em class="house-en">I ANALYZE</em></h3></div>
   <p><span>表テーマ</span>日常・仕事・健康管理の場</p>
   <p><span class="pale">裏テーマ</span>役に立てるのか</p>
+  <p class="house-question"><span>本質的な問い</span>私は日々をどう生きるのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>7</strong><h3>ハウス　関係（パートナーシップ）<em class="house-en">I BALANCE</em></h3></div>
   <p><span>表テーマ</span>対人関係・契約・協力の場</p>
   <p><span class="pale">裏テーマ</span>愛されるのか</p>
+  <p class="house-question"><span>本質的な問い</span>私は他者とどう向き合うのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>8</strong><h3>ハウス　深究（共有・変容）<em class="house-en">I DESIRE</em></h3></div>
   <p><span>表テーマ</span>深い絆・共有・心理の場</p>
   <p><span class="pale">裏テーマ</span>信頼して大丈夫か</p>
+  <p class="house-question"><span>本質的な問い</span>私は何を手放し、何を受け取るのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>9</strong><h3>ハウス　探究（学問・旅）<em class="house-en">I SEE</em></h3></div>
   <p><span>表テーマ</span>哲学・学問・世界を広げる場</p>
   <p><span class="pale">裏テーマ</span>人生に意味はあるのか</p>
+  <p class="house-question"><span>本質的な問い</span>私は何を真実として生きるのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>10</strong><h3>ハウス　社会（仕事・役割）<em class="house-en">I USE</em></h3></div>
   <p><span>表テーマ</span>仕事・使命・社会的評価の場</p>
   <p><span class="pale">裏テーマ</span>社会に認められるのか</p>
+  <p class="house-question"><span>本質的な問い</span>私は社会に何を残したいのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>11</strong><h3>ハウス　仲間（理想・未来）<em class="house-en">I KNOW</em></h3></div>
   <p><span>表テーマ</span>仲間・理想・未来を作る場</p>
   <p><span class="pale">裏テーマ</span>同じ理想を持つ人はいるのか</p>
+  <p class="house-question"><span>本質的な問い</span>私はどんな未来に参加したいのか</p>
 </article>
 <article class="card house-card">
   <div class="house-head"><strong>12</strong><h3>ハウス　見えない世界（潜在意識）<em class="house-en">I BELIEVE</em></h3></div>
   <p><span>表テーマ</span>潜在意識・癒し・精神性の場</p>
   <p><span class="pale">裏テーマ</span>私は何者なのか</p>
+  <p class="house-question"><span>本質的な問い</span>私という存在の境界はどこにあるのか</p>
 </article>
       </div>
     </section>
@@ -930,6 +952,21 @@ const signReadings = {
   capricorn:{ surface:"目標を現実に落とし込み、時間を味方につけて積み上げます", shadow:"無力でいたくない気持ちが強まると、成果や肩書きで自分を守ろうとしすぎることがあります" },
   aquarius:{ surface:"個性を保ちながら、未来につながる新しい関係性を作ります", shadow:"埋もれたくない気持ちが強まると、普通であることを避けすぎて心の距離が生まれやすいです" },
   pisces:{ surface:"境界をやわらげ、直感や癒しを通して全体とつながります", shadow:"分離されたくない気持ちが強まると、相手の痛みまで自分のものとして背負いやすくなります" }
+};
+
+const houseDeepReadings = {
+  "1":{question:"私は何者なのか",growthLine:"他者の評価に依存せず、自分として存在する",meaning:"第1ハウスは、世界に向かって自分がどのように現れ、人生へ踏み出すかを表します。外見や第一印象だけでなく、自分の意志で行動を始める姿勢や、生き方の輪郭を育てる場所です。",inner:"周囲からどう見られるかに意識が向きすぎると、自分の姿を他人の反応に委ねてしまうことがあります。自分らしさを表したい気持ちと、拒まれたくない気持ちが交差します。",growthHeading:"他者の評価に依存せず、自分として存在する。",growth:"自分の輪郭を守るために誰かと比較する段階から、違いを持ったまま堂々と世界に参加する段階へ。行動を通して『これが私だ』という感覚を育てます。",soul:"『私はここに存在する』という宣言。魂がこの世界で固有の姿を持ち、人生を自分の足で歩み始める象徴です。"},
+  "2":{question:"私の価値はどこにあるのか",growthLine:"所有や成果と自己価値を切り離す",meaning:"第2ハウスは、お金や所有物だけでなく、自分が何を大切だと感じ、どんな才能や資源を自分のものとして育てるかを表します。五感を通して確かめる豊かさや、生活を支える力とも関わります。",inner:"失うことへの怖さや、十分に持っていなければ価値がないという思いが現れることがあります。何を得るかと同じくらい、自分にとって本当の豊かさとは何かが問われます。",growthHeading:"所有や成果と自己価値を切り離す。",growth:"外側の数字や評価だけで自分を測る段階から、自分の感覚と才能に信頼を置く段階へ。自分にとっての価値を見極め、形ある豊かさを育てます。",soul:"『私は何を持って生まれ、何を育てたいのか』という探求。所有の向こう側に、存在そのものの価値を見いだしていく象徴です。"},
+  "3":{question:"私は世界をどう理解するのか",growthLine:"自分の言葉で考え、伝え、他者の視点を受け取る",meaning:"第3ハウスは、日々の会話、学び、読み書き、身近な移動や人間関係を通して世界を知る場所です。情報を集めるだけでなく、見聞きしたことを自分の言葉へ変える営みを表します。",inner:"うまく伝わらない不安や、理解されたいという切実な気持ちが浮かぶことがあります。知識の量よりも、自分が何を見て何を感じたのかを言葉にできるかが鍵になります。",growthHeading:"自分の言葉で考え、伝え、他者の視点を受け取る。",growth:"誰かの言葉をそのまま受け入れる段階から、自分なりに考え、問い直し、対話できる段階へ。身近な交流が思考の柔軟さを育てます。",soul:"言葉を通して自分と世界を結ぶ旅。小さな発見や出会いの中にも、魂の学びが宿るという象徴です。"},
+  "4":{question:"私の本当の居場所はどこか",growthLine:"外側の環境だけでなく、内側に安心の土台を築く",meaning:"第4ハウスは、家庭、家族、ルーツ、住まい、心の奥の私的な領域を表します。社会へ向かう前に立ち返る場所であり、自分を支える感情的な基盤にも関わります。",inner:"愛されたい、守られたいという願いの一方で、安心できる場所を失う怖さが現れることがあります。過去から受け継いだ価値観や家族との距離感も、この領域の問いになります。",growthHeading:"外側の環境だけでなく、内側に安心の土台を築く。",growth:"誰かが用意した居場所に自分を合わせる段階から、自分の感覚を尊重した居場所を育てる段階へ。ルーツを受け止めながら、そこに縛られない土台を築きます。",soul:"魂が帰る内なる家。外の世界で何を経験しても、静かに自分へ戻れる場所を育てるという象徴です。"},
+  "5":{question:"私は何を生み出したいのか",growthLine:"評価のためではなく、存在する喜びから創造する",meaning:"第5ハウスは、創作、遊び、恋愛、自己表現、子どもとの関わりなど、自分の内側にある喜びを外へ表す場所です。役に立つかどうかよりも、心が動くことそのものに意味があります。",inner:"自由に表現したい一方で、笑われることや受け入れられないことへの怖さが生まれることがあります。自分の喜びを優先してもよいのかという問いが隠れています。",growthHeading:"評価のためではなく、存在する喜びから創造する。",growth:"認められるために表現する段階から、作ること、愛すること、楽しむこと自体を喜べる段階へ。創造を通して自分ならではの光を育てます。",soul:"魂が遊び、創造する場所。『好きだから生み出す』という純粋な衝動を取り戻す象徴です。"},
+  "6":{question:"私は日々をどう生きるのか",growthLine:"完璧さや有用性への執着を超え、自分の力を日常に活かす",meaning:"第6ハウスは、日課、仕事の実務、健康管理、技能の習得、奉仕といった毎日の営みを表します。大きな理念を、実際の暮らしの中で続けられる形に整える場所です。",inner:"役に立てなければ価値がないという思いや、欠点を見つけて直し続けたい衝動が現れることがあります。努力と自己犠牲の境界を見つめる領域でもあります。",growthHeading:"完璧さや有用性への執着を超え、自分の力を日常に活かす。",growth:"不完全さを責めながら働く段階から、自分の身体と生活を尊重しつつ力を尽くす段階へ。小さな積み重ねが、持続する力へ変わります。",soul:"日常を通した魂の鍛錬。特別な瞬間だけでなく、繰り返す営みの中にも意味があると気づく象徴です。"},
+  "7":{question:"私は他者とどう向き合うのか",growthLine:"自分も相手も失わず、対等な関係を築く",meaning:"第7ハウスは、親密なパートナー、結婚、契約、協働など、一対一で向き合う関係を表します。相手という鏡を通して、自分だけでは気づきにくい側面に出会う場所です。",inner:"選ばれたい、愛されたいという気持ちが、自分の望みを後回しにさせることがあります。相手に近づくことと、自分を失わないことの両立が問われます。",growthHeading:"自分も相手も失わず、対等な関係を築く。",growth:"相手から自分の価値を確かめる段階から、違いを認め合い、対話と選択で関係を育てる段階へ。依存でも孤立でもない結びつきを学びます。",soul:"『あなた』との出会いを通して『私』を深く知る旅。魂が他者の独自性を尊重しながら結ばれる象徴です。"},
+  "8":{question:"私は何を手放し、何を受け取るのか",growthLine:"支配や執着を超え、信頼と深い変容を経験する",meaning:"第8ハウスは、共有財産、相続、親密な結びつき、秘密、喪失と再生など、自分一人では完結しない深い交換を表します。他者と何かを分かち合うことで変化が起こる場所です。",inner:"信頼したい気持ちと、傷つくことや失うことへの恐れがぶつかることがあります。何もかも自分で管理したい衝動の奥に、深くつながりたい願いが潜んでいます。",growthHeading:"支配や執着を超え、信頼と深い変容を経験する。",growth:"守るために握りしめる段階から、必要なものを受け取り、役目を終えたものを手放す段階へ。関係性の深さが、自分自身を作り替える契機になります。",soul:"終わりと始まりをつなぐ変容の場。手放す経験を通して、表面的な自己像を超えた真実へ触れる象徴です。"},
+  "9":{question:"私は何を真実として生きるのか",growthLine:"与えられた常識を超え、自分自身の世界観を育てる",meaning:"第9ハウスは、単に遠くへ旅をする場所ではありません。それまで当たり前だと思っていた世界の枠組みを超え、自分自身の真実を発見する場所です。未知の文化や思想との出会いは、外の世界を知る経験であると同時に、自分の内側にある思い込みや限界に気づく機会でもあります。",inner:"自分が信じてきた常識は、本当に正しいのだろうか。人生にはもっと大きな意味があるのではないか。既存の価値観だけでは満たされない探求心。",growthHeading:"与えられた常識を超え、自分自身の世界観を育てる。",growth:"他者から教えられた正解を探す段階から、自分の経験を通して人生の意味を見いだす段階へ。知識を集めるだけでなく、その知識を自分自身の生き方へ統合していくことが、このハウスの成熟につながります。",soul:"『私は何のために生まれてきたのか』。第9ハウスは、この根源的な問いを探求する領域です。旅は必ずしも地理的な移動とは限りません。精神世界への探求や価値観の転換もまた、未知の世界への旅となります。"},
+  "10":{question:"私は社会に何を残したいのか",growthLine:"他者が定めた成功ではなく、自分の使命を形にする",meaning:"第10ハウスは、職業、社会的役割、責任、評判、到達点を表します。人からどう見られるかにとどまらず、自分の力を公の場でどう使い、何を築くかが問われる場所です。",inner:"認められたい、結果を残したいという願いが、自分の望みより肩書きや評価を優先させることがあります。社会から求められる役割と、自分が本当に果たしたい役割との違いに気づく領域です。",growthHeading:"他者が定めた成功ではなく、自分の使命を形にする。",growth:"期待に応えるためだけに成果を追う段階から、自分の責任と志を引き受けて形にする段階へ。社会的な達成を、自分らしい生き方と結び直します。",soul:"魂の志が社会に姿を現す場。内側で育ててきたものを、世界に向けて具体的な働きとして差し出す象徴です。"},
+  "11":{question:"私はどんな未来に参加したいのか",growthLine:"個人の願いを超え、仲間や社会と理想を共有する",meaning:"第11ハウスは、友人、仲間、共同体、未来への希望、社会的な理想を表します。一人では実現しにくいことを、異なる個性の人々と分かち合い、未来へつなげる場所です。",inner:"自分の理想を理解してくれる人はいるのかという孤独や、集団の中で自分を消してしまう不安が生まれることがあります。所属することと、独自性を保つことの両方がテーマになります。",growthHeading:"個人の願いを超え、仲間や社会と理想を共有する。",growth:"受け入れてもらうために合わせる段階から、自分の違いを持ち寄って未来を作る段階へ。個人の願いが、誰かと共有できる希望へ育ちます。",soul:"魂が仲間と未来を描く場。個々の光が出会い、より大きな可能性を生み出していく象徴です。"},
+  "12":{question:"私という存在の境界はどこにあるのか",growthLine:"自我の枠を緩め、大きな全体とのつながりを感じる",meaning:"第12ハウスは、隠れた場所、ひとりの時間、潜在意識、夢、癒し、精神性など、普段の意識では捉えにくい領域を表します。外に向かう活動を離れ、内面に耳を澄ませる場所です。",inner:"自分の輪郭が曖昧になる不安と、何か大きなものにつながりたい願いが同時に現れることがあります。言葉にできない感情や、見ないようにしてきた心の動きにも出会います。",growthHeading:"自我の枠を緩め、大きな全体とのつながりを感じる。",growth:"一人で抱え込む段階から、静けさの中で自分の感情を受け止め、必要な助けや休息を許す段階へ。目に見えない内的な営みを大切にします。",soul:"個としての私を超え、全体とのつながりに触れる旅。終わりであると同時に、新しい始まりへ向かう静かな準備の場でもあります。"}
 };
 
 const houseReadings = {
@@ -1083,6 +1120,18 @@ function closeDetail() {
   if (activeDetailCard) activeDetailCard.focus();
 }
 
+function houseDetailMarkup(item) {
+  const deep = houseDeepReadings[item.value];
+  return `<div class="house-deep-grid">
+    <div class="house-deep-block"><h3>表テーマ｜現実世界での経験</h3><p>${item.theme}。${houseReadings[item.value].surface}。</p></div>
+    <div class="house-deep-block"><h3>裏テーマ｜無意識の欲求・葛藤</h3><p>${deep.inner}</p></div>
+    <div class="house-deep-block wide"><h3>本質的な問い</h3><p class="house-key-question">「${deep.question}」</p></div>
+    <div class="house-deep-block wide"><h3>本質的な意味</h3><p>${deep.meaning}</p></div>
+    <div class="house-deep-block wide"><h3>成長・成熟のテーマ</h3><p class="house-key-line">${deep.growthLine}</p><p>${deep.growth}</p></div>
+    <div class="house-deep-block wide"><h3>魂の探求</h3><p>${deep.soul}</p></div>
+  </div>`;
+}
+
 function showDetail(type, item, options = {}) {
   const { sourceCard = null, scroll = false, updateHash = true } = options;
   const detailSection = document.getElementById("detail");
@@ -1098,12 +1147,12 @@ function showDetail(type, item, options = {}) {
     <div class="detail-kicker">${detailTypes[type].label}の詳細</div>
     <div class="detail-title"><span class="detail-symbol">${detailIcon(type, item)}</span>${detailTitle(type, item)}</div>
     ${detailMeta(type, item)}
-    <div class="detail-grid">
+    ${type === "house" ? houseDetailMarkup(item) : `    <div class="detail-grid">
       <div class="detail-block"><h3>表テーマ</h3><p>${detailSurface(type, item)}</p></div>
       <div class="detail-block"><h3>裏テーマ</h3><p>${detailShadow(type, item)}</p></div>
       <div class="detail-block"><h3>深い解釈</h3><p>${detailDeep(type, item)}</p></div>
       <div class="detail-block"><h3>扱い方</h3><p>${detailCare(type, item)}</p></div>
-    </div>
+    </div>`}
     <div class="detail-tags" aria-label="関連キーワード">${keywords}</div>
     <div class="detail-actions">
       <button class="detail-button" type="button" data-apply-detail="${type}" data-value="${item.value}">結果選択に反映</button>
