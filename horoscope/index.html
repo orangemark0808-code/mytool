@@ -738,7 +738,7 @@ body.reader-open { overflow:hidden; }
 #detail.detail-section { grid-column:2; min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:0; border:0; scroll-margin-top:0; }
 .reader-content { width:min(860px,100%); margin:0 auto; padding:clamp(24px,4vw,56px) clamp(18px,5vw,60px) 70px; }
 .reader-breadcrumb { color:#9D7C64; font-size:12px; font-weight:800; letter-spacing:.06em; }
-.reader-heading { font-size:clamp(32px,3vw,45px); line-height:1.2; margin:10px 0 28px; color:var(--text); }
+.reader-heading { font-size:clamp(32px,3vw,45px); line-height:1.2; margin:10px 0 32px; color:var(--text); }
 .detail-panel { background:transparent; border:0; padding:0; }
 .detail-kicker { text-transform:uppercase; font-size:12px; letter-spacing:.1em; }
 .detail-title { font-size:25px; padding:22px 26px; border-radius:16px; background:#fff; border:1px solid var(--line); box-shadow:var(--atlas-shadow); }
@@ -1860,7 +1860,7 @@ function showDetail(type, item, options = {}) {
   activeReaderValue = item.value;
   document.getElementById("readerView").hidden = false;
   document.body.classList.add("reader-open");
-  document.getElementById("readerHeading").textContent = shortName(item.name);
+  document.getElementById("readerHeading").textContent = type === "sign" ? item.name : shortName(item.name);
   document.getElementById("readerBreadcrumb").textContent = "星読み辞典 / " + detailTypes[type].label;
   renderReaderRail(type, item);
   renderReaderPagination(type, item);
@@ -1869,8 +1869,6 @@ function showDetail(type, item, options = {}) {
   detailPanel.style.setProperty("--item-color", type === "sign" ? elementColorMap[item.element] : type === "house" ? houseColorMap[item.value] : type === "planet" ? planetColorMap[item.value] : "#FF7F00");
   detailPanel.style.setProperty("--item-ink", type === "sign" ? elementColorMap[item.element] : type === "house" ? houseInkMap[item.value] : type === "planet" ? planetInkMap[item.value] : "#FF7F00");
   detailPanel.innerHTML = `
-    <div class="detail-kicker">${detailTypes[type].label}の詳細</div>
-    <div class="detail-title"><span class="detail-symbol">${detailIcon(type, item)}</span>${detailTitle(type, item)}</div>
     ${detailMeta(type, item)}
     ${type === "house" ? houseDetailMarkup(item) : type === "sign" ? signDetailMarkup(item) : type === "planet" ? planetDetailMarkup(item) : `    <div class="detail-grid"
       <div class="detail-block"><h3>表テーマ</h3><p>${detailSurface(type, item)}</p></div>
