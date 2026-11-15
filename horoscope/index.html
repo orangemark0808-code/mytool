@@ -693,10 +693,10 @@ h2 {
 :root { --atlas-shadow:0 12px 36px rgba(58,42,26,.055); }
 body { background:#FAF8F4; }
 .topbar { backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
-.brand-home { font-size:22px; font-weight:900; }
+.brand-home { font-size:20px; font-weight:900; }
 main { width:min(1160px,calc(100% - 64px)); padding-top:52px; }
-h1 { color:var(--text); font-size:clamp(29px,3.5vw,44px); letter-spacing:.015em; }
-h2 { color:var(--text); font-size:clamp(23px,2.7vw,31px); letter-spacing:.005em; }
+h1 { color:var(--text); font-size:34px; letter-spacing:.015em; }
+h2 { color:var(--text); font-size:26px; letter-spacing:.005em; }
 .heading-icon { color:var(--orange); }
 .lead { max-width:780px; line-height:1.95; color:var(--muted); font-weight:500; font-size:15px; }
 .desc { max-width:880px; line-height:1.9; font-weight:500; color:var(--muted); }
@@ -717,7 +717,7 @@ section { padding:38px 0 44px; }
 .planet-card,.sign-card { min-height:280px; }
 .planet-icon { margin-bottom:14px; }
 .house-card { padding:22px; min-height:205px; }
-.card h3 { font-size:16px; }
+.card h3 { font-size:15px; }
 .card p { font-weight:600; line-height:1.65; }
 .card .planet-question,.card .sign-question,.card .house-question { margin-top:17px; }
 .note { border-radius:15px; background:#FFF6EA; padding:22px 28px; }
@@ -786,6 +786,9 @@ body.reader-open { overflow:hidden; }
  main { width:calc(100% - 30px); padding-top:28px; }
  section { padding:28px 0 34px; }
  .topbar { padding:13px 18px; gap:6px; }
+ .brand-home { font-size:18px; }
+ main > h1 { font-size:28px; }
+ main h2 { font-size:22px; }
  .nav { gap:4px 14px; }
  .nav a { font-size:12px; }
  .planets,.signs,.houses { grid-template-columns:1fr; }
