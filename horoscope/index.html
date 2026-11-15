@@ -56,10 +56,8 @@ a:focus-visible {
 }
 .topbar {
   min-height:66px;
-  background:rgba(250,248,244,.97);
-  color:var(--text);
-  border-bottom:1px solid var(--line);
-  box-shadow:0 2px 12px rgba(58,42,26,.035);
+  background:var(--orange);
+  color:#fff;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -70,13 +68,9 @@ a:focus-visible {
   z-index:10;
 }
 .brand { font-weight:800; font-size:20px; }
-.brand-home {
-  color:var(--orange);
-  text-decoration:none;
-  letter-spacing:.045em;
-}
-.brand-home:hover { color:#D76500; }
-.brand-home:focus-visible { outline:3px solid var(--orange); outline-offset:4px; }
+.brand-home { color:#fff; text-decoration:none; }
+.brand-home:hover { text-decoration:underline; }
+.brand-home:focus-visible { outline:3px solid #fff; outline-offset:4px; }
 .nav {
   display:flex;
   flex-wrap:wrap;
@@ -86,18 +80,18 @@ a:focus-visible {
   font-weight:800;
 }
 .nav a {
-  color:var(--text);
+  color:#fff;
   text-decoration:none;
   padding:4px 0;
   border-bottom:2px solid transparent;
-  transition:color .18s ease, border-color .18s ease;
+  transition:border-color .18s ease;
 }
 .nav a:hover,
 .nav a:focus-visible {
-  color:var(--orange);
-  border-bottom-color:var(--orange);
+  color:#fff;
+  border-bottom-color:#fff;
 }
-.nav a:focus-visible { outline:2px solid var(--orange); outline-offset:4px; }
+.nav a:focus-visible { outline:2px solid #fff; outline-offset:4px; }
 .layout {
   min-height:calc(100vh - 66px);
 }
@@ -692,7 +686,7 @@ h2 {
 /* Editorial atlas redesign – unified layouts for desktop, tablet and mobile */
 :root { --atlas-shadow:0 12px 36px rgba(58,42,26,.055); }
 body { background:#FAF8F4; }
-.topbar { backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+.topbar { backdrop-filter:none; -webkit-backdrop-filter:none; }
 .brand-home { font-size:20px; font-weight:900; }
 main { width:min(1160px,calc(100% - 64px)); padding-top:52px; }
 h1 { color:var(--text); font-size:26px; letter-spacing:.015em; }
