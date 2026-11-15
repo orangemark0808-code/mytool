@@ -573,6 +573,8 @@ h2 {
 @media(max-width:980px) { .house-deep-grid { grid-template-columns:1fr; } }
 
 /* Sign and house accent colours: keep site navigation orange, colour only the corresponding content. */
+.sign-card { border-color:var(--item-color); }
+.sign-card.is-clickable:hover { border-color:var(--item-color); }
 .sign-card .sign-icon { background:var(--item-color); }
 .sign-card .sign-icon svg { fill:none; stroke:#fff; }
 .sign-card .sign-phrase { color:var(--item-color); border-color:var(--item-color); background:#fff; }
