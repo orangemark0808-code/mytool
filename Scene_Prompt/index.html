@@ -222,6 +222,11 @@
               <select id="workSeatLock" name="workSeatLock"></select>
               <p class="hint" id="workSeatLockHint">平面図・配置図を使うときだけ、固定したい作業席ルールを選びます。</p>
             </div>
+            <div class="work-seat-lock" id="roomCameraPositionWrap" hidden>
+              <label class="sub-label" for="roomCameraPosition">カメラ位置（配置図基準）</label>
+              <select id="roomCameraPosition" name="roomCameraPosition"></select>
+              <p class="hint">部屋のどこから撮影するかを指定します。人物の向きとは別です。</p>
+            </div>
             <div class="side-view-direction" id="sideViewDirectionWrap" hidden>
               <label class="sub-label" for="sideViewDirection">サイドビュー方向</label>
               <select id="sideViewDirection" name="sideViewDirection"></select>
@@ -395,6 +400,6 @@
     </div>
   </main>
 
-  <script src="script.js?v=2026-06-29-07"></script>
+  <script src="script.js?v=2026-11-17-camera"></script>
 </body>
 </html>
