@@ -478,6 +478,7 @@ function getRoomCameraPositionEnglish(data) {
     "If other background rules conflict, prioritize this floor plan and camera position."].join("\n");
 }
 function getWorkSeatLock(data) {
+  if (isMyRoomMode(data)) return "この部屋の作業席を固定する";
   return data.get("workSeatLock") || "なし";
 }
 
@@ -522,6 +523,10 @@ function getSideViewDirection(data) {
 }
 
 function shouldUseSideViewDirectionLock(data) {
+  // 配置図と撮影位置が指定された場合は家具の背後位置を向きから決めない。
+  if (hasReference(data, "backgroundReference")
+      && getBackgroundReferenceUsage(data) === "配置図:位置関係だけ参照"
+      && data.get("roomCameraPosition") !== "自動（指定なし）") return false;
   return getGenerationMode(data) === "personBackground"
     && getSideViewDirection(data) !== "なし";
 }
