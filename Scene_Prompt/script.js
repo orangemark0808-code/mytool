@@ -445,11 +445,47 @@ function getSpatialRelationLockEnglish(data) {
   ], "\n");
 }
 
+function hasActiveLayoutReference(data) {
+  return getGenerationMode(data) === "personBackground"
+    && hasReference(data, "backgroundReference")
+    && getBackgroundReferenceUsage(data) === "配置図:位置関係だけ参照";
+}
+
+function getLayoutFacingJapanese(data) {
+  if (!hasActiveLayoutReference(data)) return "";
+  const direction = getSideViewDirection(data);
+  const phrases = {
+    "右向き横顔": "人物は画面右向きの横顔にする。",
+    "左向き横顔": "人物は画面左向きの横顔にする。",
+    "正面": "人物の顔と体を正面向きにする。",
+    "後ろ姿": "人物は背中が見える向きにする。"
+  };
+  return phrases[direction]
+    ? ["【人物の向き（背景配置とは独立）】", phrases[direction],
+       "この指定から壁・家具の位置を決めない。背景は参照配置図とカメラ位置を優先する。"].join("\n")
+    : "";
+}
+
+function getLayoutFacingEnglish(data) {
+  if (!hasActiveLayoutReference(data)) return "";
+  const phrases = {
+    "右向き横顔": "The character faces right in profile.",
+    "左向き横顔": "The character faces left in profile.",
+    "正面": "The character faces the camera.",
+    "後ろ姿": "The character is seen from behind."
+  };
+  const line = phrases[getSideViewDirection(data)];
+  return line
+    ? ["Character facing (independent of background layout):", line,
+       "Do not infer wall or furniture placement from facing; derive it from the referenced layout and camera position."].join("\n")
+    : "";
+}
+
 function getRoomCameraPositionJapanese(data) {
-  if (!hasReference(data, "backgroundReference") || getBackgroundReferenceUsage(data) !== "配置図:位置関係だけ参照") return "";
+  if (!hasActiveLayoutReference(data)) return "";
   const position = data.get("roomCameraPosition");
   const descriptions = {
-    "机の反対側から人物の顔を見る": "机を挟んで人物の正面側から撮る。顔と手元が見える。人物の背後は配置図に従う壁側で、窓やベッドを背後へ移動しない。",
+    "机の反対側から人物の顔を見る": "人物が座る椅子の反対側へ机を挟んでカメラを置き、人物の顔と手元を撮る。背後の背景はその位置から配置図を見た結果に従い、窓・ベッド・棚を都合よく背後へ移さない。",
     "椅子の背後から机を見る": "椅子の後ろから机へ向かって撮る。人物の背中とPCが見える。",
     "窓側から作業席を見る": "配置図の窓側から作業席を撮る。",
     "本棚側から作業席を見る": "配置図の本棚側から作業席を撮る。"
@@ -462,10 +498,10 @@ function getRoomCameraPositionJapanese(data) {
     "背景に関する他の固定指定と矛盾したら、この配置図とカメラ位置を優先する。"].join("\n");
 }
 function getRoomCameraPositionEnglish(data) {
-  if (!hasReference(data, "backgroundReference") || getBackgroundReferenceUsage(data) !== "配置図:位置関係だけ参照") return "";
+  if (!hasActiveLayoutReference(data)) return "";
   const position = data.get("roomCameraPosition");
   const descriptions = {
-    "机の反対側から人物の顔を見る": "Shoot across the desk toward the seated person's face and hands. The wall from the reference layout belongs behind the person; do not move the window or bed behind them.",
+    "机の反対側から人物の顔を見る": "Place the camera across the desk, opposite the seated person, to show their face and hands. Determine what is actually behind them from this position in the reference layout; do not move windows, beds or shelves for convenience.",
     "椅子の背後から机を見る": "Shoot from behind the chair, showing the person's back and laptop.",
     "窓側から作業席を見る": "Shoot toward the work seat from the window side.",
     "本棚側から作業席を見る": "Shoot toward the work seat from the bookcase side."
@@ -483,40 +519,35 @@ function getWorkSeatLock(data) {
 }
 
 function shouldUseFixedRoomWorkSeat(data) {
-  return getGenerationMode(data) === "personBackground"
-    && hasReference(data, "backgroundReference")
-    && getBackgroundReferenceUsage(data) === "配置図:位置関係だけ参照"
+  // 作業席の専用固定は「自分の部屋」のみ。他の場所は配置図を一般的な配置資料として使う。
+  return isMyRoomMode(data)
+    && hasActiveLayoutReference(data)
     && getWorkSeatLock(data) === "この部屋の作業席を固定する";
 }
 
 function getFixedRoomWorkSeatJapanese(data) {
   if (!shouldUseFixedRoomWorkSeat(data)) return "";
-
   return compactJoin([
-    "【部屋内の作業席固定】",
-    "添付の平面図は、最終画像のカメラアングルではなく、家具配置と距離感の参照として使う。",
-    "この部屋では、机は部屋の中央手前、椅子は机の手前側に固定する。",
-    "棚・本棚・クローゼットは、平面図上の右壁側にある家具として扱う。",
-    "窓とベッドは奥壁側、ドアはドア側の壁として扱う。",
-    "作業席固定では机・椅子・右壁家具・窓・ベッド・ドアの位置関係だけを固定し、主人公の背後背景は配置図と選択したカメラ位置から決める。",
-    "部屋の家具を見せるためにカメラを引いたり、上半身ショットを全身構図に変えたりしない。"
+    "【自分の部屋・配置図に基づく作業席固定】",
+    "添付の配置図を家具・壁・窓と作業席の位置関係の基準とし、最終画像のカメラアングルとしては使わない。",
+    "机と椅子の位置・向き・間隔は配置図のまま維持する。人物は配置図にある作業席に座らせる。",
+    "窓・ベッド・棚・収納家具などがどの壁にあるかは配置図から読み取る。存在しないドアや家具は補わない。",
+    "人物の背後は、配置図上のカメラ位置から見て実際に重なる壁・家具だけを描く。",
+    "背景を見せるために机・椅子・家具を動かしたり、指定されたショットを広げたりしない。"
   ], "\n");
 }
 
 function getFixedRoomWorkSeatEnglish(data) {
   if (!shouldUseFixedRoomWorkSeat(data)) return "";
-
   return compactJoin([
-    "Fixed work-seat layout for this room:",
-    "Use the attached floor plan as a furniture-layout and distance reference, not as the final camera angle.",
-    "In this room, the desk is fixed near the front-center of the room, and the chair is fixed on the near side of the desk.",
-    "Treat the shelves, bookcases, and closet as furniture along the right wall in the floor plan.",
-    "Treat the window and bed as the back-wall side, and the door as the door-side wall.",
-    "This work-seat lock fixes only the positional relationships of the desk, chair, right-wall furniture, window, bed, and door. Decide the visible background from the reference floor plan and selected room-relative camera position.",
-    "Do not pull the camera back or change an upper-body shot into a full-body composition just to show the room furniture."
+    "My-room work-seat lock based on the supplied layout:",
+    "Use the attached layout as the authority for wall, window, furniture, desk and chair positions, not as the final camera angle.",
+    "Keep the desk and chair positions, orientation and spacing as shown; seat the character at that exact work seat.",
+    "Derive which wall contains the window, bed, shelves and storage from the reference; do not invent a door or furniture that is not visible.",
+    "Show only walls and furniture actually behind the person from the selected camera position.",
+    "Do not rearrange furniture or widen the chosen shot to show more background."
   ], "\n");
 }
-
 
 function getSideViewDirection(data) {
   return data.get("sideViewDirection") || "なし";
@@ -524,9 +555,7 @@ function getSideViewDirection(data) {
 
 function shouldUseSideViewDirectionLock(data) {
   // 配置図と撮影位置が指定された場合は家具の背後位置を向きから決めない。
-  if (hasReference(data, "backgroundReference")
-      && getBackgroundReferenceUsage(data) === "配置図:位置関係だけ参照"
-      && data.get("roomCameraPosition") !== "自動（指定なし）") return false;
+  if (hasActiveLayoutReference(data)) return false;
   return getGenerationMode(data) === "personBackground"
     && getSideViewDirection(data) !== "なし";
 }
@@ -604,7 +633,7 @@ function shouldUseBackdropAnchorLock(data) {
 function getMyRoomDirectionJapanese(data) {
   const isMyRoom = (data.get("generationMode") || "") === "myRoom";
   if (!isMyRoom) return "";
-  if (hasReference(data, "backgroundReference") && getBackgroundReferenceUsage(data) === "配置図:位置関係だけ参照") return "";
+  if (hasActiveLayoutReference(data)) return "";
 
   const direction = data.get("sideViewDirection") || "なし";
 
@@ -678,7 +707,7 @@ function getMyRoomDirectionJapanese(data) {
 function getMyRoomDirectionEnglish(data) {
   const isMyRoom = (data.get("generationMode") || "") === "myRoom";
   if (!isMyRoom) return "";
-  if (hasReference(data, "backgroundReference") && getBackgroundReferenceUsage(data) === "配置図:位置関係だけ参照") return "";
+  if (hasActiveLayoutReference(data)) return "";
 
   const direction = data.get("sideViewDirection") || "なし";
 
@@ -1326,7 +1355,7 @@ function collectConsistencyItems(data) {
     }
 
     if (shouldUseFixedRoomWorkSeat(data)) {
-      items.push({ level: "warn", text: "作業席固定：机・椅子・右壁家具・窓・ベッド・ドアの位置関係だけを固定します。背後背景はサイドビュー方向から決めます。" });
+      items.push({ level: "warn", text: "作業席固定：参照配置図上の机・椅子・家具と壁の位置を維持します。背後背景はカメラ位置から決めます。" });
     }
 
     const selectedSideViewDirection = getSideViewDirection(data);
@@ -1515,7 +1544,8 @@ function getBackgroundReferenceUsageNoteJapanese(data) {
     ],
     "配置図:位置関係だけ参照": [
       "【参照画像の使い方】",
-      "添付画像は配置図として使い、家具・物・場所要素の位置関係、距離感、スケール感だけを参照する。",
+      "添付画像は配置図として使い、家具・壁・窓・設備・場所要素の位置関係、距離感、スケール感だけを参照する。",
+      "見える背景は配置図上のカメラ位置から決める。人物の向きによって壁や家具を配置し直さない。",
       "最終画像では、添付画像の俯瞰、アイソメ、真上視点、図面風のカメラ角度を再現しない。",
       "配置情報を、選択したカメラビューとショットに合う自然な構図へ変換する。",
       "配置図内の文字ラベルや記号は画像内に描かない。"
@@ -1560,7 +1590,8 @@ function getBackgroundReferenceUsageNoteEnglish(data) {
     ],
     "配置図:位置関係だけ参照": [
       "Reference-image usage:",
-      "Use the attached image as a layout diagram: refer only to the positional relationships, distances, and scale relationships of furniture, objects, and place elements.",
+      "Use the attached image as a layout diagram: preserve relative positions, distances, and scale of furniture, walls, windows, fixtures, and other place elements.",
+      "Derive the visible background from the camera position in the layout, not from character-facing direction. Never rearrange walls or furniture to fit the character.",
       "Do not recreate the reference image's bird's-eye, isometric, top-down, or diagram-like camera angle in the final image.",
       "Convert the layout information into a natural composition that matches the selected camera view and shot.",
       "Do not draw labels, symbols, or diagram text from the layout image inside the final image."
@@ -2058,6 +2089,8 @@ function getPersonBackgroundPrompt(data) {
   const enBodyProportionLock = getBodyProportionLockEnglish(data);
   const jpSpatialRelationLock = getSpatialRelationLockJapanese(data);
   const enSpatialRelationLock = getSpatialRelationLockEnglish(data);
+  const jpLayoutFacing = getLayoutFacingJapanese(data);
+  const enLayoutFacing = getLayoutFacingEnglish(data);
   const jpRoomCameraPosition = getRoomCameraPositionJapanese(data);
   const enRoomCameraPosition = getRoomCameraPositionEnglish(data);
   const jpFixedRoomWorkSeat = getFixedRoomWorkSeatJapanese(data);
@@ -2091,6 +2124,7 @@ function getPersonBackgroundPrompt(data) {
     jpSpatialRelationLock,
     jpFixedRoomWorkSeat,
     jpRoomCameraPosition,
+    jpLayoutFacing,
     jpMyRoomSideView,
     jpBackdropAnchor,
     jpSideViewDirection,
@@ -2148,6 +2182,7 @@ function getPersonBackgroundPrompt(data) {
     enSpatialRelationLock,
     enFixedRoomWorkSeat,
     enRoomCameraPosition,
+    enLayoutFacing,
     enMyRoomSideView,
     enBackdropAnchor,
     enSideViewDirection,
@@ -2281,7 +2316,7 @@ function updateModeUi() {
   const myRoomHint = document.querySelector("#myRoomHint");
   if (myRoomHint) myRoomHint.style.display = isMyRoom ? "block" : "none";
 
-  // 参照画像を使うかどうかは自分の部屋モードでも選べる。
+  // 自分の部屋では作業席ルールを内部的に固定。背景参照そのものは任意。
   if (isMyRoom && workSeatLockSelect) workSeatLockSelect.value = "この部屋の作業席を固定する";
 
   const setFieldDisabled = (field, disabled) => {
@@ -2326,9 +2361,7 @@ function updateModeUi() {
   }
 
   const currentBackgroundReferenceUsage = backgroundReferenceUsageSelect?.value || "";
-  const shouldShowWorkSeatLock = (hasBackgroundReference || isMyRoom)
-    && isPersonBackgroundMode
-    && (currentBackgroundReferenceUsage === "配置図:位置関係だけ参照" || isMyRoom);
+  const shouldShowWorkSeatLock = isMyRoom && isPersonBackgroundMode;
 
   if (workSeatLockWrap) {
     workSeatLockWrap.hidden = !shouldShowWorkSeatLock;
@@ -2349,7 +2382,7 @@ function updateModeUi() {
       workSeatLockHint.textContent = "自分の部屋モードでは作業席固定が自動でONになります。";
     } else {
       workSeatLockHint.textContent = workSeatLockSelect.value === "この部屋の作業席を固定する"
-        ? "机・椅子・右壁家具・窓・ベッド・ドアの位置関係だけを固定します。"
+        ? "この部屋の作業席と配置図上の家具の位置関係を固定します。"
         : "この部屋の平面図を使う時だけ、作業席固定を選びます。";
     }
   }
@@ -2398,12 +2431,12 @@ function updateModeUi() {
   if (sideViewDirectionHint && sideViewDirectionSelect) {
     const directionHints = {
       "なし": isMyRoom
-        ? "主人公の向きを選ぶと、向きに応じた背景指定が自動で追加されます。"
+        ? (showRoomCamera ? "配置図使用時は向きだけ固定し、背景はカメラ位置から決めます。" : "配置図なしでは主人公の向きに応じた背景指定が追加されます。")
         : "横顔の向き（左右）を固定したいときに選びます。",
-      "右向き横顔": "主人公を右向き横顔に固定します。背後はドア側の壁になります。",
-      "左向き横顔": "主人公を左向き横顔に固定します。右壁の棚・本棚を右端に見せます。",
-      "正面": "主人公を正面向きにします。「背景に何を見せるか」で背後を選べます。",
-      "後ろ姿": "主人公を後ろ姿にします。「背景に何を見せるか」で前方の背景を選べます。"
+      "右向き横顔": showRoomCamera ? "右向きの横顔に固定します。背景配置は参照図とカメラ位置から決めます。" : "主人公を右向き横顔に固定します。背後はドア側の壁になります。",
+      "左向き横顔": showRoomCamera ? "左向きの横顔に固定します。背景配置は参照図とカメラ位置から決めます。" : "主人公を左向き横顔に固定します。右壁の棚・本棚を右端に見せます。",
+      "正面": showRoomCamera ? "主人公の正面向きを指定します。背景配置は参照図とカメラ位置から決めます。" : "主人公を正面向きにします。背景は従来の自分の部屋ルールに従います。",
+      "後ろ姿": showRoomCamera ? "後ろ姿を指定します。背景配置は参照図とカメラ位置から決めます。" : "主人公を後ろ姿にします。背景は従来の自分の部屋ルールに従います。"
     };
     sideViewDirectionHint.textContent = directionHints[sideViewDirectionSelect.value] || directionHints["なし"];
   }
@@ -2415,7 +2448,7 @@ function updateModeUi() {
       "画面内に入る範囲だけ参照": "指定ショットに入る範囲だけ使います。背景を入れるためにカメラを引きません。",
       "接触家具・作業面だけ参照": "机・椅子・PC・小物など、人物が接するものの位置とサイズだけ使います。",
       "小物・道具だけ参照": "道具や持ち物だけを使い、部屋や空間全体は再現しません。",
-      "配置図:位置関係だけ参照": "アイソメ図や平面図の位置関係だけを使い、最終画像は選択したカメラビューに変換します。必要に応じて作業席固定も選べます。",
+      "配置図:位置関係だけ参照": "アイソメ図や平面図で配置を固定し、指定したカメラ位置から見える範囲だけ描きます。自分の部屋では作業席を自動固定します。",
       "空間の前後関係だけ参照": "前景・中景・背景の順番だけを使います。"
     };
     backgroundReferenceUsageHint.textContent = usageHints[usage] || "背景参照を有にしたとき、添付画像をどの範囲で使うかを選びます。";
@@ -2487,7 +2520,13 @@ form.addEventListener("input", () => {
   generatePrompt();
 });
 
-form.addEventListener("change", () => {
+form.addEventListener("change", (event) => {
+  if (event.target?.name === "backgroundReference"
+      && event.target.value === "yes"
+      && form.querySelector('input[name="generationMode"]:checked')?.value === "myRoom"
+      && backgroundReferenceUsageSelect) {
+    backgroundReferenceUsageSelect.value = "配置図:位置関係だけ参照";
+  }
   updateAspectDescription();
   updateModeUi();
   generatePrompt();
