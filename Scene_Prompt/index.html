@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Nunito:wght@300;400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2026-06-29-07">
+  <link rel="stylesheet" href="style.css?v=2026-11-18-tabs-02">
 
   <style>
 
@@ -139,10 +139,10 @@
       <div>
         <p class="eyebrow">ORANGEMANIA TOOL</p>
         <h1>Scene Prompt</h1>
-        <p class="version-label">2026-06-29-07</p>
+        <p class="version-label">2026-11-18-02</p>
       </div>
       <p class="lead">
-        人物＋背景、自分の部屋、人物のみ、背景のみを切り替えながら、カメラワーク、構図、空間の前後関係を選び、ショット・向き・アスペクト比の矛盾を確認しながら画像生成プロンプトを作れます。
+        自分の部屋専用タブと、人物＋背景・人物・背景の汎用タブを切り替えながら、カメラワーク、構図、空間の前後関係を選び、ショット・向き・アスペクト比の矛盾を確認しながら画像生成プロンプトを作れます。
       </p>
     </header>
 
@@ -156,25 +156,26 @@
         <form id="promptForm">
           <div class="field-card mode-card">
             <label>生成対象</label>
-            <div class="segmented-control mode-control" role="radiogroup" aria-label="生成対象">
-              <label>
-                <input type="radio" name="generationMode" value="personBackground" checked>
-                <span>人物＋背景</span>
-              </label>
-              <label>
-                <input type="radio" name="generationMode" value="myRoom">
+            <div class="mode-tabs" role="radiogroup" aria-label="生成対象">
+              <label class="mode-tab mode-tab-room">
+                <input type="radio" name="generationMode" value="myRoom" checked>
                 <span>自分の部屋</span>
               </label>
-              <label>
+              <span class="mode-tab-divider" aria-hidden="true"></span>
+              <label class="mode-tab">
+                <input type="radio" name="generationMode" value="personBackground">
+                <span>人物＋背景</span>
+              </label>
+              <label class="mode-tab">
                 <input type="radio" name="generationMode" value="person">
                 <span>人物</span>
               </label>
-              <label>
+              <label class="mode-tab">
                 <input type="radio" name="generationMode" value="background">
                 <span>背景</span>
               </label>
             </div>
-            <p class="hint" id="myRoomHint" style="display:none;margin-top:8px;color:var(--accent-deep);font-size:13px;">主人公の向きを選ぶと、向きに応じた背景指定が自動で追加されます。平面図・アイソメ図を添付して使う場合は「背景参照：有」にして使い方を選んでください。</p>
+            <p class="hint" id="myRoomHint" style="margin-top:8px;color:var(--accent-deep);font-size:13px;">自分の部屋は専用ルールを使います。配置図を添付する場合は「背景参照：有」を選び、カメラ位置と必要なら画面左右を指定してください。</p>
           </div>
 
           <div class="field-card subject-card" data-person-field>
@@ -226,6 +227,9 @@
               <label class="sub-label" for="roomCameraPosition">カメラ位置（配置図基準）</label>
               <select id="roomCameraPosition" name="roomCameraPosition"></select>
               <p class="hint">部屋のどこから撮影するかを指定します。人物の向きとは別です。</p>
+              <label class="sub-label" for="roomScreenSides">画面の左右関係（任意・優先指定）</label>
+              <textarea id="roomScreenSides" name="roomScreenSides" rows="2" class="prompt-input" placeholder="例：画面左＝本棚、中央＝壁、画面右＝ドア"></textarea>
+              <p class="hint">配置図から左右が反転しやすい場合のみ入力。入力がなければ配置図とカメラ位置に従います。</p>
             </div>
             <div class="side-view-direction" id="sideViewDirectionWrap" hidden>
               <label class="sub-label" for="sideViewDirection">サイドビュー方向</label>
@@ -400,6 +404,6 @@
     </div>
   </main>
 
-  <script src="script.js?v=2026-11-17-camera"></script>
+  <script src="script.js?v=2026-11-18-tabs-02"></script>
 </body>
 </html>
