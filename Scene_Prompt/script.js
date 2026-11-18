@@ -1334,7 +1334,7 @@ function getConsistencyLockEnglish(data) {
 function collectConsistencyItems(data) {
   const items = [];
   const generationMode = getGenerationMode(data);
-  const isMyRoom = generationMode === "myRoom";
+  const isMyRoom = isMyRoomMode(data);
   const shot = data.get("shot");
   const aspect = getAspect();
   const direction = data.get("direction");
@@ -1361,6 +1361,10 @@ function collectConsistencyItems(data) {
 
     if (shouldUseFixedRoomWorkSeat(data)) {
       items.push({ level: "warn", text: "作業席固定：参照配置図上の机・椅子・家具と壁の位置を維持します。背後背景はカメラ位置から決めます。" });
+    }
+    if (isMyRoom && hasActiveLayoutReference(data) &&
+        (!data.get("roomCameraPosition") || data.get("roomCameraPosition") === "自動（指定なし）")) {
+      items.push({ level: "warn", text: "配置図使用時は「カメラ位置（配置図基準）」の指定をおすすめします。未指定では背景の左右が安定しない場合があります。" });
     }
 
     const selectedSideViewDirection = getSideViewDirection(data);
