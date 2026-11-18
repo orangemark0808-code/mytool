@@ -733,3 +733,33 @@ textarea:focus {
   color: #6f665d;
   cursor: not-allowed;
 }
+
+/* 2026-11-18: 独立した「自分の部屋」と汎用モードのタブ */
+.mode-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 12px;
+  min-width: 0;
+}
+.mode-tabs .mode-tab { display: flex; flex: 1 1 0; min-width: 0; cursor: pointer; }
+.mode-tabs .mode-tab-room { flex: 1.28 1 0; }
+.mode-tabs .mode-tab input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.mode-tabs .mode-tab span {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; min-height: 43px; padding: 8px 3px; border-radius: 9px;
+  font-size: 14px; font-weight: 700; text-align: center; white-space: nowrap;
+  color: var(--text); transition: background .15s ease;
+}
+.mode-tabs .mode-tab input:checked + span { background: var(--accent); color: white; }
+.mode-tabs .mode-tab input:focus-visible + span { outline: 3px solid var(--accent-deep); outline-offset: -2px; }
+.mode-tabs .mode-tab-divider { width: 1px; align-self: stretch; flex: 0 0 1px; background: var(--border); margin: 5px 5px; }
+#roomCameraPositionWrap textarea { width: 100%; box-sizing: border-box; min-height: 66px; resize: vertical; }
+@media (max-width: 620px) {
+  .mode-tabs { gap: 1px; padding: 3px; }
+  .mode-tabs .mode-tab span { font-size: clamp(10px, 3vw, 13px); padding: 7px 1px; }
+  .mode-tabs .mode-tab-divider { margin: 5px 2px; }
+}
