@@ -260,6 +260,7 @@ const workSeatLockSelect = document.querySelector("#workSeatLock");
 const workSeatLockHint = document.querySelector("#workSeatLockHint");
 const roomCameraPositionWrap = document.querySelector("#roomCameraPositionWrap");
 const roomCameraPositionSelect = document.querySelector("#roomCameraPosition");
+const roomScreenSidesInput = document.querySelector("#roomScreenSides");
 const sideViewDirectionWrap = document.querySelector("#sideViewDirectionWrap");
 const sideViewDirectionSelect = document.querySelector("#sideViewDirection");
 const sideViewDirectionHint = document.querySelector("#sideViewDirectionHint");
@@ -451,34 +452,34 @@ function hasActiveLayoutReference(data) {
     && getBackgroundReferenceUsage(data) === "配置図:位置関係だけ参照";
 }
 
-function getLayoutFacingJapanese(data) {
-  if (!hasActiveLayoutReference(data)) return "";
-  const direction = getSideViewDirection(data);
-  const phrases = {
-    "右向き横顔": "人物は画面右向きの横顔にする。",
-    "左向き横顔": "人物は画面左向きの横顔にする。",
-    "正面": "人物の顔と体を正面向きにする。",
-    "後ろ姿": "人物は背中が見える向きにする。"
-  };
-  return phrases[direction]
-    ? ["【人物の向き（背景配置とは独立）】", phrases[direction],
-       "この指定から壁・家具の位置を決めない。背景は参照配置図とカメラ位置を優先する。"].join("\n")
-    : "";
-}
+// 配置図参照では、人物の向きは共通の direction フィールドだけで指定する。
+// 旧 sideViewDirection による重複した向き指定を出力しない。
+function getLayoutFacingJapanese(data) { return ""; }
+function getLayoutFacingEnglish(data) { return ""; }
 
-function getLayoutFacingEnglish(data) {
-  if (!hasActiveLayoutReference(data)) return "";
-  const phrases = {
-    "右向き横顔": "The character faces right in profile.",
-    "左向き横顔": "The character faces left in profile.",
-    "正面": "The character faces the camera.",
-    "後ろ姿": "The character is seen from behind."
-  };
-  const line = phrases[getSideViewDirection(data)];
-  return line
-    ? ["Character facing (independent of background layout):", line,
-       "Do not infer wall or furniture placement from facing; derive it from the referenced layout and camera position."].join("\n")
-    : "";
+function getRoomScreenSidesJapanese(data) {
+  if (!isMyRoomMode(data) || !hasActiveLayoutReference(data)) return "";
+  const sides = String(data.get("roomScreenSides") || "").trim();
+  if (!sides) return "";
+  return compactJoin([
+    "【カメラから見た画面左右・最優先】",
+    "配置図と撮影方向を基準とした画面左右の指定: " + stripTrailingPunctuation(sides) + "。",
+    "これは画面上の左右であり、配置図の紙面上の左右ではない。左右反転・家具移動は禁止する。",
+    "人物の向きが変化しても壁・家具の画面上の左右をそれに連動して反転させない。",
+    "指定が構図や上下角度と矛盾するときも、空間内の左右・壁の位置関係は維持し、描画範囲で調整する。"
+  ], "\n");
+}
+function getRoomScreenSidesEnglish(data) {
+  if (!isMyRoomMode(data) || !hasActiveLayoutReference(data)) return "";
+  const sides = String(data.get("roomScreenSides") || "").trim();
+  if (!sides) return "";
+  return compactJoin([
+    "Camera-view screen left/right — highest priority:",
+    "The user-specified on-screen positions (Japanese): " + stripTrailingPunctuation(sides) + ".",
+    "Interpret these as the image's left and right, NOT the floor-plan page's left and right.",
+    "Never mirror the scene or move furniture to match character facing. Keep spatial relations when changing character orientation.",
+    "If framing conflicts, crop background instead of altering the established left/right spatial arrangement."
+  ], "\n");
 }
 
 function getRoomCameraPositionJapanese(data) {
@@ -1302,7 +1303,9 @@ function getConsistencyLockJapanese(data) {
 
   return compactJoin([
     "【矛盾回避・優先順位】",
-    "指定が矛盾する場合は、映す範囲（ショット）→表情・動作→カメラビュー→上下の角度→体の向き→顔・視線の向き→背景の見せ方、の順で優先する。",
+    isMyRoomMode(data) && hasActiveLayoutReference(data)
+      ? "配置図上の壁・家具の位置関係、カメラ位置、画面左右は固定条件とする。映す範囲（ショット）→表情・動作→カメラビュー→上下の角度→人物の向き→顔・視線の順に調整するが、背景の位置関係は変更しない。"
+      : "指定が矛盾する場合は、映す範囲（ショット）→表情・動作→カメラビュー→上下の角度→体の向き→顔・視線の向き→背景の見せ方、の順で優先する。",
     "下位の指定は、上位の指定を壊さない範囲で自然に補正する。",
     getAspectPriorityLockJapanese(data),
     getShotLockJapanese(data),
@@ -1317,7 +1320,9 @@ function getConsistencyLockEnglish(data) {
 
   return compactJoin([
     "Conflict-avoidance priority:",
-    "If any instructions conflict, prioritize them in this order: shot size, expression/action, camera view, vertical camera angle, body direction, face/gaze direction, then background visibility.",
+    isMyRoomMode(data) && hasActiveLayoutReference(data)
+      ? "Treat the reference layout's walls and furniture, camera location, and on-screen left/right as fixed spatial constraints. Adjust framing, expression/action, camera view, elevation, character facing, and gaze without rearranging those spatial constraints."
+      : "If any instructions conflict, prioritize them in this order: shot size, expression/action, camera view, vertical camera angle, body direction, face/gaze direction, then background visibility.",
     "Lower-priority instructions should be adjusted naturally without breaking higher-priority instructions.",
     getAspectPriorityLockEnglish(data),
     getShotLockEnglish(data),
@@ -1329,7 +1334,7 @@ function getConsistencyLockEnglish(data) {
 function collectConsistencyItems(data) {
   const items = [];
   const generationMode = getGenerationMode(data);
-  const isMyRoom = generationMode === "myRoom";
+  const isMyRoom = isMyRoomMode(data);
   const shot = data.get("shot");
   const aspect = getAspect();
   const direction = data.get("direction");
@@ -1356,6 +1361,10 @@ function collectConsistencyItems(data) {
 
     if (shouldUseFixedRoomWorkSeat(data)) {
       items.push({ level: "warn", text: "作業席固定：参照配置図上の机・椅子・家具と壁の位置を維持します。背後背景はカメラ位置から決めます。" });
+    }
+    if (isMyRoom && hasActiveLayoutReference(data) &&
+        (!data.get("roomCameraPosition") || data.get("roomCameraPosition") === "自動（指定なし）")) {
+      items.push({ level: "warn", text: "配置図使用時は「カメラ位置（配置図基準）」の指定をおすすめします。未指定では背景の左右が安定しない場合があります。" });
     }
 
     const selectedSideViewDirection = getSideViewDirection(data);
@@ -2092,6 +2101,8 @@ function getPersonBackgroundPrompt(data) {
   const jpLayoutFacing = getLayoutFacingJapanese(data);
   const enLayoutFacing = getLayoutFacingEnglish(data);
   const jpRoomCameraPosition = getRoomCameraPositionJapanese(data);
+  const enRoomScreenSides = getRoomScreenSidesEnglish(data);
+  const jpRoomScreenSides = getRoomScreenSidesJapanese(data);
   const enRoomCameraPosition = getRoomCameraPositionEnglish(data);
   const jpFixedRoomWorkSeat = getFixedRoomWorkSeatJapanese(data);
   const enFixedRoomWorkSeat = getFixedRoomWorkSeatEnglish(data);
@@ -2124,6 +2135,7 @@ function getPersonBackgroundPrompt(data) {
     jpSpatialRelationLock,
     jpFixedRoomWorkSeat,
     jpRoomCameraPosition,
+    jpRoomScreenSides,
     jpLayoutFacing,
     jpMyRoomSideView,
     jpBackdropAnchor,
@@ -2182,6 +2194,7 @@ function getPersonBackgroundPrompt(data) {
     enSpatialRelationLock,
     enFixedRoomWorkSeat,
     enRoomCameraPosition,
+    enRoomScreenSides,
     enLayoutFacing,
     enMyRoomSideView,
     enBackdropAnchor,
@@ -2379,7 +2392,7 @@ function updateModeUi() {
 
   if (workSeatLockHint && workSeatLockSelect) {
     if (isMyRoom) {
-      workSeatLockHint.textContent = "自分の部屋モードでは作業席固定が自動でONになります。";
+      workSeatLockHint.textContent = "自分の部屋では配置図にある机・椅子の位置関係を固定します（配置図を使わない場合は従来の作業席ルール）。";
     } else {
       workSeatLockHint.textContent = workSeatLockSelect.value === "この部屋の作業席を固定する"
         ? "この部屋の作業席と配置図上の家具の位置関係を固定します。"
@@ -2393,16 +2406,24 @@ function updateModeUi() {
     roomCameraPositionWrap.hidden = !showRoomCamera;
     roomCameraPositionWrap.classList.toggle("is-mode-disabled", !showRoomCamera);
     roomCameraPositionSelect.disabled = !showRoomCamera;
+    if (roomScreenSidesInput) {
+      roomScreenSidesInput.closest("label")?.removeAttribute("data-unused");
+      roomScreenSidesInput.disabled = !showRoomCamera || !isMyRoom;
+      roomScreenSidesInput.hidden = !isMyRoom;
+      const screenSidesLabel = roomScreenSidesInput.previousElementSibling;
+      const screenSidesHint = roomScreenSidesInput.nextElementSibling;
+      if (screenSidesLabel) screenSidesLabel.hidden = !isMyRoom;
+      if (screenSidesHint) screenSidesHint.hidden = !isMyRoom;
+    }
   }
 
   const currentSideViewDirection = sideViewDirectionSelect?.value || "なし";
 
   // myRoom時はsideViewDirectionを常に表示。personBackground時は従来通り
-  const shouldShowSideViewDirection = isMyRoom
-    || (isPersonBackgroundMode && currentSideViewDirection !== "なし");
+  const shouldShowSideViewDirection = (isMyRoom && !showRoomCamera)
+    || (generationMode === "personBackground" && currentSideViewDirection !== "なし");
 
-  // backdropAnchor（背景に何を見せるか）は廃止。常に非表示。
-  // myRoomでは向き（正面・後ろ姿等）で背景が自動決定される。
+  // 旧 backdropAnchor は廃止。配置図参照時の背景はカメラ位置・左右指定で決める。
   if (backdropAnchorWrap) {
     backdropAnchorWrap.hidden = true;
     backdropAnchorWrap.classList.add("is-mode-disabled");
@@ -2521,10 +2542,11 @@ form.addEventListener("input", () => {
 });
 
 form.addEventListener("change", (event) => {
-  if (event.target?.name === "backgroundReference"
-      && event.target.value === "yes"
+  if (backgroundReferenceUsageSelect
       && form.querySelector('input[name="generationMode"]:checked')?.value === "myRoom"
-      && backgroundReferenceUsageSelect) {
+      && ((event.target?.name === "backgroundReference" && event.target.value === "yes")
+          || (event.target?.name === "generationMode" && event.target.value === "myRoom"
+              && form.querySelector('input[name="backgroundReference"]:checked')?.value === "yes"))) {
     backgroundReferenceUsageSelect.value = "配置図:位置関係だけ参照";
   }
   updateAspectDescription();
@@ -2548,6 +2570,7 @@ document.querySelector("#resetButton").addEventListener("click", () => {
   const workSeatLockInput = document.querySelector("#workSeatLock");
   if (workSeatLockInput) workSeatLockInput.value = "なし";
   if (roomCameraPositionSelect) roomCameraPositionSelect.value = "自動（指定なし）";
+  if (roomScreenSidesInput) roomScreenSidesInput.value = "";
   const sideViewDirectionInput = document.querySelector("#sideViewDirection");
   if (sideViewDirectionInput) sideViewDirectionInput.value = "なし";
   resetPersonBackgroundScaleDefaults();
