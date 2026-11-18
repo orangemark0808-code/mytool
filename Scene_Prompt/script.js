@@ -1303,7 +1303,9 @@ function getConsistencyLockJapanese(data) {
 
   return compactJoin([
     "【矛盾回避・優先順位】",
-    "指定が矛盾する場合は、映す範囲（ショット）→表情・動作→カメラビュー→上下の角度→体の向き→顔・視線の向き→背景の見せ方、の順で優先する。",
+    isMyRoomMode(data) && hasActiveLayoutReference(data)
+      ? "配置図上の壁・家具の位置関係、カメラ位置、画面左右は固定条件とする。映す範囲（ショット）→表情・動作→カメラビュー→上下の角度→人物の向き→顔・視線の順に調整するが、背景の位置関係は変更しない。"
+      : "指定が矛盾する場合は、映す範囲（ショット）→表情・動作→カメラビュー→上下の角度→体の向き→顔・視線の向き→背景の見せ方、の順で優先する。",
     "下位の指定は、上位の指定を壊さない範囲で自然に補正する。",
     getAspectPriorityLockJapanese(data),
     getShotLockJapanese(data),
@@ -1318,7 +1320,9 @@ function getConsistencyLockEnglish(data) {
 
   return compactJoin([
     "Conflict-avoidance priority:",
-    "If any instructions conflict, prioritize them in this order: shot size, expression/action, camera view, vertical camera angle, body direction, face/gaze direction, then background visibility.",
+    isMyRoomMode(data) && hasActiveLayoutReference(data)
+      ? "Treat the reference layout's walls and furniture, camera location, and on-screen left/right as fixed spatial constraints. Adjust framing, expression/action, camera view, elevation, character facing, and gaze without rearranging those spatial constraints."
+      : "If any instructions conflict, prioritize them in this order: shot size, expression/action, camera view, vertical camera angle, body direction, face/gaze direction, then background visibility.",
     "Lower-priority instructions should be adjusted naturally without breaking higher-priority instructions.",
     getAspectPriorityLockEnglish(data),
     getShotLockEnglish(data),
@@ -2384,7 +2388,7 @@ function updateModeUi() {
 
   if (workSeatLockHint && workSeatLockSelect) {
     if (isMyRoom) {
-      workSeatLockHint.textContent = "自分の部屋モードでは作業席固定が自動でONになります。";
+      workSeatLockHint.textContent = "自分の部屋では配置図にある机・椅子の位置関係を固定します（配置図を使わない場合は従来の作業席ルール）。";
     } else {
       workSeatLockHint.textContent = workSeatLockSelect.value === "この部屋の作業席を固定する"
         ? "この部屋の作業席と配置図上の家具の位置関係を固定します。"
@@ -2415,8 +2419,7 @@ function updateModeUi() {
   const shouldShowSideViewDirection = (isMyRoom && !showRoomCamera)
     || (generationMode === "personBackground" && currentSideViewDirection !== "なし");
 
-  // backdropAnchor（背景に何を見せるか）は廃止。常に非表示。
-  // myRoomでは向き（正面・後ろ姿等）で背景が自動決定される。
+  // 旧 backdropAnchor は廃止。配置図参照時の背景はカメラ位置・左右指定で決める。
   if (backdropAnchorWrap) {
     backdropAnchorWrap.hidden = true;
     backdropAnchorWrap.classList.add("is-mode-disabled");
@@ -2535,10 +2538,11 @@ form.addEventListener("input", () => {
 });
 
 form.addEventListener("change", (event) => {
-  if (event.target?.name === "backgroundReference"
-      && event.target.value === "yes"
+  if (backgroundReferenceUsageSelect
       && form.querySelector('input[name="generationMode"]:checked')?.value === "myRoom"
-      && backgroundReferenceUsageSelect) {
+      && ((event.target?.name === "backgroundReference" && event.target.value === "yes")
+          || (event.target?.name === "generationMode" && event.target.value === "myRoom"
+              && form.querySelector('input[name="backgroundReference"]:checked')?.value === "yes"))) {
     backgroundReferenceUsageSelect.value = "配置図:位置関係だけ参照";
   }
   updateAspectDescription();
@@ -2562,6 +2566,7 @@ document.querySelector("#resetButton").addEventListener("click", () => {
   const workSeatLockInput = document.querySelector("#workSeatLock");
   if (workSeatLockInput) workSeatLockInput.value = "なし";
   if (roomCameraPositionSelect) roomCameraPositionSelect.value = "自動（指定なし）";
+  if (roomScreenSidesInput) roomScreenSidesInput.value = "";
   const sideViewDirectionInput = document.querySelector("#sideViewDirection");
   if (sideViewDirectionInput) sideViewDirectionInput.value = "なし";
   resetPersonBackgroundScaleDefaults();
