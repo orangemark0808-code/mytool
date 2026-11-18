@@ -766,3 +766,53 @@ textarea:focus {
 
 /* タブを入力エリア全体に広げる（既存の２列フォーム配置は維持） */
 .mode-card { grid-column: 1 / -1; }
+
+/* 2026-11-18: p_builder のタイポグラフィ基準（14px UI / 13px補助 / 15px見出し） */
+body { font-size: 14px; line-height: 1.6; }
+.app-shell { padding-top: 28px; padding-bottom: 32px; }
+.app-header { margin-bottom: 16px; gap: 6px; }
+.app-header > div { gap: 14px; }
+.app-header .eyebrow { margin-bottom: -8px; }
+h1 { font-size: 23px; }
+h2 { font-size: 18px; }
+h3 { font-size: 15px; }
+.lead { font-size: 13px; line-height: 1.65; }
+.eyebrow, .version-label { font-size: 11px; }
+.panel { padding: 21px 23px; }
+.panel-heading { margin-bottom: 14px; }
+.workspace { gap: 16px; }
+form, .advanced-grid { gap: 11px; }
+.field-card { padding: 13px 15px; gap: 6px; }
+.mode-card { padding: 10px 15px; }
+.field-grid .field-card, .advanced-grid .field-card, .field-card-wide {
+  min-height: 52px; gap: 9px 14px;
+  grid-template-columns: minmax(120px, 190px) minmax(0, 1fr);
+}
+label { font-size: 13px; }
+.sub-label, .hint { font-size: 12px; }
+.reference-upload { gap: 6px; margin-top: 5px; padding-top: 9px; }
+input, select, textarea { font-size: 14px; }
+input, select { min-height: 39px; padding: 7px 10px; }
+.prompt-input { font-size: 13px; }
+.subject-card .prompt-input, .background-card .prompt-input { min-height: 66px; max-height: 66px; }
+.segmented-control span { min-height: 32px; padding: 5px 7px; font-size: 13px; line-height: 20px; }
+.mode-tabs .mode-tab span { min-height: 37px; padding: 6px 3px; font-size: 13px; }
+.advanced-settings summary { min-height: 40px; padding: 7px 13px; font-size: 13px; }
+.button, .copy-button { min-height: 38px; font-size: 13px; }
+.button { padding: 8px 13px; }
+.copy-button { padding: 7px 11px; }
+.prompt-card { padding: 14px; }
+.prompt-header { margin-bottom: 9px; }
+.prompt-card textarea { font-size: 13px; line-height: 1.7; padding: 11px; }
+.consistency-card ul { font-size: 12px; }
+@media (max-width: 620px) {
+  .app-shell { padding: 18px 0; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 17px; }
+  .panel { padding: 15px; }
+  .field-card { padding: 12px; }
+  .field-grid .field-card, .advanced-grid .field-card, .field-card-wide {
+    grid-template-columns: 1fr;
+  }
+  .mode-tabs .mode-tab span { font-size: 12px; min-height: 36px; }
+}
