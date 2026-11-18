@@ -529,8 +529,14 @@ function shouldUseFixedRoomWorkSeat(data) {
 function getFixedRoomWorkSeatJapanese(data) {
   if (!shouldUseFixedRoomWorkSeat(data)) return "";
   return compactJoin([
+    "【自分の部屋・2枚のソース画像の役割】",
+    "ソースの「02_配置補助シート：平面図」を、部屋の間取り、壁・窓・ドア・机・椅子・ベッド・棚・収納家具の位置関係を決める最優先資料とする。",
+    "ソースの「01_背景全体シート：アイソメ図」を、窓の横幅・高さ・形・壁面に対する比率、家具の外観・高さ・スケール感を決める補助資料とする。",
+    "特に窓はアイソメ図の横幅の広い二枚建て引き違い窓を基準にし、平面図だけから小さな窓を推測して描かない。",
+    "配置については平面図を優先し、形状や寸法感についてはアイソメ図を優先する。資料間で見え方が違っても家具や窓の位置を移動しない。",
+    "最終画像では2枚の俯瞰・アイソメ視点を模倣せず、指定カメラ位置から見える範囲だけを描く。見えない窓を無理に画面内へ入れない。",
     "【自分の部屋・配置図に基づく作業席固定】",
-    "添付の配置図を家具・壁・窓と作業席の位置関係の基準とし、最終画像のカメラアングルとしては使わない。",
+    "平面図を家具・壁・窓と作業席の位置関係の基準とし、最終画像のカメラアングルとしては使わない。",
     "机と椅子の位置・向き・間隔は配置図のまま維持する。人物は配置図にある作業席に座らせる。",
     "窓・ベッド・棚・収納家具などがどの壁にあるかは配置図から読み取る。存在しないドアや家具は補わない。",
     "人物の背後は、配置図上のカメラ位置から見て実際に重なる壁・家具だけを描く。",
@@ -541,8 +547,14 @@ function getFixedRoomWorkSeatJapanese(data) {
 function getFixedRoomWorkSeatEnglish(data) {
   if (!shouldUseFixedRoomWorkSeat(data)) return "";
   return compactJoin([
+    "My room — roles of the two source images:",
+    "Use the source image named '02_配置補助シート：平面図' as the primary authority for the room layout and positions of walls, windows, door, desk, chair, bed, shelves, and storage.",
+    "Use '01_背景全体シート：アイソメ図' as the supplemental authority for the window's width, height, shape, and proportions relative to the wall, and for furniture appearance, height, and scale.",
+    "In particular, preserve the wide, two-panel sliding window shown in the isometric reference; do not infer a small window from the floor plan alone.",
+    "For positioning, prioritize the floor plan. For appearance and proportions, prioritize the isometric reference. Never move the windows or furniture to reconcile differences in viewpoint.",
+    "Do not copy either reference image's overhead or isometric camera angle. Render only what is visible from the selected camera position; do not force an out-of-frame window into the image.",
     "My-room work-seat lock based on the supplied layout:",
-    "Use the attached layout as the authority for wall, window, furniture, desk and chair positions, not as the final camera angle.",
+    "Use the floor plan as the authority for wall, window, furniture, desk and chair positions, not as the final camera angle.",
     "Keep the desk and chair positions, orientation and spacing as shown; seat the character at that exact work seat.",
     "Derive which wall contains the window, bed, shelves and storage from the reference; do not invent a door or furniture that is not visible.",
     "Show only walls and furniture actually behind the person from the selected camera position.",
