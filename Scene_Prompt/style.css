@@ -763,3 +763,6 @@ textarea:focus {
   .mode-tabs .mode-tab span { font-size: clamp(10px, 3vw, 13px); padding: 7px 1px; }
   .mode-tabs .mode-tab-divider { margin: 5px 2px; }
 }
+
+/* タブを入力エリア全体に広げる（既存の２列フォーム配置は維持） */
+.mode-card { grid-column: 1 / -1; }
