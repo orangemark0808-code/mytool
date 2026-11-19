@@ -82,7 +82,6 @@ jobs:
           cp -R daily-notice/dist/. dist/daily-notice/
           mkdir -p dist/PROMPT_STOCK
           mkdir -p dist/Scene_Prompt
-          mkdir -p dist/horoscope
           mkdir -p dist/netakiroku
           mkdir -p dist/MITAMONO
           mkdir -p dist/iroiro
@@ -98,7 +97,6 @@ jobs:
           cp "Scene_Prompt/style.css" "dist/Scene_Prompt/style.css"
           cp "Scene_Prompt/script.js" "dist/Scene_Prompt/script.js"
           cp "Scene_Prompt/favicon.svg" "dist/Scene_Prompt/favicon.svg"
-          cp -R "horoscope/." "dist/horoscope/"
           cp "netakiroku/index.html" "dist/netakiroku/index.html"
           cp "netakiroku/app.js" "dist/netakiroku/app.js"
           cp "netakiroku/styles.css" "dist/netakiroku/styles.css"
